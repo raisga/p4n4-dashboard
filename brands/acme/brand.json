@@ -1,0 +1,23 @@
+{
+  "id": "acme",
+  "appName": "Acme Edge Console",
+  "wordmark": { "text": "acme", "suffix": ".edge" },
+  "logo": "logo.png",
+  "platform": "acme",
+  "tagline": "Example white-label brand — replace or delete.",
+  "fonts": { "display": "Inter", "mono": "IBM Plex Mono" },
+  "colors": {
+    "light": { "accent": "#0F766E", "accent2": "#115E59", "onAccent": "#FFFFFF" },
+    "dark": { "accent": "#2DD4BF", "accent2": "#14B8A6", "onAccent": "#042F2E", "bg": "#07110F", "bg2": "#0C1816", "bg3": "#12211E", "border": "#16302B", "border2": "#1F3D37", "err": "#F87171" }
+  },
+  "tabs": ["services", "edge", "agent", "grafana"],
+  "links": [{ "label": "Support", "url": "https://example.com/support" }],
+  "defaults": { "host": "192.168.1.50", "themeMode": "light", "grafanaPath": "/d/edge/overview" },
+  "native": {
+    "displayName": "Acme Edge",
+    "applicationId": "com.example.acme.edge",
+    "bundleId": "com.example.acme.edge",
+    "company": "Acme Corp",
+    "localNetworkUsage": "Connects to your Acme edge devices on the local network."
+  }
+}

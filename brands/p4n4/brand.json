@@ -1,0 +1,22 @@
+{
+  "id": "p4n4",
+  "appName": "p4n4 dashboard",
+  "wordmark": { "text": "p4n4", "suffix": ".dashboard" },
+  "platform": "p4n4",
+  "tagline": "raisga — open source platform",
+  "fonts": { "display": "Plus Jakarta Sans", "mono": "JetBrains Mono" },
+  "colors": { "light": {}, "dark": {} },
+  "tabs": ["services", "edge", "agent", "grafana", "video"],
+  "links": [
+    { "label": "GitHub", "url": "https://github.com/raisga/p4n4" },
+    { "label": "p4n4.com", "url": "https://p4n4.com" }
+  ],
+  "defaults": { "host": "localhost" },
+  "native": {
+    "displayName": "p4n4 dashboard",
+    "applicationId": "com.raisga.p4n4_dashboard",
+    "bundleId": "com.raisga.p4n4Dashboard",
+    "company": "raisga",
+    "localNetworkUsage": "Connects to p4n4 services (Grafana, Ollama, cameras) on your local network."
+  }
+}
