@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api/fleet.dart';
+import 'brand.dart';
 
 enum AgentBackend { ollama, letta }
 
@@ -89,6 +94,26 @@ class AppSettings extends ChangeNotifier {
   // Video feed: MJPEG stream or a JPEG snapshot URL.
   String get videoUrl => _str('videoUrl', '');
   set videoUrl(String v) => _set('videoUrl', v.trim());
+
+  /// Brand tabs shown in the client view, after Home. Set by admins.
+  List<DashTab> get clientTabs {
+    final names = _str('clientTabs', 'agent,grafana,video').split(',');
+    return [
+      for (final t in DashTab.values)
+        if (names.contains(t.name)) t,
+    ];
+  }
+
+  set clientTabs(List<DashTab> v) => _set('clientTabs', v.map((t) => t.name).join(','));
+
+  /// Deployments listed in the admin Clients tab. Starts with the current host.
+  List<Deployment> get deployments {
+    final raw = _prefs.getString('deployments');
+    if (raw == null) return [Deployment('Default', host)];
+    return [for (final d in jsonDecode(raw) as List) Deployment.fromJson((d as Map).cast())];
+  }
+
+  set deployments(List<Deployment> v) => _set('deployments', jsonEncode([for (final d in v) d.toJson()]));
 }
 
 /// Exposes [AppSettings] to the widget tree and rebuilds dependents on change.

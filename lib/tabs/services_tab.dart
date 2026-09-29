@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api/services.dart';
 import '../core/brand.dart';
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -183,6 +184,7 @@ class _ServicesTabState extends State<ServicesTab> {
               TagBadge('$n ${stack.suffix == 'api' ? 'endpoint' : 'service'}${n == 1 ? '' : 's'}'),
             ],
           ),
+          trailing: SessionScope.of(context).isAdmin && stack.suffix != 'api' ? const _StackControls() : null,
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -202,6 +204,38 @@ class _ServicesTabState extends State<ServicesTab> {
               ),
             );
           },
+        ),
+      ],
+    );
+  }
+}
+
+/// Start/restart/stop menu for a stack. The actions stay disabled until
+/// p4n4-api has state-changing stack endpoints; wire them up then.
+class _StackControls extends StatelessWidget {
+  const _StackControls();
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return PopupMenuButton<void>(
+      tooltip: 'Stack controls',
+      icon: Icon(Icons.more_vert, color: p4.muted),
+      color: p4.bg3,
+      itemBuilder: (_) => [
+        for (final (icon, label) in [
+          (Icons.play_arrow_outlined, 'Start'),
+          (Icons.restart_alt, 'Restart'),
+          (Icons.stop_outlined, 'Stop'),
+        ])
+          PopupMenuItem(
+            enabled: false,
+            child: Row(children: [Icon(icon, size: 18), const SizedBox(width: 12), Text(label)]),
+          ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          enabled: false,
+          child: Text('Needs stack control endpoints in the API', style: p4.mono(size: 10, spacing: 0)),
         ),
       ],
     );

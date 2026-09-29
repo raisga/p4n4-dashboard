@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -34,6 +35,8 @@ class _VideoTabState extends State<VideoTab> {
     final s = SettingsScope.of(context);
     final uri = Uri.tryParse(s.videoUrl);
     final valid = s.videoUrl.isNotEmpty && uri != null && uri.hasScheme && uri.host.isNotEmpty;
+    // Only admins see or change the source URL.
+    final admin = SessionScope.of(context).isAdmin;
 
     return Column(
       children: [
@@ -46,7 +49,11 @@ class _VideoTabState extends State<VideoTab> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  valid ? s.videoUrl : 'no source configured',
+                  switch ((valid, admin)) {
+                    (true, true) => s.videoUrl,
+                    (true, false) => 'live camera',
+                    _ => 'no source configured',
+                  },
                   overflow: TextOverflow.ellipsis,
                   style: p4.mono(),
                 ),
@@ -63,11 +70,12 @@ class _VideoTabState extends State<VideoTab> {
                   icon: const Icon(Icons.refresh, size: 18),
                 ),
               ],
-              IconButton(
-                tooltip: 'Change source',
-                onPressed: () => _editUrl(s),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-              ),
+              if (admin)
+                IconButton(
+                  tooltip: 'Change source',
+                  onPressed: () => _editUrl(s),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                ),
             ],
           ),
         ),
@@ -78,8 +86,10 @@ class _VideoTabState extends State<VideoTab> {
               : EmptyState(
                   icon: Icons.videocam_off_outlined,
                   title: 'No video source',
-                  message: 'Add the URL of an MJPEG stream or JPEG snapshot from your edge camera.',
-                  actions: [FilledButton(onPressed: () => _editUrl(s), child: const Text('SET SOURCE'))],
+                  message: admin
+                      ? 'Add the URL of an MJPEG stream or JPEG snapshot from your edge camera.'
+                      : 'No camera has been set up yet. Ask your administrator to add one.',
+                  actions: [if (admin) FilledButton(onPressed: () => _editUrl(s), child: const Text('SET SOURCE'))],
                 ),
         ),
       ],

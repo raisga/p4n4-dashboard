@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/agent_client.dart';
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -161,6 +162,7 @@ class _AgentTabState extends State<AgentTab> {
   Widget _toolbar(AppSettings s) {
     final opts = _options;
     final selected = _selected(s);
+    final admin = SessionScope.of(context).isAdmin;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Wrap(
@@ -168,30 +170,32 @@ class _AgentTabState extends State<AgentTab> {
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          SegmentedButton<AgentBackend>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-              shape: const RoundedRectangleBorder(),
-              selectedBackgroundColor: p4.accent,
-              selectedForegroundColor: p4.onAccent,
-              textStyle: p4.mono(size: 11, weight: FontWeight.w600),
-              side: BorderSide(color: p4.border2),
+          // Choosing the backend is admin configuration; clients chat with whatever is set.
+          if (admin)
+            SegmentedButton<AgentBackend>(
+              showSelectedIcon: false,
+              style: SegmentedButton.styleFrom(
+                shape: const RoundedRectangleBorder(),
+                selectedBackgroundColor: p4.accent,
+                selectedForegroundColor: p4.onAccent,
+                textStyle: p4.mono(size: 11, weight: FontWeight.w600),
+                side: BorderSide(color: p4.border2),
+              ),
+              segments: const [
+                ButtonSegment(
+                  value: AgentBackend.ollama,
+                  label: Text('OLLAMA'),
+                  icon: Icon(Icons.psychology_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: AgentBackend.letta,
+                  label: Text('LETTA'),
+                  icon: Icon(Icons.smart_toy_outlined, size: 16),
+                ),
+              ],
+              selected: {s.agentBackend},
+              onSelectionChanged: _busy ? null : (v) => s.agentBackend = v.first,
             ),
-            segments: const [
-              ButtonSegment(
-                value: AgentBackend.ollama,
-                label: Text('OLLAMA'),
-                icon: Icon(Icons.psychology_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: AgentBackend.letta,
-                label: Text('LETTA'),
-                icon: Icon(Icons.smart_toy_outlined, size: 16),
-              ),
-            ],
-            selected: {s.agentBackend},
-            onSelectionChanged: _busy ? null : (v) => s.agentBackend = v.first,
-          ),
           if (opts == null && _optionsError == null)
             SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
           else if (_optionsError != null)
@@ -236,6 +240,19 @@ class _AgentTabState extends State<AgentTab> {
 
   Widget _empty(AppSettings s) {
     final ollama = s.agentBackend == AgentBackend.ollama;
+    if (!SessionScope.of(context).isAdmin) {
+      final (icon, title, message) = switch ((_optionsError, _options)) {
+        (_?, _) => (Icons.cloud_off_outlined, 'Assistant unavailable', 'The assistant can\'t be reached right now.'),
+        (_, []) => (Icons.inbox_outlined, 'No assistant set up', 'Ask your administrator to set one up.'),
+        _ => (Icons.forum_outlined, 'Chat with your assistant', 'Ask about your devices, data or dashboards.'),
+      };
+      return EmptyState(
+        icon: icon,
+        title: title,
+        message: message,
+        actions: [if (_optionsError != null) OutlinedButton(onPressed: _loadOptions, child: const Text('RETRY'))],
+      );
+    }
     if (_optionsError != null) {
       return EmptyState(
         icon: Icons.cloud_off_outlined,

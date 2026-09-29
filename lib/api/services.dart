@@ -106,3 +106,39 @@ Future<bool> probeHttp(Uri uri) async {
     return false;
   }
 }
+
+/// Status of every HTTP catalog entry on one host.
+class ServiceReport {
+  const ServiceReport(this.up, {required this.viaApi});
+
+  /// `null` when p4n4-api answered but has no matching Compose service.
+  final Map<ServiceDef, bool?> up;
+
+  /// Whether the status came from p4n4-api rather than port probes.
+  final bool viaApi;
+
+  int get online => up.values.where((v) => v == true).length;
+  int get known => up.values.where((v) => v != null).length;
+
+  /// Online/known counts for one stack.
+  (int, int) of(StackDef stack) {
+    final vs = [
+      for (final d in stack.services)
+        if (up.containsKey(d)) up[d],
+    ].nonNulls;
+    return (vs.where((v) => v).length, vs.length);
+  }
+}
+
+/// Asks p4n4-api at [api] for status and falls back to probing each service's
+/// port, built by [urlFor], when the API is unreachable.
+Future<ServiceReport> checkServices(Uri api, Uri Function(ServiceDef) urlFor) async {
+  final defs = [for (final st in stacks) ...st.services.where((d) => !d.tcpOnly)];
+  try {
+    final status = await fetchComposeStatus(api);
+    return ServiceReport({for (final d in defs) d: statusFor(d, status)?.running}, viaApi: true);
+  } catch (_) {
+    final up = await Future.wait(defs.map((d) => probeHttp(urlFor(d))));
+    return ServiceReport(Map.fromIterables(defs, up), viaApi: false);
+  }
+}

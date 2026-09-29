@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -54,6 +55,7 @@ class _GrafanaTabState extends State<GrafanaTab> {
   @override
   Widget build(BuildContext context) {
     final uri = SettingsScope.of(context).grafanaUri;
+    final admin = SessionScope.of(context).isAdmin;
     final toolbar = Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
       color: p4.bg2,
@@ -62,7 +64,7 @@ class _GrafanaTabState extends State<GrafanaTab> {
           Icon(Icons.show_chart, color: p4.blue, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(uri.toString(), overflow: TextOverflow.ellipsis, style: p4.mono()),
+            child: Text(admin ? uri.toString() : 'dashboards', overflow: TextOverflow.ellipsis, style: p4.mono()),
           ),
           if (_controller != null) ...[
             IconButton(
@@ -109,8 +111,8 @@ class _GrafanaTabState extends State<GrafanaTab> {
             ),
             (_, final String err) => EmptyState(
               icon: Icons.cloud_off_outlined,
-              title: 'Grafana unreachable',
-              message: '$uri\n$err',
+              title: admin ? 'Grafana unreachable' : 'Dashboards unavailable',
+              message: admin ? '$uri\n$err' : 'Dashboards can\'t be loaded right now. Try again shortly.',
               actions: [OutlinedButton(onPressed: () => _controller!.loadRequest(uri), child: const Text('RETRY'))],
             ),
             (final c?, _) => WebViewWidget(controller: c),

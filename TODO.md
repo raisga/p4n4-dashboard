@@ -1,6 +1,6 @@
 # TODO
 
-_Last updated: 2026-09-28_
+_Last updated: 2026-09-29_
 
 ## Original scope
 
@@ -11,6 +11,7 @@ _Last updated: 2026-09-28_
 - [x] Tab for video feed
 - [x] Light/dark theme support (follows the system setting; can be set by hand)
 - [x] White-label support (`brands/`, `dart run tool/brand.dart apply <id>`)
+- [x] Admin and client views (role picked at sign-in; see README)
 
 ## Current status
 
@@ -23,6 +24,7 @@ _Last updated: 2026-09-28_
 | Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. There's no default source; the user enters a URL. |
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
 | White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
+| Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
 | Settings | ✅ Working | Host, API URL, metrics URL, Letta password, Grafana path/kiosk, video URL and theme, all persisted. |
 
 ## What was checked
@@ -30,9 +32,10 @@ _Last updated: 2026-09-28_
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze`: no issues.
-- `flutter test`: 18 tests pass.
+- `flutter test`: 25 tests pass.
   - Unit tests: metrics JSON parsing, mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
+  - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see.
   - Brand tests:
     - every folder in `brands/` parses;
     - color overrides apply per mode;
@@ -77,14 +80,17 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
   - The Linux window icon isn't set.
   - The binary name (`p4n4_dashboard`) and the Android Kotlin package don't change per brand.
   - The service catalog (names, ports, which services exist) is shared by all brands. Only the `p4n4` prefix is replaced.
-- **No authentication.** Nothing sends a JWT yet, because p4n4-api has no auth yet either.
+- **No authentication.** Nothing sends a JWT yet, because p4n4-api has no auth yet either. Anyone can pick the admin role on the sign-in screen, so the client view hides configuration but is not a security boundary.
+- **Clients tab assumes port 8000.** Each deployment's API is expected at `http://<host>:8000`; per-deployment API URLs aren't supported. **Connect** changes only the host, so a custom p4n4-api base URL in settings still points at the old API.
 
 ## Future work
 
 ### Needs p4n4-api changes
 - [ ] Implement `GET /api/v1/edge/metrics` (or pick an existing exporter and adapt `EdgeMetrics.fromJson`)
 - [ ] Route agent chat through the API's planned `/api/v1/agents/*` endpoints instead of calling Ollama and Letta directly
-- [ ] Add JWT auth (`/api/v1/auth/token`) once the API supports it, and store the token securely
+- [ ] Add JWT auth (`/api/v1/auth/token`) once the API supports it, store the token securely, and take the admin/client role from it instead of the sign-in picker
+- [ ] Enable the stack-controls menu (start/restart/stop) once the API has stack endpoints
+- [ ] Serve the Clients tab's deployment list from the API instead of local settings
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### App

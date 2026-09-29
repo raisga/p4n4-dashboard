@@ -47,6 +47,31 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+/// Brand logo, or the text wordmark with its muted suffix.
+class Wordmark extends StatelessWidget {
+  const Wordmark({super.key, this.size = 20});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    final brand = BrandScope.of(context);
+    if (brand.logo != null) return Image.asset(brand.logo!, height: size * 1.4, semanticLabel: brand.appName);
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: brand.wordmark),
+          TextSpan(
+            text: brand.wordmarkSuffix,
+            style: p4.mono(size: size * 0.9, color: p4.muted, weight: FontWeight.w700, spacing: -0.05),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// `<platform>-<suffix>` wordmark, e.g. `p4n4-iot`.
 class StackName extends StatelessWidget {
   const StackName(this.suffix, {super.key, this.size = 18});

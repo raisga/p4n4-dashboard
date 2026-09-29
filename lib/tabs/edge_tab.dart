@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api/edge_metrics.dart';
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -105,19 +106,22 @@ class _EdgeTabState extends State<EdgeTab> {
   @override
   Widget build(BuildContext context) {
     final settings = SettingsScope.of(context);
+    final admin = SessionScope.of(context).isAdmin;
     final m = _latest;
 
     final header = SectionHeader(
       tag: 'edge system',
       title: const StackName('edge', size: 24),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('DEMO', style: p4.mono()),
-          const SizedBox(width: 8),
-          Switch(value: settings.edgeDemo, onChanged: (v) => settings.edgeDemo = v),
-        ],
-      ),
+      trailing: admin
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('DEMO', style: p4.mono()),
+                const SizedBox(width: 8),
+                Switch(value: settings.edgeDemo, onChanged: (v) => settings.edgeDemo = v),
+              ],
+            )
+          : null,
     );
 
     if (m == null && _error != null) {
@@ -130,12 +134,14 @@ class _EdgeTabState extends State<EdgeTab> {
               child: EmptyState(
                 icon: Icons.sensors_off_outlined,
                 title: 'No metrics from edge device',
-                message:
-                    'GET ${settings.edgeMetricsUri} failed:\n$_error\n\n'
-                    'Point the metrics URL at an endpoint returning the JSON described in the README, '
-                    'or turn on demo data to preview the dashboard.',
+                message: admin
+                    ? 'GET ${settings.edgeMetricsUri} failed:\n$_error\n\n'
+                          'Point the metrics URL at an endpoint returning the JSON described in the README, '
+                          'or turn on demo data to preview the dashboard.'
+                    : 'Device readings are unavailable right now. Try again shortly.',
                 actions: [
-                  FilledButton(onPressed: () => settings.edgeDemo = true, child: const Text('USE DEMO DATA')),
+                  if (admin)
+                    FilledButton(onPressed: () => settings.edgeDemo = true, child: const Text('USE DEMO DATA')),
                   OutlinedButton(onPressed: _tick, child: const Text('RETRY')),
                 ],
               ),
@@ -167,7 +173,9 @@ class _EdgeTabState extends State<EdgeTab> {
                     const SizedBox(width: 12),
                     Flexible(
                       child: Text(
-                        settings.edgeDemo ? 'synthetic random walk' : settings.edgeMetricsUri.toString(),
+                        settings.edgeDemo
+                            ? 'synthetic random walk'
+                            : (admin ? settings.edgeMetricsUri.toString() : 'live readings'),
                         overflow: TextOverflow.ellipsis,
                         style: p4.mono(),
                       ),
