@@ -59,11 +59,13 @@ void main() {
   });
 
   test('colour overrides apply per mode and leave other tokens alone', () {
-    final brand = Brand.fromJson(_minimal({
-      'colors': {
-        'dark': {'accent': '#2DD4BF'},
-      },
-    }));
+    final brand = Brand.fromJson(
+      _minimal({
+        'colors': {
+          'dark': {'accent': '#2DD4BF'},
+        },
+      }),
+    );
     expect(brand.dark.accent, const Color(0xFF2DD4BF));
     expect(brand.dark.bg, P4Colors.dark.bg);
     expect(brand.light.accent, P4Colors.light.accent);
@@ -79,35 +81,50 @@ void main() {
   });
 
   test('tabs keep canonical order', () {
-    final brand = Brand.fromJson(_minimal({
-      'tabs': ['video', 'services'],
-    }));
+    final brand = Brand.fromJson(
+      _minimal({
+        'tabs': ['video', 'services'],
+      }),
+    );
     expect(brand.tabs, [DashTab.services, DashTab.video]);
   });
 
   test('invalid brand config is rejected', () {
     expect(() => Brand.fromJson(_minimal({'tabs': <String>[]})), throwsFormatException);
-    expect(() => Brand.fromJson(_minimal({'tabs': ['radar']})), throwsFormatException);
     expect(
-      () => Brand.fromJson(_minimal({
-        'colors': {
-          'light': {'accentt': '#000000'},
-        },
-      })),
+      () => Brand.fromJson(
+        _minimal({
+          'tabs': ['radar'],
+        }),
+      ),
       throwsFormatException,
     );
     expect(
-      () => Brand.fromJson(_minimal({
-        'colors': {
-          'light': {'accent': 'teal'},
-        },
-      })),
+      () => Brand.fromJson(
+        _minimal({
+          'colors': {
+            'light': {'accentt': '#000000'},
+          },
+        }),
+      ),
       throwsFormatException,
     );
     expect(
-      () => Brand.fromJson(_minimal({
-        'fonts': {'mono': 'Not A Real Font'},
-      })),
+      () => Brand.fromJson(
+        _minimal({
+          'colors': {
+            'light': {'accent': 'teal'},
+          },
+        }),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => Brand.fromJson(
+        _minimal({
+          'fonts': {'mono': 'Not A Real Font'},
+        }),
+      ),
       throwsFormatException,
     );
   });

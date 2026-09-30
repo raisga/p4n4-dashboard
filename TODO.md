@@ -31,7 +31,7 @@ _Last updated: 2026-09-29_
 
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
-- `flutter analyze`: no issues.
+- `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
 - `flutter test`: 31 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
@@ -57,9 +57,12 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
   - The contrast check caught a real failure in `acme` (dark `err` on `bg3`, 4.42:1), which is fixed.
   - Worked around a `flutter_launcher_icons` 0.14.4 bug that sets an unrelated iOS build setting (`…SWIFT_ASSET_SYMBOL_EXTENSIONS`) to `AppIcon`.
 
+- Android: `flutter build apk --release` succeeds locally (not yet run on a device).
+- CI steps run locally: brand validation, the p4n4 re-apply check, and the full test suite with `acme` applied (31 pass).
+
 **Not checked:**
 
-- Android, iOS, macOS and Windows builds: none of them have been built or run.
+- iOS, macOS and Windows builds: set up in CI but not yet run. Android has been built but not run on a device.
 - The embedded Grafana web view, which only runs on those untested platforms.
 - Letta chat against a real server.
 - The Services tab with a running p4n4-api.
@@ -98,7 +101,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. CI: GitHub Actions running `flutter analyze`, `flutter test` and a Linux build, then a matrix over every brand in `brands/` (see *White-label*). Four of the five platforms have never been built.
+1. Check the first CI run on GitHub (`.github/workflows/ci.yml`): the macOS, iOS and Windows jobs have never run anywhere, so expect fixes there.
 2. Connection profiles (see below). This also fixes the *Clients tab assumes port 8000* limitation.
 3. Several cameras.
 
@@ -117,7 +120,9 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Incident history: local log of status changes per deployment (e.g. "Node-RED down 14:02–14:09"), shown on each Clients row
 
 ### App
-- [ ] Build and smoke-test on Android, iOS, macOS and Windows; add CI (`flutter analyze`, `flutter test`, per-platform builds)
+- [x] CI (`.github/workflows/ci.yml`): format, analyze, test, brand validation, a check that the committed files match the p4n4 brand, release builds for all five platforms (iOS unsigned) with downloadable artifacts, and tests + a Linux build for every brand
+- [ ] Smoke-test the CI builds on real Android, iOS, macOS and Windows devices
+- [ ] Shrink the Android APK (80 MB universal, ~14 MB of Dart code per ABI): replace `google_fonts`, whose table of every Google font is compiled in, with the bundled files declared as pubspec font families; ship split APKs or an app bundle
 - [ ] Embedded Grafana on Windows/Linux (e.g. `webview_windows`, or render panels as images with the Grafana image renderer)
 - [ ] Discover video sources automatically, or allow several cameras (named, with a grid view on desktop)
 - [ ] Kiosk / wall-display mode: fullscreen Home or Grafana, no navigation, cycling between pages
@@ -138,6 +143,5 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 ### White-label
 - [ ] Per-brand service catalog (rename/hide services, custom ports) in `brand.json`
 - [ ] Linux window icon, plus optional per-brand binary name
-- [ ] CI matrix that builds every brand in `brands/`
 - [ ] Per-brand Android signing and iOS team/provisioning configuration
 - [ ] Remove or replace the example `acme` brand before shipping

@@ -12,5 +12,6 @@ Brand loadBrand(String id) {
 }
 
 List<String> brandIds() => [
-  for (final d in Directory('brands').listSync().whereType<Directory>()) d.uri.pathSegments.lastWhere((s) => s.isNotEmpty),
+  for (final d in Directory('brands').listSync().whereType<Directory>())
+    d.uri.pathSegments.lastWhere((s) => s.isNotEmpty),
 ]..sort();

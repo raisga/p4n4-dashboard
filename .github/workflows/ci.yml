@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.2
+
+jobs:
+  check:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    outputs:
+      brands: ${{ steps.brands.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test tool
+      - run: flutter analyze
+      - run: flutter test
+      - name: Validate every brand
+        id: brands
+        # Lists folders directly: `dart run` can print build-hook progress to stdout.
+        run: |
+          brands=$(find brands -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+          for id in $brands; do dart run tool/brand.dart check "$id"; done
+          echo "list=$(echo "$brands" | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+      # The repository ships with p4n4 applied; re-applying it must be a no-op.
+      - name: Committed files match the p4n4 brand
+        run: |
+          dart run tool/brand.dart apply p4n4
+          git status --porcelain
+          test -z "$(git status --porcelain)" || { echo "::error::Run 'dart run tool/brand.dart apply p4n4' and commit the result"; exit 1; }
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+            command: flutter build linux --release
+            artifact: build/linux/x64/release/bundle
+          - platform: android
+            os: ubuntu-latest
+            command: flutter build apk --release
+            artifact: build/app/outputs/flutter-apk/app-release.apk
+          - platform: windows
+            os: windows-latest
+            command: flutter build windows --release
+            artifact: build/windows/x64/runner/Release
+          - platform: macos
+            os: macos-latest
+            command: flutter build macos --release
+            artifact: build/macos/Build/Products/Release
+          # Unsigned, so only proves the project compiles; nothing to install.
+          - platform: ios
+            os: macos-latest
+            command: flutter build ios --release --no-codesign
+    steps:
+      - uses: actions/checkout@v4
+      - if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+      - if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: ${{ matrix.command }}
+      - if: matrix.artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4n4-dashboard-${{ matrix.platform }}
+          path: ${{ matrix.artifact }}
+          retention-days: 7
+
+  brands:
+    name: Brand ${{ matrix.brand }}
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        brand: ${{ fromJSON(needs.check.outputs.brands) }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run tool/brand.dart apply ${{ matrix.brand }}
+      # Layout tests render the applied brand, so they cover its tabs and palette.
+      - run: flutter test
+      - run: flutter build linux --release
