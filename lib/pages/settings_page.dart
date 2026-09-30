@@ -63,6 +63,11 @@ class SettingsPage extends StatelessWidget {
                   ]),
                   if (admin) ...[
                     _section('connection', [
+                      Text(
+                        'This section and the ones below belong to the "${s.deployment.name}" deployment. '
+                        'Switch deployments from the Clients tab.',
+                        style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
+                      ),
                       _Field(
                         'Host',
                         s.host,

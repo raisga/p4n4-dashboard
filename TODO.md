@@ -25,17 +25,18 @@ _Last updated: 2026-09-29_
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
 | White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
 | Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
-| Settings | ✅ Working | Host, API URL, metrics URL, Letta password, Grafana path/kiosk, video URL and theme, all persisted. |
+| Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password, Grafana path/kiosk and video URL are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
 
 ## What was checked
 
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
-- `flutter test`: 31 tests pass.
+- `flutter test`: 39 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
-  - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see.
+  - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
+  - Settings tests: per-deployment settings switch together on connect (theme doesn't), custom API URLs, the connected deployment can't be removed, state survives a restart, and migration of pre-profile settings.
   - Brand tests:
     - every folder in `brands/` parses;
     - color overrides apply per mode;
@@ -57,12 +58,12 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
   - The contrast check caught a real failure in `acme` (dark `err` on `bg3`, 4.42:1), which is fixed.
   - Worked around a `flutter_launcher_icons` 0.14.4 bug that sets an unrelated iOS build setting (`…SWIFT_ASSET_SYMBOL_EXTENSIONS`) to `AppIcon`.
 
-- Android: `flutter build apk --release` succeeds locally (not yet run on a device).
+- Builds: CI builds release versions for all five platforms (iOS unsigned); Android also builds locally.
 - CI steps run locally: brand validation, the p4n4 re-apply check, and the full test suite with `acme` applied (31 pass).
 
 **Not checked:**
 
-- iOS, macOS and Windows builds: set up in CI but not yet run. Android has been built but not run on a device.
+- Running the app on Android, iOS, macOS or Windows. All five platforms build in CI (first green run: 2026-09-30), but only Linux has been run.
 - The embedded Grafana web view, which only runs on those untested platforms.
 - Letta chat against a real server.
 - The Services tab with a running p4n4-api.
@@ -85,7 +86,6 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
   - The binary name (`p4n4_dashboard`) and the Android Kotlin package don't change per brand.
   - The service catalog (names, ports, which services exist) is shared by all brands. Only the `p4n4` prefix is replaced.
 - **No authentication.** Nothing sends a JWT yet, because p4n4-api has no auth yet either. Anyone can pick the admin role on the sign-in screen, so the client view hides configuration but is not a security boundary.
-- **Clients tab assumes port 8000.** Each deployment's API is expected at `http://<host>:8000`; per-deployment API URLs aren't supported. **Connect** changes only the host, so a custom p4n4-api base URL in settings still points at the old API.
 
 ## Future work
 
@@ -101,9 +101,9 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. Check the first CI run on GitHub (`.github/workflows/ci.yml`): the macOS, iOS and Windows jobs have never run anywhere, so expect fixes there.
-2. Connection profiles (see below). This also fixes the *Clients tab assumes port 8000* limitation.
-3. Several cameras.
+1. Several cameras. Store them in the deployment's settings (`profileKeys` in `lib/core/settings.dart`) so each client keeps its own.
+2. Shared polling layer (see *Code health*).
+3. Shrink the Android APK (see *App*).
 
 ### Code health
 - [ ] Share one polling layer (e.g. a per-host status repository) between Home, Services and Clients. Each tab currently runs its own `checkServices` timer, so one host can be probed three times.
@@ -114,7 +114,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Localization (i18n) for client-facing builds; brands could pick a default locale
 
 ### Fleet and alerts
-- [ ] Connection profiles: store host, API URL, Grafana path and camera URLs per deployment; **Connect** switches the whole profile instead of only the host
+- [x] Connection profiles: each deployment stores its own connection settings; **Connect** switches them all
 - [ ] Fleet overview grid: one card per client with status, edge CPU/temperature and a sparkline
 - [ ] Alerts: thresholds (e.g. temperature > X, service down > N minutes), shown in-app while it's open; push notifications later (see API section)
 - [ ] Incident history: local log of status changes per deployment (e.g. "Node-RED down 14:02–14:09"), shown on each Clients row

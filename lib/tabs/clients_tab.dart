@@ -21,19 +21,23 @@ class ClientsTab extends StatefulWidget {
 class _ClientsTabState extends State<ClientsTab> {
   P4Colors get p4 => context.p4;
 
-  /// Keyed by host, so renaming a deployment keeps its status.
+  /// Keyed by [_target], so renaming a deployment keeps its status.
   final _reports = <String, ServiceReport>{};
   final _checking = <String>{};
   Timer? _timer;
-  String? _hosts;
+  String? _targets;
 
-  /// Re-checks only when the set of hosts changes, not on every settings change.
+  /// What a deployment's status depends on: its host and API URL.
+  String _target(AppSettings s, Deployment d) => '${s.hostOf(d)}|${s.apiUriOf(d)}';
+
+  /// Re-checks only when a deployment's host or API changes, not on every settings change.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final hosts = SettingsScope.of(context).deployments.map((d) => d.host).join('|');
-    if (hosts != _hosts) {
-      _hosts = hosts;
+    final s = SettingsScope.of(context);
+    final targets = s.deployments.map((d) => _target(s, d)).join(' ');
+    if (targets != _targets) {
+      _targets = targets;
       _refresh();
     }
     _schedule();
@@ -65,40 +69,40 @@ class _ClientsTabState extends State<ClientsTab> {
 
   Future<void> _refresh() async {
     if (!widget.active) return;
-    final byHost = {for (final d in SettingsScope.of(context).deployments) d.host: d};
-    await Future.wait(byHost.values.map(_check));
+    final s = SettingsScope.of(context);
+    final byTarget = {for (final d in s.deployments) _target(s, d): d};
+    await Future.wait(byTarget.entries.map((e) => _check(s, e.key, e.value)));
   }
 
-  Future<void> _check(Deployment d) async {
-    if (!_checking.add(d.host)) return;
+  Future<void> _check(AppSettings s, String target, Deployment d) async {
+    if (!_checking.add(target)) return;
     setState(() {});
+    final host = s.hostOf(d);
     try {
-      final r = await checkServices(d.apiUri, (s) => Uri.parse('http://${d.host}:${s.port}${s.path}'));
-      if (mounted) setState(() => _reports[d.host] = r);
+      final r = await checkServices(s.apiUriOf(d), (svc) => Uri.parse('http://$host:${svc.port}${svc.path}'));
+      if (mounted) setState(() => _reports[target] = r);
     } finally {
-      if (mounted) setState(() => _checking.remove(d.host));
+      if (mounted) setState(() => _checking.remove(target));
     }
   }
 
-  Future<void> _edit(AppSettings s, [int? index]) async {
-    final list = s.deployments;
-    final result = await showDialog<Deployment>(
+  Future<void> _edit(AppSettings s, [Deployment? d]) async {
+    final result = await showDialog<_DeploymentForm>(
       context: context,
-      builder: (_) => _DeploymentDialog(initial: index == null ? null : list[index]),
+      builder: (_) => _DeploymentDialog(
+        initial: d == null ? null : (name: d.name, host: s.hostOf(d), apiBase: d.values['apiBase'] as String? ?? ''),
+      ),
     );
     if (result == null) return;
-    if (index == null) {
-      list.add(result);
-    } else {
-      list[index] = result;
-    }
-    // Saving changes the host list, which triggers a check of any new host.
-    s.deployments = list;
-  }
-
-  void _remove(AppSettings s, int index) {
-    final list = s.deployments..removeAt(index);
-    s.deployments = list;
+    // An empty API URL means "the default", so drop the key rather than store ''.
+    final values = {...?d?.values, 'host': result.host}..remove('apiBase');
+    if (result.apiBase.isNotEmpty) values['apiBase'] = result.apiBase;
+    // Saving changes the targets, which triggers a check of anything new.
+    await s.saveDeployment(
+      d == null
+          ? Deployment(id: s.newDeploymentId(), name: result.name, values: values)
+          : d.copyWith(name: result.name, values: values),
+    );
   }
 
   @override
@@ -139,8 +143,8 @@ class _ClientsTabState extends State<ClientsTab> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Status comes from each host\'s API on port 8000, or from probing service ports when it\'s down. '
-                    'Connect switches this dashboard to that host.',
+                    'Status comes from each deployment\'s API (port 8000 unless set), or from probing service ports when '
+                    'it\'s down. Connect switches this dashboard, and every connection setting, to that deployment.',
                     style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                   ),
                   const SizedBox(height: 24),
@@ -156,7 +160,7 @@ class _ClientsTabState extends State<ClientsTab> {
                       padding: const EdgeInsets.all(1),
                       child: Column(
                         children: [
-                          for (final (i, d) in list.indexed) ...[if (i > 0) const SizedBox(height: 1), _row(s, i, d)],
+                          for (final (i, d) in list.indexed) ...[if (i > 0) const SizedBox(height: 1), _row(s, d)],
                         ],
                       ),
                     ),
@@ -169,9 +173,11 @@ class _ClientsTabState extends State<ClientsTab> {
     );
   }
 
-  Widget _row(AppSettings s, int i, Deployment d) {
-    final r = _reports[d.host];
-    final current = d.host == s.host;
+  Widget _row(AppSettings s, Deployment d) {
+    final r = _reports[_target(s, d)];
+    final current = d.id == s.deployment.id;
+    final api = s.apiUriOf(d);
+    final customApi = api != Uri.parse('http://${s.hostOf(d)}:8000');
     final health = switch (r) {
       null => Health.pending,
       _ when r.known == 0 => Health.unknown,
@@ -195,7 +201,7 @@ class _ClientsTabState extends State<ClientsTab> {
           ],
         ),
         const SizedBox(height: 4),
-        Text(d.host, overflow: TextOverflow.ellipsis, style: p4.mono()),
+        Text(customApi ? '${s.hostOf(d)} · api $api' : s.hostOf(d), overflow: TextOverflow.ellipsis, style: p4.mono()),
         const SizedBox(height: 8),
         StatusIndicator(health, label: label),
       ],
@@ -203,9 +209,13 @@ class _ClientsTabState extends State<ClientsTab> {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextButton(onPressed: current ? null : () => s.host = d.host, child: const Text('CONNECT')),
-        IconButton(tooltip: 'Edit', onPressed: () => _edit(s, i), icon: const Icon(Icons.edit_outlined, size: 18)),
-        IconButton(tooltip: 'Remove', onPressed: () => _remove(s, i), icon: const Icon(Icons.delete_outline, size: 18)),
+        TextButton(onPressed: current ? null : () => s.connect(d.id), child: const Text('CONNECT')),
+        IconButton(tooltip: 'Edit', onPressed: () => _edit(s, d), icon: const Icon(Icons.edit_outlined, size: 18)),
+        IconButton(
+          tooltip: current ? 'Connect to another deployment to remove this one' : 'Remove',
+          onPressed: current ? null : () => s.removeDeployment(d.id),
+          icon: const Icon(Icons.delete_outline, size: 18),
+        ),
       ],
     );
     return Container(
@@ -232,11 +242,13 @@ class _ClientsTabState extends State<ClientsTab> {
   }
 }
 
+typedef _DeploymentForm = ({String name, String host, String apiBase});
+
 /// Owns its controllers so they outlive the dialog's exit animation.
 class _DeploymentDialog extends StatefulWidget {
   const _DeploymentDialog({this.initial});
 
-  final Deployment? initial;
+  final _DeploymentForm? initial;
 
   @override
   State<_DeploymentDialog> createState() => _DeploymentDialogState();
@@ -247,18 +259,20 @@ class _DeploymentDialogState extends State<_DeploymentDialog> {
 
   late final _name = TextEditingController(text: widget.initial?.name);
   late final _host = TextEditingController(text: widget.initial?.host);
+  late final _api = TextEditingController(text: widget.initial?.apiBase);
 
   @override
   void dispose() {
     _name.dispose();
     _host.dispose();
+    _api.dispose();
     super.dispose();
   }
 
   void _save() {
-    final name = _name.text.trim(), host = _host.text.trim();
+    final name = _name.text.trim(), host = _host.text.trim(), api = _api.text.trim();
     if (host.isEmpty) return;
-    Navigator.pop(context, Deployment(name.isEmpty ? host : name, host));
+    Navigator.pop<_DeploymentForm>(context, (name: name.isEmpty ? host : name, host: host, apiBase: api));
   }
 
   @override
@@ -283,6 +297,17 @@ class _DeploymentDialogState extends State<_DeploymentDialog> {
               controller: _host,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
               decoration: const InputDecoration(labelText: 'Host', hintText: '192.168.1.50'),
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _api,
+              style: p4.mono(size: 13, color: p4.text, spacing: 0),
+              decoration: const InputDecoration(
+                labelText: 'API URL (optional)',
+                hintText: 'http://<host>:8000',
+                helperText: 'Only if the API isn\'t on port 8000 of the host',
+              ),
               onSubmitted: (_) => _save(),
             ),
           ],

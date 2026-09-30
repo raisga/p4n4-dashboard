@@ -159,7 +159,7 @@ class _HomeShellState extends State<HomeShell> {
         title: const Wordmark(),
         actions: [
           if (wide) ...[
-            if (admin) Center(child: Text('// ${SettingsScope.of(context).host}', style: p4.mono())),
+            if (admin) Center(child: Text('// ${_connection(SettingsScope.of(context))}', style: p4.mono())),
             const SizedBox(width: 12),
             Center(child: TagBadge(admin ? 'admin' : 'client', color: admin ? p4.amber : p4.accent)),
             const SizedBox(width: 8),
@@ -223,6 +223,9 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 }
+
+/// The connected deployment, named once there's more than one to tell apart.
+String _connection(AppSettings s) => s.deployments.length > 1 ? '${s.deployment.name} · ${s.host}' : s.host;
 
 /// Cycles system → light → dark.
 class _ThemeToggle extends StatelessWidget {

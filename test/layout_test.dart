@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/main.dart';
@@ -160,5 +161,22 @@ void main() {
     final brand = loadBrand('p4n4');
     expect(screensFor(Role.client, brand, settings), [Screen.home, Screen.edge, Screen.agent, Screen.grafana]);
     expect(screensFor(Role.admin, brand, settings), [...brand.tabs.map(Screen.of), Screen.clients]);
+  });
+
+  testWidgets('connecting to a deployment in Clients switches the dashboard to it', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    await settings.saveDeployment(Deployment(id: 'site', name: 'Site', values: {'host': '10.0.0.2'}));
+    await tester.tap(find.text('CLIENTS'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // The connected deployment's button is disabled, so the enabled one is Site's.
+    final connect = find.widgetWithText(TextButton, 'CONNECT');
+    expect(connect, findsNWidgets(2));
+    await tester.tap(connect.last);
+    await tester.pump();
+
+    expect(settings.deployment.name, 'Site');
+    expect(find.text('// Site · 10.0.0.2'), findsOneWidget);
   });
 }
