@@ -44,7 +44,11 @@ class EdgeMetrics {
     disk: _num(j['disk_percent']),
     tempC: _num(j['temp_c']),
     uptime: j['uptime_s'] is num ? Duration(seconds: (j['uptime_s'] as num).toInt()) : null,
-    load: (j['load'] as List?)?.map((e) => (e as num).toDouble()).toList(),
+    // Non-numeric entries are dropped rather than failing the whole snapshot.
+    load: switch ((j['load'] is List ? j['load'] as List : const []).map(_num).nonNulls.toList()) {
+      final l when l.isNotEmpty => l,
+      _ => null,
+    },
     inferenceMs: _num(j['inference_ms']),
   );
 }

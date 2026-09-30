@@ -50,9 +50,15 @@ class _ServicesTabState extends State<ServicesTab> {
     _schedule();
   }
 
+  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
+  /// don't push the next poll back.
   void _schedule() {
-    _timer?.cancel();
-    if (widget.active) _timer = Timer.periodic(const Duration(seconds: 15), (_) => _refresh());
+    if (!widget.active) {
+      _timer?.cancel();
+      _timer = null;
+    } else {
+      _timer ??= Timer.periodic(const Duration(seconds: 15), (_) => _refresh());
+    }
   }
 
   @override

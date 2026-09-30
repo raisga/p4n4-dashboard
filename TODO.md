@@ -21,7 +21,7 @@ _Last updated: 2026-09-29_
 | Edge metrics | ⚠️ UI only | Polls `/api/v1/edge/metrics` every 2 s. **That endpoint doesn't exist in p4n4-api v0.1**, so the tab shows an error until it's added or pointed at another URL. A demo mode generates synthetic data. The JSON it expects is in `README.md`. |
 | Agent chat | ✅ Ollama / ⚠️ Letta | Ollama streaming chat and model list work against a live server. The Letta client is written to the Letta REST API but has not been run against a real Letta server. |
 | Grafana | ✅ Android/iOS/macOS, ↗ Windows/Linux | Embedded web view in kiosk mode. On Windows and Linux there's no Flutter web view, so the tab opens Grafana in the browser. |
-| Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. There's no default source; the user enters a URL. |
+| Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. Dropped streams reconnect automatically (backoff 2 s → 30 s). There's no default source; the user enters a URL. |
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
 | White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
 | Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
@@ -32,8 +32,8 @@ _Last updated: 2026-09-29_
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze`: no issues.
-- `flutter test`: 25 tests pass.
-  - Unit tests: metrics JSON parsing, mapping catalog entries to Compose service names, chat message serialization.
+- `flutter test`: 31 tests pass.
+  - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
   - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see.
   - Brand tests:
@@ -41,6 +41,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
     - color overrides apply per mode;
     - tab order and filtering;
     - invalid config is rejected (unknown tab or color token, bad hex, non-Google font);
+    - every brand ships its fonts, and the applied brand's fonts are in the asset bundle;
     - brand defaults seed settings;
     - the `acme` brand changes the wordmark, stack names, accent color, tab count and settings sections.
 - Debug build run by hand, with a screenshot of every tab in both themes:
@@ -74,7 +75,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 
   Fine on a trusted LAN, but it should be narrowed before any store/public release.
 - **Loose status matching.** Matching catalog entries to Compose service names is heuristic (`statusFor` in `lib/api/services.dart`: exact name, alias, or substring). Oddly named services may show the wrong status or "unknown".
-- **Fonts need internet on first launch.** They load through `google_fonts` at runtime, so a first offline launch falls back to system fonts.
+- **Changing a brand's fonts needs internet.** `tool/brand.dart apply` downloads missing fonts into `brands/<id>/fonts/`; builds themselves are offline. Font licenses (OFL) aren't yet registered with Flutter's `LicenseRegistry`, so they don't appear on the licenses page.
 - **Ollama chat history is in-memory.** It's lost when the app restarts. Letta keeps its own history on the server.
 - **White-label gaps:**
   - The Linux window icon isn't set.
@@ -91,15 +92,45 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Add JWT auth (`/api/v1/auth/token`) once the API supports it, store the token securely, and take the admin/client role from it instead of the sign-in picker
 - [ ] Enable the stack-controls menu (start/restart/stop) once the API has stack endpoints
 - [ ] Serve the Clients tab's deployment list from the API instead of local settings
+- [ ] Show per-service detail (health, uptime, image version) in Services, not just up/down
+- [ ] Log viewer: stream container logs (pairs with the stack-controls menu)
+- [ ] Push notifications for alerts (see *Fleet and alerts* below), sent by the API rather than polled by the app
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
+
+### Next session (suggested order)
+1. CI: GitHub Actions running `flutter analyze`, `flutter test` and a Linux build, then a matrix over every brand in `brands/` (see *White-label*). Four of the five platforms have never been built.
+2. Connection profiles (see below). This also fixes the *Clients tab assumes port 8000* limitation.
+3. Several cameras.
+
+### Code health
+- [ ] Share one polling layer (e.g. a per-host status repository) between Home, Services and Clients. Each tab currently runs its own `checkServices` timer, so one host can be probed three times.
+- [ ] Move the Letta token (and the future JWT) from SharedPreferences to `flutter_secure_storage`
+- [ ] Make Home's status summary testable: inject the HTTP client (or extract the summary logic) so "can't reach" / "status unavailable" / "needs attention" get widget tests. Flutter's test HTTP stub answers every request, so offline hosts can't be simulated today.
+- [ ] Test MJPEG auto-reconnect and EXIF-thumbnail frames against a real IP camera
+- [ ] Golden (screenshot) tests per tab × theme × brand to catch visual regressions
+- [ ] Localization (i18n) for client-facing builds; brands could pick a default locale
+
+### Fleet and alerts
+- [ ] Connection profiles: store host, API URL, Grafana path and camera URLs per deployment; **Connect** switches the whole profile instead of only the host
+- [ ] Fleet overview grid: one card per client with status, edge CPU/temperature and a sparkline
+- [ ] Alerts: thresholds (e.g. temperature > X, service down > N minutes), shown in-app while it's open; push notifications later (see API section)
+- [ ] Incident history: local log of status changes per deployment (e.g. "Node-RED down 14:02–14:09"), shown on each Clients row
 
 ### App
 - [ ] Build and smoke-test on Android, iOS, macOS and Windows; add CI (`flutter analyze`, `flutter test`, per-platform builds)
 - [ ] Embedded Grafana on Windows/Linux (e.g. `webview_windows`, or render panels as images with the Grafana image renderer)
-- [ ] Discover video sources automatically, or allow several cameras
-- [ ] Bundle the JetBrains Mono / Plus Jakarta Sans fonts as assets so the app works fully offline
+- [ ] Discover video sources automatically, or allow several cameras (named, with a grid view on desktop)
+- [ ] Kiosk / wall-display mode: fullscreen Home or Grafana, no navigation, cycling between pages
+- [ ] Show a "last updated" time on Home
+- [ ] Friendlier client error states with a "Contact support" action, from a new `support` email/URL field in `brand.json`
+- [x] Bundle each brand's fonts as assets so the app works fully offline
+- [ ] Register the bundled fonts' OFL licenses with `LicenseRegistry`
 - [ ] Persist Ollama chat history; render Markdown in agent replies
-- [ ] Longer metrics history, with a time-range selector and a table view
+- [ ] Agent: stop button while a reply streams, copy/retry per message, selectable system prompt
+- [ ] Agent: "include system status" button that adds current service status and edge readings to the prompt
+- [ ] Longer metrics history, with a time-range selector and a table view; CSV export
+- [ ] Warning/critical thresholds per edge tile, shown in color (feeds *Alerts*)
+- [ ] Read Prometheus `node_exporter` output directly, so the Edge tab works before p4n4-api adds `/api/v1/edge/metrics`
 - [ ] Start/stop stacks from the app once the API has state-changing endpoints
 - [ ] Splash screens per brand (launcher icons are done)
 - [ ] Narrow cleartext exceptions to local networks for release builds

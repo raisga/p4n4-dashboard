@@ -25,11 +25,17 @@ class _ClientsTabState extends State<ClientsTab> {
   final _reports = <String, ServiceReport>{};
   final _checking = <String>{};
   Timer? _timer;
+  String? _hosts;
 
+  /// Re-checks only when the set of hosts changes, not on every settings change.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _refresh();
+    final hosts = SettingsScope.of(context).deployments.map((d) => d.host).join('|');
+    if (hosts != _hosts) {
+      _hosts = hosts;
+      _refresh();
+    }
     _schedule();
   }
 
@@ -40,9 +46,15 @@ class _ClientsTabState extends State<ClientsTab> {
     _schedule();
   }
 
+  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
+  /// don't push the next poll back.
   void _schedule() {
-    _timer?.cancel();
-    if (widget.active) _timer = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
+    if (!widget.active) {
+      _timer?.cancel();
+      _timer = null;
+    } else {
+      _timer ??= Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
+    }
   }
 
   @override
@@ -80,8 +92,8 @@ class _ClientsTabState extends State<ClientsTab> {
     } else {
       list[index] = result;
     }
+    // Saving changes the host list, which triggers a check of any new host.
     s.deployments = list;
-    unawaited(_check(result));
   }
 
   void _remove(AppSettings s, int index) {

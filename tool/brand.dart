@@ -3,10 +3,11 @@
 //
 //   dart run tool/brand.dart list            # available brands
 //   dart run tool/brand.dart check <id>      # validate brands/<id>/ only
+//   dart run tool/brand.dart fonts <id>      # download the brand's fonts into brands/<id>/fonts/
 //   dart run tool/brand.dart apply <id>      # install brand + patch native projects
 //
-// `apply` copies brands/<id>/ into assets/brand/ (so a build ships exactly one
-// brand), rewrites the app name / bundle IDs in the Android, iOS, macOS,
+// `apply` fetches any missing fonts, copies brands/<id>/ into assets/brand/
+// (so a build ships exactly one brand and works offline), rewrites the app name / bundle IDs in the Android, iOS, macOS,
 // Windows and Linux runners, and regenerates launcher icons when the brand
 // has an icon.png. Every patch is a regex over the current value, so applying
 // brands repeatedly in any order is safe.
@@ -47,14 +48,17 @@ Future<void> main(List<String> args) async {
       case ['check', final id]:
         _validate(id);
         print('✓ brands/$id is valid');
+      case ['fonts', final id]:
+        await _fonts(_validate(id), refresh: true);
       case ['apply', final id]:
         final brand = _validate(id);
+        await _fonts(brand);
         _install(id);
         _patchNative(brand);
         await _icons(id);
         print('✓ Applied brand "$id". Rebuild the app (flutter clean is not required).');
       default:
-        stderr.writeln('usage: dart run tool/brand.dart list | check <id> | apply <id>');
+        stderr.writeln('usage: dart run tool/brand.dart list | check <id> | fonts <id> | apply <id>');
         exit(64);
     }
   } on FormatException catch (e) {
@@ -152,6 +156,51 @@ void _contrast(String mode, Map<String, String> p) {
   for (final (fg, bg) in pairs) {
     final r = ratio(p[fg]!, p[bg]!);
     if (r < 4.5) stderr.writeln('! $mode: $fg on $bg is ${r.toStringAsFixed(2)}:1 (WCAG AA needs 4.5:1)');
+  }
+}
+
+// ── fonts ─────────────────────────────────────────────────────────────────
+
+/// Weights the app uses (lib/core/theme.dart, plus Material's w500 labels).
+const _weights = {400: 'Regular', 500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold'};
+
+/// Downloads the brand's display and mono fonts into `brands/<id>/fonts/` as
+/// `<Family>-<Weight>.ttf`, the names google_fonts looks for in the asset
+/// bundle before fetching at runtime. Existing files are kept unless [refresh].
+Future<void> _fonts(Map<String, dynamic> brand, {bool refresh = false}) async {
+  final fonts = (brand['fonts'] as Map?) ?? const {};
+  final families = {fonts['display'] ?? 'Plus Jakarta Sans', fonts['mono'] ?? 'JetBrains Mono'}.cast<String>();
+  final dir = Directory('${_brands.path}/${brand['id']}/fonts')..createSync(recursive: true);
+  final http = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+  try {
+    for (final family in families) {
+      for (final MapEntry(key: weight, value: name) in _weights.entries) {
+        final file = File('${dir.path}/${family.replaceAll(' ', '')}-$name.ttf');
+        if (file.existsSync() && !refresh) continue;
+        // A non-browser user agent makes the CSS API return static TTF URLs.
+        final css = Uri.https('fonts.googleapis.com', '/css2', {'family': '$family:wght@$weight'});
+        final res = await (await http.getUrl(css)).close();
+        final body = await res.transform(utf8.decoder).join();
+        if (res.statusCode == 400) continue; // the family has no such weight; google_fonts picks the nearest
+        final url = RegExp(r'url\((https://[^)]+\.ttf)\)').firstMatch(body)?.group(1);
+        if (res.statusCode != 200 || url == null) {
+          throw FormatException('Could not fetch "$family" $weight from Google Fonts (HTTP ${res.statusCode})');
+        }
+        final ttf = await (await http.getUrl(Uri.parse(url))).close();
+        if (ttf.statusCode != 200) throw FormatException('Could not download $url (HTTP ${ttf.statusCode})');
+        file.writeAsBytesSync(await ttf.fold<List<int>>([], (a, b) => a..addAll(b)));
+        print('  ${file.path.substring(_root.path.length + 1)}');
+      }
+    }
+  } on SocketException catch (e) {
+    throw FormatException('Fonts need a network connection to download: ${e.message}');
+  } finally {
+    http.close();
+  }
+  // Drop fonts left over from a previous font choice.
+  final prefixes = families.map((f) => '${f.replaceAll(' ', '')}-');
+  for (final f in dir.listSync().whereType<File>()) {
+    if (!prefixes.any(f.uri.pathSegments.last.startsWith)) f.deleteSync();
   }
 }
 

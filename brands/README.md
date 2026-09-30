@@ -5,6 +5,7 @@ Each folder here is one brand. A build ships **exactly one** brand: the one last
 ```bash
 dart run tool/brand.dart list          # acme, p4n4
 dart run tool/brand.dart check acme    # validate only
+dart run tool/brand.dart fonts acme    # (re)download the brand's fonts into brands/acme/fonts/
 dart run tool/brand.dart apply acme    # install + patch native projects + icons
 flutter build apk                      # …or any other platform
 ```
@@ -15,6 +16,7 @@ flutter build apk                      # …or any other platform
 
 | Where | What |
 |-------|------|
+| `brands/<id>/fonts/` | Missing fonts are downloaded from Google Fonts (weights 400–800), so `apply` needs a network connection the first time |
 | `assets/brand/` | Replaced with `brands/<id>/`, minus `icon.png` |
 | Android | `applicationId`, app label |
 | iOS | Bundle ID (app and tests), display name, local-network permission text |
@@ -40,7 +42,7 @@ What `apply` doesn't change:
   "logo": "logo.png",                   // optional; replaces the wordmark (≈28px tall; ship 3× resolution)
   "platform": "acme",                   // replaces "p4n4" in stack/service names: acme-iot, acme-api
   "tagline": "…",                       // shown under Settings → About
-  "fonts": { "display": "Inter", "mono": "IBM Plex Mono" },   // any Google Fonts family
+  "fonts": { "display": "Inter", "mono": "IBM Plex Mono" },   // any Google Fonts family; bundled from fonts/
   "colors": {                           // partial overrides of the built-in palette, per mode
     "light": { "accent": "#0F766E" },
     "dark":  { "accent": "#2DD4BF", "bg": "#07110F" }

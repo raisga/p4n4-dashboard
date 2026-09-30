@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
@@ -25,6 +28,28 @@ void main() {
       expect(brand.tabs, isNotEmpty);
     });
   }
+
+  for (final id in brandIds()) {
+    test('brands/$id ships its fonts', () {
+      final brand = loadBrand(id);
+      for (final family in {brand.displayFont, brand.monoFont}) {
+        final file = File('brands/$id/fonts/${family.replaceAll(' ', '')}-Regular.ttf');
+        expect(file.existsSync(), isTrue, reason: 'run `dart run tool/brand.dart fonts $id`');
+      }
+    });
+  }
+
+  testWidgets('the applied brand bundles its fonts, so they load offline', (tester) async {
+    final brand = await Brand.load();
+    final assets = (await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets();
+    // google_fonts checks the asset bundle for `<Family>-<Weight>.ttf` before fetching.
+    for (final family in {brand.displayFont, brand.monoFont}) {
+      for (final weight in ['Regular', 'SemiBold', 'Bold']) {
+        final name = '${family.replaceAll(' ', '')}-$weight.ttf';
+        expect(assets.any((a) => a.endsWith('/$name')), isTrue, reason: '$name is not bundled');
+      }
+    }
+  });
 
   test('the p4n4 brand is the built-in palette', () {
     final brand = loadBrand('p4n4');

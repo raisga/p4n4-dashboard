@@ -46,7 +46,7 @@ flutter test
 Brands live in [`brands/`](brands/README.md). Pick one before building:
 
 ```bash
-dart run tool/brand.dart apply acme   # copies brands/acme into assets/brand/, patches native projects, regenerates icons
+dart run tool/brand.dart apply acme   # copies brands/acme into assets/brand/ (fonts included), patches native projects, regenerates icons
 flutter run -d linux
 dart run tool/brand.dart apply p4n4   # back to the default
 ```

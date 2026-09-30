@@ -58,9 +58,15 @@ class _OverviewTabState extends State<OverviewTab> {
     _schedule();
   }
 
+  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
+  /// don't push the next poll back.
   void _schedule() {
-    _timer?.cancel();
-    if (widget.active) _timer = Timer.periodic(_interval, (_) => _refresh());
+    if (!widget.active) {
+      _timer?.cancel();
+      _timer = null;
+    } else {
+      _timer ??= Timer.periodic(_interval, (_) => _refresh());
+    }
   }
 
   @override
@@ -152,7 +158,18 @@ class _OverviewTabState extends State<OverviewTab> {
     final r = _report;
     final (health, title, sub) = switch (r) {
       null => (Health.pending, 'Checking your system…', 'This takes a few seconds.'),
-      _ when r.known == 0 => (Health.down, 'We can\'t reach your system', 'Check that the device is on and connected.'),
+      // The API answered but reported none of the catalog's services.
+      _ when r.known == 0 => (
+        Health.unknown,
+        'Service status unavailable',
+        'Your system is responding but didn\'t report service status. Contact your administrator if this persists.',
+      ),
+      // Probing is the fallback when the API is down, so nothing answering means the host is unreachable.
+      _ when !r.viaApi && r.online == 0 => (
+        Health.down,
+        'We can\'t reach your system',
+        'Check that the device is on and connected.',
+      ),
       _ when r.online == r.known => (
         Health.up,
         'All systems operational',
