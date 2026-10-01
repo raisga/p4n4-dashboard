@@ -59,8 +59,9 @@ jobs:
             artifact: build/linux/x64/release/bundle
           - platform: android
             os: ubuntu-latest
-            command: flutter build apk --release
-            artifact: build/app/outputs/flutter-apk/app-release.apk
+            # One APK per CPU architecture: each is a third the size of a universal APK.
+            command: flutter build apk --release --split-per-abi
+            artifact: build/app/outputs/flutter-apk/*-release.apk
           - platform: windows
             os: windows-latest
             command: flutter build windows --release

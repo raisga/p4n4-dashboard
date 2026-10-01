@@ -53,7 +53,7 @@ Future<void> main(List<String> args) async {
       case ['apply', final id]:
         final brand = _validate(id);
         await _fonts(brand);
-        _install(id);
+        _install(brand);
         _patchNative(brand);
         await _icons(id);
         print('✓ Applied brand "$id". Rebuild the app (flutter clean is not required).');
@@ -164,24 +164,47 @@ void _contrast(String mode, Map<String, String> p) {
 /// Weights the app uses (lib/core/theme.dart, plus Material's w500 labels).
 const _weights = {400: 'Regular', 500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold'};
 
-/// Downloads the brand's display and mono fonts into `brands/<id>/fonts/` as
-/// `<Family>-<Weight>.ttf`, the names google_fonts looks for in the asset
-/// bundle before fetching at runtime. Existing files are kept unless [refresh].
-Future<void> _fonts(Map<String, dynamic> brand, {bool refresh = false}) async {
+/// The brand's font families by role, as the app's `BrandDisplay` /
+/// `BrandMono` families in pubspec.yaml name them (lowercased).
+Map<String, String> _families(Map<String, dynamic> brand) {
   final fonts = (brand['fonts'] as Map?) ?? const {};
-  final families = {fonts['display'] ?? 'Plus Jakarta Sans', fonts['mono'] ?? 'JetBrains Mono'}.cast<String>();
+  return {
+    'display': (fonts['display'] ?? 'Plus Jakarta Sans') as String,
+    'mono': (fonts['mono'] ?? 'JetBrains Mono') as String,
+  };
+}
+
+String _fontFile(String family, int weight) => '${family.replaceAll(' ', '')}-${_weights[weight]}.ttf';
+
+String _licenseFile(String family) => '${family.replaceAll(' ', '')}-LICENSE.txt';
+
+/// Where google/fonts keeps a family's license, by license type.
+List<Uri> _licenseUrls(String family) {
+  final dir = family.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
+  return [
+    for (final path in ['ofl/$dir/OFL.txt', 'apache/$dir/LICENSE.txt', 'ufl/$dir/UFL.txt'])
+      Uri.https('raw.githubusercontent.com', '/google/fonts/main/$path'),
+  ];
+}
+
+/// Downloads the brand's display and mono fonts from Google Fonts into
+/// `brands/<id>/fonts/` as `<Family>-<Weight>.ttf`, plus each family's
+/// license as `<Family>-LICENSE.txt` (shown on the app's licenses page).
+/// Existing files are kept unless [refresh].
+Future<void> _fonts(Map<String, dynamic> brand, {bool refresh = false}) async {
+  final families = _families(brand).values.toSet();
   final dir = Directory('${_brands.path}/${brand['id']}/fonts')..createSync(recursive: true);
   final http = HttpClient()..connectionTimeout = const Duration(seconds: 15);
   try {
     for (final family in families) {
-      for (final MapEntry(key: weight, value: name) in _weights.entries) {
-        final file = File('${dir.path}/${family.replaceAll(' ', '')}-$name.ttf');
+      for (final weight in _weights.keys) {
+        final file = File('${dir.path}/${_fontFile(family, weight)}');
         if (file.existsSync() && !refresh) continue;
         // A non-browser user agent makes the CSS API return static TTF URLs.
         final css = Uri.https('fonts.googleapis.com', '/css2', {'family': '$family:wght@$weight'});
         final res = await (await http.getUrl(css)).close();
         final body = await res.transform(utf8.decoder).join();
-        if (res.statusCode == 400) continue; // the family has no such weight; google_fonts picks the nearest
+        if (res.statusCode == 400) continue; // no such weight (or family; checked below)
         final url = RegExp(r'url\((https://[^)]+\.ttf)\)').firstMatch(body)?.group(1);
         if (res.statusCode != 200 || url == null) {
           throw FormatException('Could not fetch "$family" $weight from Google Fonts (HTTP ${res.statusCode})');
@@ -190,6 +213,24 @@ Future<void> _fonts(Map<String, dynamic> brand, {bool refresh = false}) async {
         if (ttf.statusCode != 200) throw FormatException('Could not download $url (HTTP ${ttf.statusCode})');
         file.writeAsBytesSync(await ttf.fold<List<int>>([], (a, b) => a..addAll(b)));
         print('  ${file.path.substring(_root.path.length + 1)}');
+      }
+      if (!_weights.keys.any((w) => File('${dir.path}/${_fontFile(family, w)}').existsSync())) {
+        throw FormatException('Font "$family" is not a Google Fonts family (brand.json `fonts`)');
+      }
+      final license = File('${dir.path}/${_licenseFile(family)}');
+      if (!license.existsSync() || refresh) {
+        String? text;
+        for (final url in _licenseUrls(family)) {
+          final res = await (await http.getUrl(url)).close();
+          final body = await res.transform(utf8.decoder).join();
+          if (res.statusCode == 200) {
+            text = body;
+            break;
+          }
+        }
+        if (text == null) throw FormatException('No license found for "$family" in github.com/google/fonts');
+        license.writeAsStringSync(text);
+        print('  ${license.path.substring(_root.path.length + 1)}');
       }
     }
   } on SocketException catch (e) {
@@ -206,16 +247,34 @@ Future<void> _fonts(Map<String, dynamic> brand, {bool refresh = false}) async {
 
 // ── install ───────────────────────────────────────────────────────────────
 
-void _install(String id) {
+void _install(Map<String, dynamic> brand) {
+  final id = brand['id'] as String;
+  final src = '${_brands.path}/$id';
   final dest = Directory('${_root.path}/assets/brand');
   if (dest.existsSync()) dest.deleteSync(recursive: true);
   dest.createSync(recursive: true);
-  for (final f in Directory('${_brands.path}/$id').listSync(recursive: true).whereType<File>()) {
-    final rel = f.path.substring('${_brands.path}/$id/'.length);
-    if (rel == 'icon.png') continue; // launcher icon only, not a runtime asset
+  for (final f in Directory(src).listSync(recursive: true).whereType<File>()) {
+    final rel = f.path.substring('$src/'.length);
+    // icon.png is the launcher icon only; fonts are installed under fixed names below.
+    if (rel == 'icon.png' || rel.startsWith('fonts/')) continue;
     File('${dest.path}/$rel')
       ..parent.createSync(recursive: true)
       ..writeAsBytesSync(f.readAsBytesSync());
+  }
+  // pubspec.yaml declares BrandDisplay / BrandMono from `fonts/<role>-<weight>.ttf`
+  // for every weight, so a weight the family lacks gets the nearest one it has.
+  for (final MapEntry(key: role, value: family) in _families(brand).entries) {
+    final have = [
+      for (final w in _weights.keys)
+        if (File('$src/fonts/${_fontFile(family, w)}').existsSync()) w,
+    ];
+    for (final w in _weights.keys) {
+      final nearest = have.reduce((a, b) => (a - w).abs() <= (b - w).abs() ? a : b);
+      File('$src/fonts/${_fontFile(family, nearest)}')
+          .copySync((File('${dest.path}/fonts/$role-$w.ttf')..parent.createSync(recursive: true)).path);
+    }
+    File('$src/fonts/${_licenseFile(family)}')
+        .copySync((File('${dest.path}/licenses/$role.txt')..parent.createSync(recursive: true)).path);
   }
   print('  assets/brand/ ← brands/$id/');
 }

@@ -18,7 +18,8 @@ import 'widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final brand = await Brand.load();
+  final brand = await Brand.load()
+    ..registerFontLicenses();
   final settings = await AppSettings.load(defaults: brand.defaults);
   final session = await Session.load();
   runApp(

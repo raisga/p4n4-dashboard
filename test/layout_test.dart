@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
@@ -14,8 +13,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/brands.dart';
 
 void main() {
-  GoogleFonts.config.allowRuntimeFetching = false;
-
   Future<void> pumpAt(
     WidgetTester tester,
     Size size,
@@ -147,6 +144,12 @@ void main() {
     expect(find.text('p4n4-api base URL'), findsNothing);
     expect(find.textContaining('CLIENT VIEW', findRichText: true), findsNothing);
     expect(find.text('Signed in as client'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('LICENSES'));
+    await tester.tap(find.text('LICENSES'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(LicensePage), findsOneWidget);
   });
 
   testWidgets('admins choose which tabs the client view shows', (tester) async {

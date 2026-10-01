@@ -32,10 +32,10 @@ _Last updated: 2026-09-29_
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
-- `flutter test`: 50 tests pass.
+- `flutter test`: 51 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
-  - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
+  - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections and offer the licenses page; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
   - Video tests: switching between one camera and the grid, tapping a tile to open it, clients seeing names but no URLs or camera controls, and adding a camera (SAVE disabled until the URL is valid). Settings tests cover the camera list, the single-`videoUrl` fallback and URL validation.
   - Status polling tests: tabs watching one host share a check, fresh data is reused across tabs, the shortest interval wins, polling stops when nothing is watched, and a failed check keeps the last report.
   - Settings tests: per-deployment settings switch together on connect (theme doesn't), custom API URLs, the connected deployment can't be removed, state survives a restart, and migration of pre-profile settings.
@@ -43,8 +43,8 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
     - every folder in `brands/` parses;
     - color overrides apply per mode;
     - tab order and filtering;
-    - invalid config is rejected (unknown tab or color token, bad hex, non-Google font);
-    - every brand ships its fonts, and the applied brand's fonts are in the asset bundle;
+    - invalid config is rejected (unknown tab or color token, bad hex, empty font name; unknown Google Fonts families are rejected by `tool/brand.dart`);
+    - every brand ships its fonts and their licenses, the applied brand's licenses are on the licenses page, and the applied brand's fonts are bundled for every weight of `BrandDisplay` and `BrandMono` (a missing file fails the build);
     - brand defaults seed settings;
     - the `acme` brand changes the wordmark, stack names, accent color, tab count and settings sections.
 - Debug build run by hand, with a screenshot of every tab in both themes:
@@ -81,7 +81,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 
   Fine on a trusted LAN, but it should be narrowed before any store/public release.
 - **Loose status matching.** Matching catalog entries to Compose service names is heuristic (`statusFor` in `lib/api/services.dart`: exact name, alias, or substring). Oddly named services may show the wrong status or "unknown".
-- **Changing a brand's fonts needs internet.** `tool/brand.dart apply` downloads missing fonts into `brands/<id>/fonts/`; builds themselves are offline. Font licenses (OFL) aren't yet registered with Flutter's `LicenseRegistry`, so they don't appear on the licenses page.
+- **Changing a brand's fonts needs internet.** `tool/brand.dart apply` downloads missing fonts into `brands/<id>/fonts/`; builds themselves are offline. Their licenses (OFL, Apache or UFL) come from github.com/google/fonts and are listed under Settings → About → **Licenses**.
 - **Ollama chat history is in-memory.** It's lost when the app restarts. Letta keeps its own history on the server.
 - **White-label gaps:**
   - The Linux window icon isn't set.
@@ -103,9 +103,9 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. Shrink the Android APK (see *App*).
+1. Secure storage for the Letta token (see *Code health*).
 2. Try several cameras by hand against real streams (grid bandwidth, reconnects), then decide on auto-discovery.
-3. Secure storage for the Letta token (see *Code health*).
+3. Edge metrics on the shared polling pattern (see *Code health*).
 
 ### Code health
 - [x] Shared status polling (`lib/api/status_monitor.dart`): Home, Services and Clients watch targets through one `StatusMonitor`, so a host is checked once however many tabs show it
@@ -127,7 +127,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [x] CI (`.github/workflows/ci.yml`): format, analyze, test, brand validation, a check that the committed files match the p4n4 brand, release builds for all five platforms (iOS unsigned) with downloadable artifacts, and tests + a Linux build for every brand
 - [ ] Re-enable CI when needed: it's disabled on GitHub to save Actions minutes (`gh workflow enable CI`; a disabled workflow can't be started by hand either). Until then, run `dart format`, `flutter analyze` and `flutter test` locally before pushing.
 - [ ] Smoke-test the CI builds on real Android, iOS, macOS and Windows devices
-- [ ] Shrink the Android APK (80 MB universal, ~14 MB of Dart code per ABI): replace `google_fonts`, whose table of every Google font is compiled in, with the bundled files declared as pubspec font families; ship split APKs or an app bundle
+- [x] Shrink the Android APK: replaced `google_fonts` (7.9 MB of Dart code per ABI for its table of every Google font) with the bundled files declared as pubspec font families, and dropped the unused `cupertino_icons`. Universal APK 80.3 → 54.7 MB; arm64 APK 28.0 → 19.5 MB with `--split-per-abi`, which CI now uses. Most of the rest is the Flutter engine (`libflutter.so`).
 - [ ] Embedded Grafana on Windows/Linux (e.g. `webview_windows`, or render panels as images with the Grafana image renderer)
 - [x] Several named cameras per deployment, with a grid view
 - [ ] Discover video sources automatically (e.g. go2rtc's stream list)
@@ -136,7 +136,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Show a "last updated" time on Home
 - [ ] Friendlier client error states with a "Contact support" action, from a new `support` email/URL field in `brand.json`
 - [x] Bundle each brand's fonts as assets so the app works fully offline
-- [ ] Register the bundled fonts' OFL licenses with `LicenseRegistry`
+- [x] Register the bundled fonts' licenses with `LicenseRegistry`, and add a **Licenses** button (Settings → About) that opens Flutter's licenses page
 - [ ] Persist Ollama chat history; render Markdown in agent replies
 - [ ] Agent: stop button while a reply streams, copy/retry per message, selectable system prompt
 - [ ] Agent: "include system status" button that adds current service status and edge readings to the prompt

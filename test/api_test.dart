@@ -1,15 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:p4n4_dashboard/api/agent_client.dart';
 import 'package:p4n4_dashboard/api/edge_metrics.dart';
 import 'package:p4n4_dashboard/api/services.dart';
 import 'package:p4n4_dashboard/widgets/mjpeg_view.dart';
 
 void main() {
-  GoogleFonts.config.allowRuntimeFetching = false;
-
   test('EdgeMetrics parses the documented JSON', () {
     final m = EdgeMetrics.fromJson({
       'cpu_percent': 23.1,

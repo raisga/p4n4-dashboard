@@ -1,8 +1,8 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'theme.dart';
 
@@ -51,6 +51,9 @@ class Brand {
   /// Replaces "p4n4" in stack and service names (`<platform>-iot`, `<platform>-api`).
   final String platform;
   final String tagline;
+
+  /// Google Fonts family names from brand.json `fonts`. The app renders them
+  /// through [P4Colors.displayFamily] and [P4Colors.monoFamily].
   final String displayFont;
   final String monoFont;
   final P4Colors light;
@@ -69,6 +72,17 @@ class Brand {
   static Future<Brand> load() async {
     final json = jsonDecode(await rootBundle.loadString('$assetDir/brand.json')) as Map<String, dynamic>;
     return Brand.fromJson(json);
+  }
+
+  /// Adds the bundled fonts' licenses (installed by `tool/brand.dart apply`
+  /// as `licenses/<role>.txt`) to the licenses page.
+  void registerFontLicenses() {
+    LicenseRegistry.addLicense(() async* {
+      for (final (role, family) in [('display', displayFont), ('mono', monoFont)]) {
+        if (role == 'mono' && family == displayFont) continue; // one family for both
+        yield LicenseEntryWithLineBreaks([family], await rootBundle.loadString('$assetDir/licenses/$role.txt'));
+      }
+    });
   }
 
   factory Brand.fromJson(Map<String, dynamic> j) {
@@ -95,8 +109,8 @@ class Brand {
       tagline: (j['tagline'] ?? '') as String,
       displayFont: displayFont,
       monoFont: monoFont,
-      light: P4Colors.light.withBrand(_colors(colors['light']), displayFont: displayFont, monoFont: monoFont),
-      dark: P4Colors.dark.withBrand(_colors(colors['dark']), displayFont: displayFont, monoFont: monoFont),
+      light: P4Colors.light.withBrand(_colors(colors['light'])),
+      dark: P4Colors.dark.withBrand(_colors(colors['dark'])),
       tabs: tabs,
       links: [
         for (final l in (j['links'] as List?) ?? const [])
@@ -107,13 +121,13 @@ class Brand {
     );
   }
 
-  static String _font(Object? name, String fallback) {
-    final family = (name as String?) ?? fallback;
-    if (!GoogleFonts.asMap().containsKey(family)) {
-      throw FormatException('Font "$family" is not a Google Fonts family');
-    }
-    return family;
-  }
+  /// Fonts are checked against Google Fonts by `tool/brand.dart`, which
+  /// downloads and bundles them; here only the name is needed.
+  static String _font(Object? name, String fallback) => switch (name) {
+    null => fallback,
+    String s when s.trim().isNotEmpty => s,
+    _ => throw FormatException('Font "$name" must be a non-empty family name'),
+  };
 
   static Map<String, Color> _colors(Object? raw) => {
     for (final e in ((raw as Map?) ?? const {}).entries) e.key as String: parseHex(e.value as String),

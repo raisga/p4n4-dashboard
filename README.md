@@ -34,7 +34,7 @@ flutter pub get
 flutter run -d linux      # or macos, windows, android, ios
 ```
 
-Build release artifacts with `flutter build apk | ios | macos | windows | linux`.
+Build release artifacts with `flutter build apk --split-per-abi | ios | macos | windows | linux`. `--split-per-abi` gives one APK per CPU architecture (arm64 ≈ 20 MB) instead of one universal APK (≈ 55 MB); for Play Store use `flutter build appbundle`.
 
 ```bash
 flutter analyze

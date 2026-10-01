@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
@@ -19,8 +20,6 @@ Map<String, dynamic> _minimal([Map<String, dynamic> extra = const {}]) => {
 };
 
 void main() {
-  GoogleFonts.config.allowRuntimeFetching = false;
-
   for (final id in brandIds()) {
     test('brands/$id parses', () {
       final brand = loadBrand(id);
@@ -35,19 +34,36 @@ void main() {
       for (final family in {brand.displayFont, brand.monoFont}) {
         final file = File('brands/$id/fonts/${family.replaceAll(' ', '')}-Regular.ttf');
         expect(file.existsSync(), isTrue, reason: 'run `dart run tool/brand.dart fonts $id`');
+        final license = File('brands/$id/fonts/${family.replaceAll(' ', '')}-LICENSE.txt');
+        expect(license.existsSync(), isTrue, reason: 'run `dart run tool/brand.dart fonts $id`');
       }
     });
   }
 
   testWidgets('the applied brand bundles its fonts, so they load offline', (tester) async {
-    final brand = await Brand.load();
-    final assets = (await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets();
-    // google_fonts checks the asset bundle for `<Family>-<Weight>.ttf` before fetching.
-    for (final family in {brand.displayFont, brand.monoFont}) {
-      for (final weight in ['Regular', 'SemiBold', 'Bold']) {
-        final name = '${family.replaceAll(' ', '')}-$weight.ttf';
-        expect(assets.any((a) => a.endsWith('/$name')), isTrue, reason: '$name is not bundled');
+    final manifest = (jsonDecode(await rootBundle.loadString('FontManifest.json')) as List).cast<Map>();
+    for (final family in [P4Colors.displayFamily, P4Colors.monoFamily]) {
+      final fonts = (manifest.firstWhere((f) => f['family'] == family)['fonts'] as List).cast<Map>();
+      expect(fonts.map((f) => f['weight']), [400, 500, 600, 700, 800], reason: family);
+      for (final f in fonts) {
+        // Throws if `tool/brand.dart apply` didn't install the file.
+        expect(
+          (await rootBundle.load(f['asset'] as String)).lengthInBytes,
+          greaterThan(10000),
+          reason: '${f['asset']}',
+        );
       }
+    }
+  });
+
+  testWidgets('the applied brand\'s font licenses are on the licenses page', (tester) async {
+    addTearDown(LicenseRegistry.reset);
+    final brand = await Brand.load()
+      ..registerFontLicenses();
+    final entries = (await tester.runAsync(() => LicenseRegistry.licenses.toList()))!;
+    for (final family in {brand.displayFont, brand.monoFont}) {
+      final entry = entries.singleWhere((e) => e.packages.contains(family));
+      expect(entry.paragraphs.map((p) => p.text).join('\n'), contains('License'), reason: family);
     }
   });
 
@@ -122,7 +138,7 @@ void main() {
     expect(
       () => Brand.fromJson(
         _minimal({
-          'fonts': {'mono': 'Not A Real Font'},
+          'fonts': {'mono': ''},
         }),
       ),
       throwsFormatException,

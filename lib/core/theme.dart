@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Brand palette + fonts. The defaults are the p4n4 brand: dark is the
 /// original launcher palette; light is its own set of steps tuned for contrast on
@@ -24,8 +23,6 @@ class P4Colors extends ThemeExtension<P4Colors> {
     required this.ok,
     required this.warn,
     required this.err,
-    this.displayFont = 'Plus Jakarta Sans',
-    this.monoFont = 'JetBrains Mono',
   });
 
   final Brightness brightness;
@@ -45,8 +42,11 @@ class P4Colors extends ThemeExtension<P4Colors> {
   final Color ok;
   final Color warn;
   final Color err;
-  final String displayFont;
-  final String monoFont;
+
+  /// Font families declared in pubspec.yaml. `tool/brand.dart apply` fills
+  /// them with the brand's fonts (brand.json `fonts`), bundled for offline use.
+  static const displayFamily = 'BrandDisplay';
+  static const monoFamily = 'BrandMono';
 
   /// Colour tokens a brand may override in brand.json, by name.
   static const tokens = [
@@ -75,7 +75,7 @@ class P4Colors extends ThemeExtension<P4Colors> {
   };
 
   /// Returns this palette with [overrides] (token name → colour) applied.
-  P4Colors withBrand(Map<String, Color> overrides, {String? displayFont, String? monoFont}) {
+  P4Colors withBrand(Map<String, Color> overrides) {
     final unknown = overrides.keys.where((k) => !tokens.contains(k));
     if (unknown.isNotEmpty) throw FormatException('Unknown colour tokens: ${unknown.join(', ')}');
     Color c(String name) => overrides[name] ?? token(name);
@@ -97,8 +97,6 @@ class P4Colors extends ThemeExtension<P4Colors> {
       ok: c('ok'),
       warn: c('warn'),
       err: c('err'),
-      displayFont: displayFont ?? this.displayFont,
-      monoFont: monoFont ?? this.monoFont,
     );
   }
 
@@ -145,8 +143,8 @@ class P4Colors extends ThemeExtension<P4Colors> {
   bool get isDark => brightness == Brightness.dark;
 
   TextStyle mono({double size = 11, Color? color, FontWeight weight = FontWeight.w400, double spacing = 0.08}) =>
-      GoogleFonts.getFont(
-        monoFont,
+      TextStyle(
+        fontFamily: monoFamily,
         fontSize: size,
         color: color ?? muted,
         fontWeight: weight,
@@ -154,8 +152,8 @@ class P4Colors extends ThemeExtension<P4Colors> {
       );
 
   TextStyle display({double size = 15, Color? color, FontWeight weight = FontWeight.w700, double spacing = -0.3}) =>
-      GoogleFonts.getFont(
-        displayFont,
+      TextStyle(
+        fontFamily: displayFamily,
         fontSize: size,
         color: color ?? heading,
         fontWeight: weight,
@@ -202,11 +200,7 @@ ThemeData buildTheme(P4Colors c) {
   );
   return base.copyWith(
     extensions: [c],
-    textTheme: base.textTheme.apply(
-      fontFamily: GoogleFonts.getFont(c.displayFont).fontFamily,
-      bodyColor: c.text,
-      displayColor: c.heading,
-    ),
+    textTheme: base.textTheme.apply(fontFamily: P4Colors.displayFamily, bodyColor: c.text, displayColor: c.heading),
     iconTheme: IconThemeData(color: c.text),
     appBarTheme: AppBarTheme(
       backgroundColor: c.bg,

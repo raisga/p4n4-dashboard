@@ -182,19 +182,24 @@ class SettingsPage extends StatelessWidget {
                         brand.tagline,
                         style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                       ),
-                    if (brand.links.isNotEmpty)
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 8,
-                        children: [
-                          for (final l in brand.links)
-                            OutlinedButton.icon(
-                              onPressed: () => launchUrl(l.url, mode: LaunchMode.externalApplication),
-                              icon: const Icon(Icons.open_in_new, size: 14),
-                              label: Text(l.label.toUpperCase()),
-                            ),
-                        ],
-                      ),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        for (final l in brand.links)
+                          OutlinedButton.icon(
+                            onPressed: () => launchUrl(l.url, mode: LaunchMode.externalApplication),
+                            icon: const Icon(Icons.open_in_new, size: 14),
+                            label: Text(l.label.toUpperCase()),
+                          ),
+                        // Fonts, Flutter and every package the app ships with.
+                        OutlinedButton.icon(
+                          onPressed: () => showLicensePage(context: context, applicationName: brand.appName),
+                          icon: const Icon(Icons.gavel_outlined, size: 14),
+                          label: const Text('LICENSES'),
+                        ),
+                      ],
+                    ),
                   ]),
                 ],
               ),

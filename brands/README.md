@@ -5,7 +5,7 @@ Each folder here is one brand. A build ships **exactly one** brand: the one last
 ```bash
 dart run tool/brand.dart list          # acme, p4n4
 dart run tool/brand.dart check acme    # validate only
-dart run tool/brand.dart fonts acme    # (re)download the brand's fonts into brands/acme/fonts/
+dart run tool/brand.dart fonts acme    # (re)download the brand's fonts and their licenses into brands/acme/fonts/
 dart run tool/brand.dart apply acme    # install + patch native projects + icons
 flutter build apk                      # …or any other platform
 ```
@@ -16,7 +16,9 @@ flutter build apk                      # …or any other platform
 
 | Where | What |
 |-------|------|
-| `brands/<id>/fonts/` | Missing fonts are downloaded from Google Fonts (weights 400–800), so `apply` needs a network connection the first time |
+| `brands/<id>/fonts/` | Missing fonts are downloaded from Google Fonts (weights 400–800), with each family's license from github.com/google/fonts, so `apply` needs a network connection the first time. An unknown family name is an error |
+| `assets/brand/licenses/` | Each font family's license (`display.txt`, `mono.txt`), shown under Settings → About → **Licenses** |
+| `assets/brand/fonts/` | The fonts, renamed to `display-<weight>.ttf` / `mono-<weight>.ttf` for the `BrandDisplay` / `BrandMono` families in `pubspec.yaml`. A weight the family lacks uses its nearest weight |
 | `assets/brand/` | Replaced with `brands/<id>/`, minus `icon.png` |
 | Android | `applicationId`, app label |
 | iOS | Bundle ID (app and tests), display name, local-network permission text |
