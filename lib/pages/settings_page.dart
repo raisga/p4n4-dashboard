@@ -127,11 +127,10 @@ class SettingsPage extends StatelessWidget {
                       ]),
                     if (brand.tabs.contains(DashTab.video))
                       _section('video', [
-                        _Field(
-                          'Stream URL',
-                          s.videoUrl,
-                          (v) => s.videoUrl = v,
-                          hint: 'http://host:8080/?action=stream',
+                        for (final c in s.cameras) Text('${c.name}  ${c.url}', style: p4.mono(color: p4.text)),
+                        Text(
+                          '${s.cameras.isEmpty ? 'No cameras yet. ' : ''}Add, edit and remove cameras on the Video tab.',
+                          style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                         ),
                       ]),
                     _section('client view', [

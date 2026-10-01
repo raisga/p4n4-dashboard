@@ -66,7 +66,7 @@ What `apply` doesn't change:
 Only `id`, `appName`, `wordmark.text` and `native` are required. Every other field falls back to the p4n4 defaults.
 
 - **Colors.** Color tokens are the fields of `P4Colors` in `lib/core/theme.dart`: `bg`, `bg2`, `bg3`, `accent`, `accent2`, `onAccent`, `amber`, `blue`, `heading`, `text`, `muted`, `border`, `border2`, `ok`, `warn`, `err`. `check` and `apply` warn when a text color falls below WCAG AA contrast (4.5:1) against any surface in that mode. Light and dark are validated separately, so a teal that works on black may need a darker step on white.
-- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `agentBackend` (`ollama` | `letta`), `grafanaPath`, `grafanaKiosk`, `videoUrl`, `themeMode` (`system` | `light` | `dark`).
+- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `agentBackend` (`ollama` | `letta`), `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`).
 - **Disabled tabs** also hide their section on the settings page.
 
 ## Files

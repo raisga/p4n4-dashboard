@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/pages/login_page.dart';
+import 'package:p4n4_dashboard/widgets/mjpeg_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
@@ -178,5 +180,68 @@ void main() {
 
     expect(settings.deployment.name, 'Site');
     expect(find.text('// Site · 10.0.0.2'), findsOneWidget);
+  });
+
+  const cameras = [
+    Camera(id: 'a', name: 'Gate', url: 'http://cam-a/stream'),
+    Camera(id: 'b', name: 'Yard', url: 'http://cam-b/snap.jpg'),
+  ];
+
+  testWidgets('video shows one camera or all of them in a grid', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
+    SettingsScope.of(tester.element(find.byType(HomeShell))).cameras = cameras;
+    await tester.tap(find.text('VIDEO'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(MjpegView), findsOneWidget);
+    expect(find.text('http://cam-a/stream'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('All cameras'));
+    await tester.pump();
+    expect(find.text('2 cameras'), findsOneWidget);
+    expect(find.byType(MjpegView), findsNWidgets(2));
+
+    // Tapping a tile's label opens that camera on its own.
+    await tester.tap(find.text('Yard'));
+    await tester.pump();
+    expect(find.byType(MjpegView), findsOneWidget);
+    expect(find.text('http://cam-b/snap.jpg'), findsOneWidget);
+    expect(find.byTooltip('All cameras'), findsOneWidget);
+  });
+
+  testWidgets('clients see camera names but no URLs or camera controls', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.client);
+    SettingsScope.of(tester.element(find.byType(HomeShell))).cameras = cameras;
+    await tester.tap(find.text('VIDEO'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Gate'), findsWidgets);
+    expect(find.textContaining('http://'), findsNothing);
+    expect(find.byTooltip('Add camera'), findsNothing);
+    expect(find.byTooltip('Edit camera'), findsNothing);
+  });
+
+  testWidgets('admins add a camera; SAVE waits for a valid URL', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    await tester.tap(find.text('VIDEO'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('ADD CAMERA'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final save = find.widgetWithText(FilledButton, 'SAVE');
+    final url = find.widgetWithText(TextField, 'MJPEG or snapshot URL');
+    await tester.enterText(url, 'not a url');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Gate');
+    await tester.enterText(url, 'http://cam/stream');
+    await tester.pump();
+    await tester.tap(save);
+    // No pumpAndSettle in this test: loading spinners keep animating.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(settings.cameras.single.name, 'Gate');
+    expect(find.byType(MjpegView), findsOneWidget);
   });
 }

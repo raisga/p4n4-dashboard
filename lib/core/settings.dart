@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/camera.dart';
 import '../api/fleet.dart';
 import 'brand.dart';
 
@@ -23,6 +24,7 @@ const profileKeys = {
   'grafanaPath',
   'grafanaKiosk',
   'videoUrl',
+  'cameras',
 };
 
 /// User-editable settings, persisted with shared_preferences.
@@ -130,9 +132,24 @@ class AppSettings extends ChangeNotifier {
     return u.replace(queryParameters: {...u.queryParameters, 'kiosk': '1'});
   }
 
-  // Video feed: MJPEG stream or a JPEG snapshot URL.
-  String get videoUrl => _str('videoUrl', '');
-  set videoUrl(String v) => _set('videoUrl', v.trim());
+  // Video
+
+  /// The deployment's cameras, in display order.
+  ///
+  /// Until cameras are first saved, a single `videoUrl` (stored, or a brand
+  /// default) appears as one camera named "Camera".
+  List<Camera> get cameras => switch (deployment.values['cameras']) {
+    List list => [for (final c in list) Camera.fromJson((c as Map).cast())],
+    _ => [if (_str('videoUrl', '') case final url when url.isNotEmpty) Camera(id: 'camera', name: 'Camera', url: url)],
+  };
+
+  set cameras(List<Camera> v) {
+    deployment.values.remove('videoUrl'); // superseded by the list
+    _set('cameras', [for (final c in v) c.toJson()]);
+  }
+
+  /// A camera id not used by any of [cameras].
+  String newCameraId() => _newId(cameras.map((c) => c.id));
 
   /// Brand tabs shown in the client view, after Home. Set by admins.
   List<DashTab> get clientTabs {
@@ -185,9 +202,12 @@ class AppSettings extends ChangeNotifier {
   }
 
   /// A new, unused deployment id.
-  String newDeploymentId() {
+  String newDeploymentId() => _newId(_deployments.map((d) => d.id));
+
+  static String _newId(Iterable<String> taken) {
+    final used = taken.toSet();
     var n = DateTime.now().microsecondsSinceEpoch;
-    while (_deployments.any((d) => d.id == n.toRadixString(36))) {
+    while (used.contains(n.toRadixString(36))) {
       n++;
     }
     return n.toRadixString(36);

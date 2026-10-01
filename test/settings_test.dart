@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,7 +24,7 @@ void main() {
   test('connecting switches every connection setting but not app-wide ones', () async {
     final s = await _load({});
     s.host = '10.0.0.1';
-    s.videoUrl = 'http://10.0.0.1:8080/stream';
+    s.cameras = [const Camera(id: 'c', name: 'Gate', url: 'http://10.0.0.1:8080/stream')];
     s.themeMode = ThemeMode.dark;
     final site = Deployment(id: s.newDeploymentId(), name: 'Site', values: {'host': '10.0.0.2'});
     await s.saveDeployment(site);
@@ -31,13 +32,13 @@ void main() {
     await s.connect(site.id);
     expect(s.deployment.name, 'Site');
     expect(s.host, '10.0.0.2');
-    expect(s.videoUrl, isEmpty);
+    expect(s.cameras, isEmpty);
     expect(s.themeMode, ThemeMode.dark);
 
     s.grafanaPath = '/d/site';
     await s.connect(s.deployments.first.id);
     expect(s.host, '10.0.0.1');
-    expect(s.videoUrl, 'http://10.0.0.1:8080/stream');
+    expect(s.cameras.single.url, 'http://10.0.0.1:8080/stream');
     expect(s.grafanaPath, '/');
   });
 
@@ -63,12 +64,39 @@ void main() {
     final site = Deployment(id: s.newDeploymentId(), name: 'Site', values: {'host': '10.0.0.2'});
     await s.saveDeployment(site);
     await s.connect(site.id);
-    s.videoUrl = 'http://cam';
+    s.cameras = [const Camera(id: 'c', name: 'Gate', url: 'http://cam')];
 
     final again = await AppSettings.load();
     expect(again.deployments.map((d) => d.name), ['Default', 'Site']);
     expect(again.deployment.id, site.id);
-    expect(again.videoUrl, 'http://cam');
+    expect(again.cameras.single.name, 'Gate');
+  });
+
+  group('cameras', () {
+    test('a single videoUrl (e.g. a brand default) appears as one camera', () async {
+      final s = await _load({}, defaults: {'videoUrl': 'http://cam/stream'});
+      expect(s.cameras.single.url, 'http://cam/stream');
+      expect(s.cameras.single.name, 'Camera');
+    });
+
+    test('saving cameras replaces the single videoUrl, even with an empty list', () async {
+      final s = await _load({}, defaults: {'videoUrl': 'http://cam/stream'});
+      final cams = [...s.cameras, Camera(id: s.newCameraId(), name: 'Yard', url: 'http://yard/snap.jpg')];
+      s.cameras = cams;
+      expect(s.cameras.map((c) => c.name), ['Camera', 'Yard']);
+      expect(s.deployment.values, isNot(contains('videoUrl')));
+
+      s.cameras = [];
+      expect(s.cameras, isEmpty);
+    });
+
+    test('only http(s) URLs with a host are usable', () {
+      expect(Camera.parseUrl('http://10.0.0.2:8080/?action=stream'), isNotNull);
+      expect(Camera.parseUrl(' https://cam.lan/snap.jpg '), isNotNull);
+      expect(Camera.parseUrl('http://'), isNull);
+      expect(Camera.parseUrl('rtsp://cam/stream'), isNull);
+      expect(Camera.parseUrl('cam.lan'), isNull);
+    });
   });
 
   group('migration from top-level settings', () {
@@ -84,7 +112,7 @@ void main() {
       });
       expect(s.deployments.map((d) => d.name), ['Lab', 'Site']);
       expect(s.deployment.name, 'Site');
-      expect(s.videoUrl, 'http://cam');
+      expect(s.cameras.single.url, 'http://cam');
       expect(s.themeMode, ThemeMode.dark);
       expect(s.hostOf(s.deployments.first), '10.0.0.9');
       expect(s.deployments.first.values, isNot(contains('videoUrl')));

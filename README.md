@@ -8,7 +8,7 @@ Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs on Android,
 | **Edge** | CPU, memory, SoC temperature and inference latency, with 2 minutes of history | Configurable metrics URL (see [below](#edge-metrics-contract)); a demo mode is built in |
 | **Agent** | Chat with a local model or a stateful agent | Ollama `/api/chat` (streaming), or Letta `/v1/agents/{id}/messages` |
 | **Grafana** | Embedded Grafana, in kiosk mode by default | `http://<host>:3000` |
-| **Video** | Live camera feed from the edge device | Any MJPEG stream (`multipart/x-mixed-replace`) or JPEG snapshot URL |
+| **Video** | Live camera feeds from the edge device: pick one, or see them all in a grid | Any MJPEG stream (`multipart/x-mixed-replace`) or JPEG snapshot URL |
 
 ## Admin and client views
 
@@ -20,12 +20,12 @@ On launch you pick a role on the sign-in screen. The role is saved until you sig
 | Home | — | Overall health, per-stack status, edge device readings and shortcuts. No hosts, ports or URLs |
 | Clients | Client deployments, each a connection profile (name, host, optional API URL), with live status from each one's API, or port probes as a fallback. **Connect** switches the dashboard, with all its connection settings, to that deployment | — |
 | Services | Launcher, plus a stack-controls menu (start/restart/stop, disabled until the API has stack endpoints) | Only if enabled; no stack controls |
-| Tabs' config controls | Video source, Grafana URL, agent backend, edge demo toggle | Hidden; errors are shown in plain language |
+| Tabs' config controls | Add/edit/remove cameras, Grafana URL, agent backend, edge demo toggle | Hidden (clients see camera names, not URLs); errors are shown in plain language |
 | Settings | Everything, plus a **Client view** section to choose client tabs | Appearance, account and about only |
 
 On phones the bottom bar holds at most five destinations; any extras (e.g. admin **Clients**) open from an app-bar button.
 
-Connection settings (host, API, metrics, agent, Grafana and video) live behind the ⚙ button, belong to the connected deployment, and persist between launches. Theme and client tabs are app-wide. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
+Connection settings (host, API, metrics, agent, Grafana and cameras) live behind the ⚙ button (cameras on the Video tab), belong to the connected deployment, and persist between launches. Theme and client tabs are app-wide. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
 
 ## Run
 

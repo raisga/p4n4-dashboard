@@ -21,21 +21,22 @@ _Last updated: 2026-09-29_
 | Edge metrics | ⚠️ UI only | Polls `/api/v1/edge/metrics` every 2 s. **That endpoint doesn't exist in p4n4-api v0.1**, so the tab shows an error until it's added or pointed at another URL. A demo mode generates synthetic data. The JSON it expects is in `README.md`. |
 | Agent chat | ✅ Ollama / ⚠️ Letta | Ollama streaming chat and model list work against a live server. The Letta client is written to the Letta REST API but has not been run against a real Letta server. |
 | Grafana | ✅ Android/iOS/macOS, ↗ Windows/Linux | Embedded web view in kiosk mode. On Windows and Linux there's no Flutter web view, so the tab opens Grafana in the browser. |
-| Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. Dropped streams reconnect automatically (backoff 2 s → 30 s). There's no default source; the user enters a URL. |
+| Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. Several named cameras per deployment: one at a time (dropdown) or all in a grid; each camera's stream stays connected when switching views. Admins add/edit/delete cameras; clients see names only. Dropped streams reconnect automatically (backoff 2 s → 30 s). A single `videoUrl` (older settings or a brand default) shows up as one camera. |
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
 | White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
 | Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
-| Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password, Grafana path/kiosk and video URL are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
+| Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password, Grafana path/kiosk and cameras are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
 
 ## What was checked
 
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
-- `flutter test`: 39 tests pass.
+- `flutter test`: 45 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
   - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
+  - Video tests: switching between one camera and the grid, tapping a tile to open it, clients seeing names but no URLs or camera controls, and adding a camera (SAVE disabled until the URL is valid). Settings tests cover the camera list, the single-`videoUrl` fallback and URL validation.
   - Settings tests: per-deployment settings switch together on connect (theme doesn't), custom API URLs, the connected deployment can't be removed, state survives a restart, and migration of pre-profile settings.
   - Brand tests:
     - every folder in `brands/` parses;
@@ -101,9 +102,9 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. Several cameras. Store them in the deployment's settings (`profileKeys` in `lib/core/settings.dart`) so each client keeps its own.
-2. Shared polling layer (see *Code health*).
-3. Shrink the Android APK (see *App*).
+1. Shared polling layer (see *Code health*).
+2. Shrink the Android APK (see *App*).
+3. Try several cameras by hand against real streams (grid bandwidth, reconnects), then decide on auto-discovery.
 
 ### Code health
 - [ ] Share one polling layer (e.g. a per-host status repository) between Home, Services and Clients. Each tab currently runs its own `checkServices` timer, so one host can be probed three times.
@@ -121,10 +122,13 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 
 ### App
 - [x] CI (`.github/workflows/ci.yml`): format, analyze, test, brand validation, a check that the committed files match the p4n4 brand, release builds for all five platforms (iOS unsigned) with downloadable artifacts, and tests + a Linux build for every brand
+- [ ] Re-enable CI when needed: it's disabled on GitHub to save Actions minutes (`gh workflow enable CI`; a disabled workflow can't be started by hand either). Until then, run `dart format`, `flutter analyze` and `flutter test` locally before pushing.
 - [ ] Smoke-test the CI builds on real Android, iOS, macOS and Windows devices
 - [ ] Shrink the Android APK (80 MB universal, ~14 MB of Dart code per ABI): replace `google_fonts`, whose table of every Google font is compiled in, with the bundled files declared as pubspec font families; ship split APKs or an app bundle
 - [ ] Embedded Grafana on Windows/Linux (e.g. `webview_windows`, or render panels as images with the Grafana image renderer)
-- [ ] Discover video sources automatically, or allow several cameras (named, with a grid view on desktop)
+- [x] Several named cameras per deployment, with a grid view
+- [ ] Discover video sources automatically (e.g. go2rtc's stream list)
+- [ ] Grid mode streams every camera at full rate; consider snapshot polling or a lower frame rate for grid tiles on slow links
 - [ ] Kiosk / wall-display mode: fullscreen Home or Grafana, no navigation, cycling between pages
 - [ ] Show a "last updated" time on Home
 - [ ] Friendlier client error states with a "Contact support" action, from a new `support` email/URL field in `brand.json`
