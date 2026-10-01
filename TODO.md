@@ -32,11 +32,12 @@ _Last updated: 2026-09-29_
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
-- `flutter test`: 45 tests pass.
+- `flutter test`: 50 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
   - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
   - Video tests: switching between one camera and the grid, tapping a tile to open it, clients seeing names but no URLs or camera controls, and adding a camera (SAVE disabled until the URL is valid). Settings tests cover the camera list, the single-`videoUrl` fallback and URL validation.
+  - Status polling tests: tabs watching one host share a check, fresh data is reused across tabs, the shortest interval wins, polling stops when nothing is watched, and a failed check keeps the last report.
   - Settings tests: per-deployment settings switch together on connect (theme doesn't), custom API URLs, the connected deployment can't be removed, state survives a restart, and migration of pre-profile settings.
   - Brand tests:
     - every folder in `brands/` parses;
@@ -102,12 +103,14 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. Shared polling layer (see *Code health*).
-2. Shrink the Android APK (see *App*).
-3. Try several cameras by hand against real streams (grid bandwidth, reconnects), then decide on auto-discovery.
+1. Shrink the Android APK (see *App*).
+2. Try several cameras by hand against real streams (grid bandwidth, reconnects), then decide on auto-discovery.
+3. Secure storage for the Letta token (see *Code health*).
 
 ### Code health
-- [ ] Share one polling layer (e.g. a per-host status repository) between Home, Services and Clients. Each tab currently runs its own `checkServices` timer, so one host can be probed three times.
+- [x] Shared status polling (`lib/api/status_monitor.dart`): Home, Services and Clients watch targets through one `StatusMonitor`, so a host is checked once however many tabs show it
+- [ ] `StatusMonitor` keeps the last status of every target it has seen (e.g. a deployment's old host); prune unwatched entries if fleets get large
+- [ ] Edge metrics are still polled separately by Home and the Edge tab; move them onto the same pattern
 - [ ] Move the Letta token (and the future JWT) from SharedPreferences to `flutter_secure_storage`
 - [ ] Make Home's status summary testable: inject the HTTP client (or extract the summary logic) so "can't reach" / "status unavailable" / "needs attention" get widget tests. Flutter's test HTTP stub answers every request, so offline hosts can't be simulated today.
 - [ ] Test MJPEG auto-reconnect and EXIF-thumbnail frames against a real IP camera

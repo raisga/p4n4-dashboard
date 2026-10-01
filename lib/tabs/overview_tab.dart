@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api/edge_metrics.dart';
 import '../api/services.dart';
+import '../api/status_monitor.dart';
 import '../core/brand.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -30,23 +31,30 @@ class _OverviewTabState extends State<OverviewTab> {
   P4Colors get p4 => context.p4;
 
   final _demo = DemoMetrics();
-  ServiceReport? _report;
   EdgeMetrics? _metrics;
   bool _metricsFailed = false;
-  bool _loading = false;
+  bool _metricsLoading = false;
   Timer? _timer;
-  String? _sourceKey;
+  String? _metricsKey;
+
+  // Service status comes from the shared StatusMonitor; only edge metrics are polled here.
+  late StatusMonitor _monitor;
+  late StatusTarget _target;
+
+  ServiceReport? get _report => _monitor.statusOf(_target).report;
+  bool get _loading => _metricsLoading || _monitor.statusOf(_target).checking;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _monitor = StatusScope.of(context);
     final s = SettingsScope.of(context);
-    final key = '${s.apiUri}|${s.host}|${s.edgeDemo}|${s.edgeMetricsUri}';
-    if (key != _sourceKey) {
-      _sourceKey = key;
-      _report = null;
+    _target = s.statusTarget;
+    final key = '${s.edgeDemo}|${s.edgeMetricsUri}';
+    if (key != _metricsKey) {
+      _metricsKey = key;
       _metrics = null;
-      _refresh();
+      _fetchMetrics();
     }
     _schedule();
   }
@@ -54,53 +62,51 @@ class _OverviewTabState extends State<OverviewTab> {
   @override
   void didUpdateWidget(OverviewTab old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) _refresh();
+    if (widget.active && !old.active) _fetchMetrics();
     _schedule();
   }
 
-  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
-  /// don't push the next poll back.
+  /// Matches polling to [active]; a no-op otherwise, so rebuilds don't push
+  /// the next poll back.
   void _schedule() {
     if (!widget.active) {
       _timer?.cancel();
       _timer = null;
+      _monitor.unwatch(this);
     } else {
-      _timer ??= Timer.periodic(_interval, (_) => _refresh());
+      _timer ??= Timer.periodic(_interval, (_) => _fetchMetrics());
+      _monitor.watch(this, [_target], interval: _interval);
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _monitor.unwatch(this);
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    if (_loading) return;
-    final s = SettingsScope.of(context);
-    final key = _sourceKey;
-    final withEdge = BrandScope.of(context).tabs.contains(DashTab.edge);
-    setState(() => _loading = true);
-    Future<EdgeMetrics?> metrics() async {
-      if (!withEdge) return null;
-      if (s.edgeDemo) return _demo.next();
-      try {
-        return await fetchEdgeMetrics(s.edgeMetricsUri);
-      } catch (_) {
-        return null;
-      }
-    }
+  Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics()).wait;
 
+  Future<void> _fetchMetrics() async {
+    if (_metricsLoading || !BrandScope.of(context).tabs.contains(DashTab.edge)) return;
+    final s = SettingsScope.of(context);
+    final key = _metricsKey;
+    // Not setState: this can run from didChangeDependencies, mid-build.
+    _metricsLoading = true;
     try {
-      final (report, m) = await (checkServices(s.apiUri, (d) => s.url(d.port, d.path)), metrics()).wait;
-      if (!mounted || key != _sourceKey) return;
-      setState(() {
-        _report = report;
-        _metrics = m;
-        _metricsFailed = withEdge && m == null;
-      });
+      final m = s.edgeDemo ? _demo.next() : await fetchEdgeMetrics(s.edgeMetricsUri);
+      if (mounted && key == _metricsKey) {
+        setState(() {
+          _metrics = m;
+          _metricsFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted && key == _metricsKey) setState(() => _metricsFailed = true);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _metricsLoading = false;
+      if (mounted) setState(() {});
     }
   }
 

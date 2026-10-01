@@ -126,7 +126,7 @@ lib/
 │   ├── brand.dart         # white-label config (assets/brand/brand.json)
 │   ├── theme.dart         # light/dark palettes (P4Colors ThemeExtension) + fonts
 │   └── settings.dart      # persisted connection settings (SettingsScope)
-├── api/                   # services catalog + status, edge metrics, Ollama/Letta clients
+├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, Ollama/Letta clients
 ├── tabs/                  # one file per tab
 ├── pages/                 # settings page
 └── widgets/               # shared UI, sparkline, MJPEG viewer

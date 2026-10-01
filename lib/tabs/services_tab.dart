@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/services.dart';
+import '../api/status_monitor.dart';
 import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -23,91 +22,46 @@ class ServicesTab extends StatefulWidget {
 class _ServicesTabState extends State<ServicesTab> {
   P4Colors get p4 => context.p4;
 
-  Map<String, ComposeService>? _status;
-  Map<ServiceDef, bool>? _probe;
-  Object? _error;
-  bool _loading = false;
-  Timer? _timer;
-  Uri? _api;
+  late StatusMonitor _monitor;
+  late StatusTarget _target;
 
+  /// Shown while visible; the shared [StatusMonitor] does the polling.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final api = SettingsScope.of(context).apiUri;
-    if (api != _api) {
-      _api = api;
-      _status = null;
-      _probe = null;
-      _refresh();
-    }
-    _schedule();
+    _monitor = StatusScope.of(context);
+    _target = SettingsScope.of(context).statusTarget;
+    _watch();
   }
 
   @override
   void didUpdateWidget(ServicesTab old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) _refresh();
-    _schedule();
+    _watch();
   }
 
-  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
-  /// don't push the next poll back.
-  void _schedule() {
-    if (!widget.active) {
-      _timer?.cancel();
-      _timer = null;
-    } else {
-      _timer ??= Timer.periodic(const Duration(seconds: 15), (_) => _refresh());
-    }
-  }
+  void _watch() =>
+      widget.active ? _monitor.watch(this, [_target], interval: const Duration(seconds: 15)) : _monitor.unwatch(this);
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _monitor.unwatch(this);
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    final api = _api;
-    if (api == null || _loading) return;
-    setState(() => _loading = true);
-    try {
-      final status = await fetchComposeStatus(api);
-      if (!mounted || api != _api) return;
-      setState(() {
-        _status = status;
-        _probe = null;
-        _error = null;
-      });
-    } catch (e) {
-      if (!mounted || api != _api) return;
-      setState(() {
-        _status = null;
-        _error = e;
-      });
-      final settings = SettingsScope.of(context);
-      final defs = [for (final st in stacks) ...st.services.where((d) => !d.tcpOnly)];
-      final up = await Future.wait(defs.map((d) => probeHttp(settings.url(d.port, d.path))));
-      if (mounted && api == _api) setState(() => _probe = Map.fromIterables(defs, up));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  Future<void> _refresh() => _monitor.refresh(_target);
 
-  Health _healthOf(ServiceDef def) {
-    if (_status == null) {
-      final probed = _probe?[def];
-      if (probed != null) return probed ? Health.up : Health.down;
-      return _probe == null ? Health.pending : Health.unknown;
-    }
-    final s = statusFor(def, _status!);
-    if (s == null) return Health.unknown;
-    return s.running ? Health.up : Health.down;
-  }
+  static Health _healthOf(ServiceDef def, ServiceReport? r) => switch (r?.up[def]) {
+    _ when r == null => Health.pending,
+    true => Health.up,
+    false => Health.down,
+    null => Health.unknown,
+  };
 
   @override
   Widget build(BuildContext context) {
     final settings = SettingsScope.of(context);
+    final status = StatusScope.of(context).statusOf(_target);
     return RefreshIndicator(
       color: p4.accent,
       onRefresh: _refresh,
@@ -120,9 +74,12 @@ class _ServicesTabState extends State<ServicesTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _header(settings),
+                  _header(settings, status),
                   const SizedBox(height: 32),
-                  for (final stack in stacks) ...[_stackSection(stack, settings), const SizedBox(height: 36)],
+                  for (final stack in stacks) ...[
+                    _stackSection(stack, settings, status.report),
+                    const SizedBox(height: 36),
+                  ],
                 ],
               ),
             ),
@@ -132,12 +89,14 @@ class _ServicesTabState extends State<ServicesTab> {
     );
   }
 
-  Widget _header(AppSettings settings) {
+  Widget _header(AppSettings settings, TargetStatus status) {
     final brand = BrandScope.of(context);
-    final apiLabel = switch ((_status, _error)) {
-      (_, _?) => '${brand.platform}-api unreachable — probing service ports directly',
-      (_?, _) => 'Live status from ${settings.apiUri.authority}',
-      _ => 'Contacting ${settings.apiUri.authority}…',
+    final viaApi = status.report?.viaApi;
+    final loading = status.checking;
+    final apiLabel = switch (viaApi) {
+      false => '${brand.platform}-api unreachable — probing service ports directly',
+      true => 'Live status from ${settings.apiUri.authority}',
+      null => 'Contacting ${settings.apiUri.authority}…',
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,8 +117,8 @@ class _ServicesTabState extends State<ServicesTab> {
           ),
           trailing: IconButton(
             tooltip: 'Refresh status',
-            onPressed: _loading ? null : _refresh,
-            icon: _loading
+            onPressed: loading ? null : _refresh,
+            icon: loading
                 ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
                 : Icon(Icons.refresh, color: p4.muted),
           ),
@@ -170,12 +129,12 @@ class _ServicesTabState extends State<ServicesTab> {
           style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
         ),
         const SizedBox(height: 10),
-        Text(apiLabel, style: p4.mono(color: _error != null ? p4.warn : p4.muted)),
+        Text(apiLabel, style: p4.mono(color: viaApi == false ? p4.warn : p4.muted)),
       ],
     );
   }
 
-  Widget _stackSection(StackDef stack, AppSettings settings) {
+  Widget _stackSection(StackDef stack, AppSettings settings, ServiceReport? report) {
     final n = stack.services.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,7 +164,7 @@ class _ServicesTabState extends State<ServicesTab> {
                 runSpacing: 1,
                 children: [
                   for (final svc in stack.services)
-                    SizedBox(width: w, child: _ServiceCard(svc, stack.tone(p4), _healthOf(svc), settings)),
+                    SizedBox(width: w, child: _ServiceCard(svc, stack.tone(p4), _healthOf(svc, report), settings)),
                 ],
               ),
             );

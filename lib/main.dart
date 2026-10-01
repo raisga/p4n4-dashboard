@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'api/status_monitor.dart';
 import 'core/brand.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
@@ -31,14 +32,28 @@ Future<void> main() async {
   );
 }
 
-class DashboardApp extends StatelessWidget {
+class DashboardApp extends StatefulWidget {
   const DashboardApp({super.key});
+
+  @override
+  State<DashboardApp> createState() => _DashboardAppState();
+}
+
+class _DashboardAppState extends State<DashboardApp> {
+  /// Above the navigator, so pushed screens (e.g. Clients on phones) share it.
+  final _status = StatusMonitor();
+
+  @override
+  void dispose() {
+    _status.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final role = SessionScope.of(context).role;
-    return MaterialApp(
+    final app = MaterialApp(
       title: brand.appName,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(brand.light),
@@ -47,6 +62,7 @@ class DashboardApp extends StatelessWidget {
       // Keyed by role so switching views starts from a fresh shell.
       home: role == null ? const LoginPage() : HomeShell(key: ValueKey(role)),
     );
+    return StatusScope(monitor: _status, child: app);
   }
 }
 

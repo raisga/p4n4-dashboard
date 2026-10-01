@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/camera.dart';
 import '../api/fleet.dart';
+import '../api/status_monitor.dart';
 import 'brand.dart';
 
 enum AgentBackend { ollama, letta }
@@ -176,6 +177,12 @@ class AppSettings extends ChangeNotifier {
     final base = _str('apiBase', '', d);
     return base.isNotEmpty ? Uri.parse(base) : Uri.parse('http://${hostOf(d)}:8000');
   }
+
+  /// Where [d]'s service status comes from (see [StatusMonitor]).
+  StatusTarget targetOf(Deployment d) => (api: apiUriOf(d), host: hostOf(d));
+
+  /// The connected deployment's [targetOf].
+  StatusTarget get statusTarget => targetOf(deployment);
 
   /// Switches every connection setting to [id]'s.
   Future<void> connect(String id) async {

@@ -1,9 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../api/fleet.dart';
-import '../api/services.dart';
+import '../api/status_monitor.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
@@ -21,70 +19,37 @@ class ClientsTab extends StatefulWidget {
 class _ClientsTabState extends State<ClientsTab> {
   P4Colors get p4 => context.p4;
 
-  /// Keyed by [_target], so renaming a deployment keeps its status.
-  final _reports = <String, ServiceReport>{};
-  final _checking = <String>{};
-  Timer? _timer;
-  String? _targets;
+  late StatusMonitor _monitor;
+  late List<StatusTarget> _targets;
 
-  /// What a deployment's status depends on: its host and API URL.
-  String _target(AppSettings s, Deployment d) => '${s.hostOf(d)}|${s.apiUriOf(d)}';
-
-  /// Re-checks only when a deployment's host or API changes, not on every settings change.
+  /// Every deployment's status comes from the shared StatusMonitor, keyed by
+  /// host and API, so renaming a deployment keeps its status and the
+  /// connected one shares checks with Home and Services.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _monitor = StatusScope.of(context);
     final s = SettingsScope.of(context);
-    final targets = s.deployments.map((d) => _target(s, d)).join(' ');
-    if (targets != _targets) {
-      _targets = targets;
-      _refresh();
-    }
-    _schedule();
+    _targets = [for (final d in s.deployments) s.targetOf(d)];
+    _watch();
   }
 
   @override
   void didUpdateWidget(ClientsTab old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) _refresh();
-    _schedule();
+    _watch();
   }
 
-  /// Starts or stops polling to match [active]; a no-op otherwise, so rebuilds
-  /// don't push the next poll back.
-  void _schedule() {
-    if (!widget.active) {
-      _timer?.cancel();
-      _timer = null;
-    } else {
-      _timer ??= Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
-    }
-  }
+  void _watch() =>
+      widget.active ? _monitor.watch(this, _targets, interval: const Duration(seconds: 30)) : _monitor.unwatch(this);
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _monitor.unwatch(this);
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    if (!widget.active) return;
-    final s = SettingsScope.of(context);
-    final byTarget = {for (final d in s.deployments) _target(s, d): d};
-    await Future.wait(byTarget.entries.map((e) => _check(s, e.key, e.value)));
-  }
-
-  Future<void> _check(AppSettings s, String target, Deployment d) async {
-    if (!_checking.add(target)) return;
-    setState(() {});
-    final host = s.hostOf(d);
-    try {
-      final r = await checkServices(s.apiUriOf(d), (svc) => Uri.parse('http://$host:${svc.port}${svc.path}'));
-      if (mounted) setState(() => _reports[target] = r);
-    } finally {
-      if (mounted) setState(() => _checking.remove(target));
-    }
-  }
+  Future<void> _refresh() => Future.wait(_targets.toSet().map(_monitor.refresh));
 
   Future<void> _edit(AppSettings s, [Deployment? d]) async {
     final result = await showDialog<_DeploymentForm>(
@@ -174,7 +139,7 @@ class _ClientsTabState extends State<ClientsTab> {
   }
 
   Widget _row(AppSettings s, Deployment d) {
-    final r = _reports[_target(s, d)];
+    final r = _monitor.statusOf(s.targetOf(d)).report;
     final current = d.id == s.deployment.id;
     final api = s.apiUriOf(d);
     final customApi = api != Uri.parse('http://${s.hostOf(d)}:8000');
