@@ -25,19 +25,20 @@ _Last updated: 2026-09-29_
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
 | White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
 | Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
-| Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password, Grafana path/kiosk and cameras are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
+| Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password (in secure storage, not shared_preferences), Grafana path/kiosk and cameras are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
 
 ## What was checked
 
 On **Linux only** (Manjaro, Flutter 3.47.2):
 
 - `flutter analyze` and `dart format` (120 columns, set in `analysis_options.yaml`): no issues.
-- `flutter test`: 51 tests pass.
+- `flutter test`: 56 tests pass.
   - Unit tests: metrics JSON parsing (including malformed `load` values), MJPEG frame splitting (including an embedded EXIF thumbnail), mapping catalog entries to Compose service names, chat message serialization.
   - Widget tests: every tab renders without exceptions at phone (390×844) and desktop (1280×800) sizes, in both light and dark mode; the theme toggle cycles system → light → dark.
   - Role tests: the client view at phone and desktop sizes in both modes (Home plus client tabs, no Services/Edge/Clients); admins get Clients (in the rail on desktop, in the app bar on phones); sign-in and sign-out switch views; client settings hide connection sections and offer the licenses page; admins can change which tabs clients see; **Connect** in Clients switches the dashboard to that deployment.
   - Video tests: switching between one camera and the grid, tapping a tile to open it, clients seeing names but no URLs or camera controls, and adding a camera (SAVE disabled until the URL is valid). Settings tests cover the camera list, the single-`videoUrl` fallback and URL validation.
   - Status polling tests: tabs watching one host share a check, fresh data is reused across tabs, the shortest interval wins, polling stops when nothing is watched, and a failed check keeps the last report.
+  - Letta token tests: kept in secure storage per deployment and never in shared_preferences, survives a restart, deleted when cleared or when its deployment is removed, plain-text tokens from older versions move over, and without secure storage old tokens still work while new ones stay in memory.
   - Settings tests: per-deployment settings switch together on connect (theme doesn't), custom API URLs, the connected deployment can't be removed, state survives a restart, and migration of pre-profile settings.
   - Brand tests:
     - every folder in `brands/` parses;
@@ -103,7 +104,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Use the planned SSE telemetry stream (`/api/v1/telemetry/stream`) for live sensor values
 
 ### Next session (suggested order)
-1. Secure storage for the Letta token (see *Code health*).
+1. Try the Letta password on a real keychain on each platform (only tested with an in-memory store), especially Linux with and without a keyring service.
 2. Try several cameras by hand against real streams (grid bandwidth, reconnects), then decide on auto-discovery.
 3. Edge metrics on the shared polling pattern (see *Code health*).
 
@@ -111,7 +112,7 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [x] Shared status polling (`lib/api/status_monitor.dart`): Home, Services and Clients watch targets through one `StatusMonitor`, so a host is checked once however many tabs show it
 - [ ] `StatusMonitor` keeps the last status of every target it has seen (e.g. a deployment's old host); prune unwatched entries if fleets get large
 - [ ] Edge metrics are still polled separately by Home and the Edge tab; move them onto the same pattern
-- [ ] Move the Letta token (and the future JWT) from SharedPreferences to `flutter_secure_storage`
+- [x] Move the Letta token from SharedPreferences to `flutter_secure_storage` (`lib/core/secrets.dart`; add the future JWT to `secretKeys`). Older plain-text tokens move over on first launch.
 - [ ] Make Home's status summary testable: inject the HTTP client (or extract the summary logic) so "can't reach" / "status unavailable" / "needs attention" get widget tests. Flutter's test HTTP stub answers every request, so offline hosts can't be simulated today.
 - [ ] Test MJPEG auto-reconnect and EXIF-thumbnail frames against a real IP camera
 - [ ] Golden (screenshot) tests per tab × theme × brand to catch visual regressions

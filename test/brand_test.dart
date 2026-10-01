@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
+import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -147,7 +148,10 @@ void main() {
 
   test('brand defaults seed settings until the user changes them', () async {
     SharedPreferences.setMockInitialValues({});
-    final settings = await AppSettings.load(defaults: {'host': 'edge.local', 'edgeDemo': true, 'themeMode': 'dark'});
+    final settings = await AppSettings.load(
+      defaults: {'host': 'edge.local', 'edgeDemo': true, 'themeMode': 'dark'},
+      secrets: MemorySecretStore(),
+    );
     expect(settings.host, 'edge.local');
     expect(settings.edgeDemo, isTrue);
     expect(settings.themeMode, ThemeMode.dark);
@@ -157,7 +161,7 @@ void main() {
 
   test('a mistyped brand default fails loudly', () async {
     SharedPreferences.setMockInitialValues({});
-    final settings = await AppSettings.load(defaults: {'edgeDemo': 'yes'});
+    final settings = await AppSettings.load(defaults: {'edgeDemo': 'yes'}, secrets: MemorySecretStore());
     expect(() => settings.edgeDemo, throwsFormatException);
   });
 }

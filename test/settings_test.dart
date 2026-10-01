@@ -4,12 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
+import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<AppSettings> _load(Map<String, Object> prefs, {Map<String, Object> defaults = const {}}) {
+Future<AppSettings> _load(Map<String, Object> prefs, {Map<String, Object> defaults = const {}, SecretStore? secrets}) {
   SharedPreferences.setMockInitialValues(prefs);
-  return AppSettings.load(defaults: defaults);
+  return AppSettings.load(defaults: defaults, secrets: secrets ?? MemorySecretStore());
+}
+
+/// What shared_preferences holds, to check no credential is left in it.
+Future<String> _savedPrefs() async {
+  final prefs = await SharedPreferences.getInstance();
+  return [for (final k in prefs.getKeys()) '$k=${prefs.get(k)}'].join('\n');
 }
 
 void main() {
@@ -66,7 +73,7 @@ void main() {
     await s.connect(site.id);
     s.cameras = [const Camera(id: 'c', name: 'Gate', url: 'http://cam')];
 
-    final again = await AppSettings.load();
+    final again = await AppSettings.load(secrets: MemorySecretStore());
     expect(again.deployments.map((d) => d.name), ['Default', 'Site']);
     expect(again.deployment.id, site.id);
     expect(again.cameras.single.name, 'Gate');
@@ -96,6 +103,90 @@ void main() {
       expect(Camera.parseUrl('http://'), isNull);
       expect(Camera.parseUrl('rtsp://cam/stream'), isNull);
       expect(Camera.parseUrl('cam.lan'), isNull);
+    });
+  });
+
+  group('Letta token', () {
+    test('is kept in secure storage, per deployment, and survives a restart', () async {
+      final store = MemorySecretStore();
+      final s = await _load({}, secrets: store);
+      s.lettaToken = 'pw-default';
+      await pumpEventQueue();
+      final site = Deployment(id: 'site', name: 'Site', values: {'host': 'site'});
+      await s.saveDeployment(site);
+      await s.connect(site.id);
+      expect(s.lettaToken, isEmpty);
+      s.lettaToken = 'pw-site';
+      await pumpEventQueue();
+
+      expect(store.values, {'deployment.default.lettaToken': 'pw-default', 'deployment.site.lettaToken': 'pw-site'});
+      expect(await _savedPrefs(), isNot(contains('pw-')));
+
+      final again = await AppSettings.load(secrets: store);
+      expect(again.lettaToken, 'pw-site');
+      await again.connect('default');
+      expect(again.lettaToken, 'pw-default');
+    });
+
+    test('clearing it deletes it; removing a deployment deletes its token', () async {
+      final store = MemorySecretStore({'deployment.default.lettaToken': 'a', 'deployment.x.lettaToken': 'b'});
+      final s = await _load({
+        'deployments': jsonEncode([
+          {'id': 'default', 'name': 'Default', 'values': {}},
+          {'id': 'x', 'name': 'X', 'values': {}},
+        ]),
+      }, secrets: store);
+      s.lettaToken = '';
+      await pumpEventQueue();
+      await s.removeDeployment('x');
+      expect(store.values, isEmpty);
+    });
+
+    test('a plain-text token from an older version moves into secure storage', () async {
+      final store = MemorySecretStore();
+      final s = await _load({
+        'deployments': jsonEncode([
+          {
+            'id': 'd0',
+            'name': 'Site',
+            'values': {'host': 'site', 'lettaToken': 'old-pw'},
+          },
+        ]),
+      }, secrets: store);
+      expect(s.lettaToken, 'old-pw');
+      expect(store.values, {'deployment.d0.lettaToken': 'old-pw'});
+      expect(await _savedPrefs(), isNot(contains('old-pw')));
+    });
+
+    test('without secure storage, old tokens still work and new ones stay in memory', () async {
+      final store = MemorySecretStore({}, true);
+      final s = await _load({
+        'deployments': jsonEncode([
+          {
+            'id': 'd0',
+            'name': 'Site',
+            'values': {'host': 'site', 'lettaToken': 'old-pw'},
+          },
+        ]),
+      }, secrets: store);
+      expect(s.secureStorageAvailable, isFalse);
+      expect(s.lettaToken, 'old-pw');
+
+      s.lettaToken = 'new-pw';
+      await pumpEventQueue();
+      expect(s.lettaToken, 'new-pw');
+      expect(store.values, isEmpty);
+      expect(await _savedPrefs(), isNot(contains('-pw')));
+    });
+
+    test('a failed write is reported and the token is kept in memory', () async {
+      final store = MemorySecretStore();
+      final s = await _load({}, secrets: store);
+      store.fail = true;
+      s.lettaToken = 'pw';
+      await pumpEventQueue();
+      expect(s.secureStorageAvailable, isFalse);
+      expect(s.lettaToken, 'pw');
     });
   });
 

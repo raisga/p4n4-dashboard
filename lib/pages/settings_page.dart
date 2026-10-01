@@ -105,7 +105,10 @@ class SettingsPage extends StatelessWidget {
                           s.lettaToken,
                           (v) => s.lettaToken = v,
                           obscure: true,
-                          help: 'Only needed if LETTA_SERVER_PASSWORD is set.',
+                          help: s.secureStorageAvailable
+                              ? 'Only needed if LETTA_SERVER_PASSWORD is set. Stored in the system keychain.'
+                              : 'Only needed if LETTA_SERVER_PASSWORD is set. The system keychain isn\'t available, '
+                                    'so it\'s kept only until the app closes.',
                         ),
                       ]),
                     if (brand.tabs.contains(DashTab.grafana))

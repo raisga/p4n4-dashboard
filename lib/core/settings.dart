@@ -8,6 +8,7 @@ import '../api/camera.dart';
 import '../api/fleet.dart';
 import '../api/status_monitor.dart';
 import 'brand.dart';
+import 'secrets.dart';
 
 enum AgentBackend { ollama, letta }
 
@@ -28,16 +29,32 @@ const profileKeys = {
   'cameras',
 };
 
+/// Profile keys whose values are credentials: kept in the platform's secure
+/// storage ([SecretStore]) instead of shared_preferences.
+const secretKeys = {'lettaToken'};
+
 /// User-editable settings, persisted with shared_preferences.
 ///
 /// Keys in [profileKeys] are read from and written to the active
 /// [deployment]; the getters below always reflect whichever one is connected.
 class AppSettings extends ChangeNotifier {
-  AppSettings._(this._prefs, this._defaults) {
+  AppSettings._(this._prefs, this._defaults, this._store, Map<String, String>? secrets)
+    : _secrets = {...?secrets},
+      _secretsOk = secrets != null {
     _loadDeployments();
   }
 
   final SharedPreferences _prefs;
+  final SecretStore _store;
+
+  /// Everything in [_store], read once at load so getters stay synchronous.
+  final Map<String, String> _secrets;
+  bool _secretsOk;
+
+  /// False when the platform's secure storage can't be used (e.g. Linux
+  /// without a keyring service). Credentials set meanwhile are kept in memory
+  /// only, until the app closes.
+  bool get secureStorageAvailable => _secretsOk;
 
   /// Brand-supplied defaults, used until the user changes a value.
   final Map<String, Object> _defaults;
@@ -45,11 +62,26 @@ class AppSettings extends ChangeNotifier {
   late List<Deployment> _deployments;
   late String _activeId;
 
-  static Future<AppSettings> load({Map<String, Object> defaults = const {}}) async =>
-      AppSettings._(await SharedPreferences.getInstance(), defaults);
+  static Future<AppSettings> load({Map<String, Object> defaults = const {}, SecretStore? secrets}) async {
+    final store = secrets ?? PlatformSecretStore();
+    Map<String, String>? saved;
+    try {
+      saved = await store.readAll();
+    } catch (_) {
+      // No secure storage; see [secureStorageAvailable].
+    }
+    final settings = AppSettings._(await SharedPreferences.getInstance(), defaults, store, saved);
+    await settings._moveSecretsToStore();
+    return settings;
+  }
 
-  Object? _raw(String key, Deployment? d) =>
-      profileKeys.contains(key) ? (d ?? deployment).values[key] : _prefs.get(key);
+  static String _secretId(Deployment d, String key) => 'deployment.${d.id}.$key';
+
+  Object? _raw(String key, Deployment? d) {
+    d ??= deployment;
+    if (secretKeys.contains(key)) return _secrets[_secretId(d, key)] ?? d.values[key];
+    return profileKeys.contains(key) ? d.values[key] : _prefs.get(key);
+  }
 
   String _str(String key, String fallback, [Deployment? d]) => switch (_raw(key, d)) {
     String v => v,
@@ -68,6 +100,7 @@ class AppSettings extends ChangeNotifier {
   };
 
   Future<void> _set(String key, Object value) async {
+    if (secretKeys.contains(key)) return _setSecret(key, value as String);
     if (profileKeys.contains(key)) {
       deployment.values[key] = value;
       await _saveDeployments();
@@ -80,6 +113,46 @@ class AppSettings extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  Future<void> _setSecret(String key, String value) async {
+    final id = _secretId(deployment, key);
+    value.isEmpty ? _secrets.remove(id) : _secrets[id] = value;
+    // Drop any plain-text copy left from before secure storage.
+    if (deployment.values.remove(key) != null) await _saveDeployments();
+    notifyListeners();
+    if (!_secretsOk) return;
+    try {
+      value.isEmpty ? await _store.delete(id) : await _store.write(id, value);
+    } catch (_) {
+      _secretsOk = false;
+      notifyListeners();
+    }
+  }
+
+  /// Credentials used to be saved in shared_preferences with the rest of a
+  /// deployment. Moves them into secure storage, removing each plain-text
+  /// copy only once it's stored. Without secure storage they stay put.
+  Future<void> _moveSecretsToStore() async {
+    if (!_secretsOk) return;
+    var moved = false;
+    try {
+      for (final d in _deployments) {
+        for (final key in secretKeys) {
+          if (d.values[key] case final String v) {
+            if (v.isNotEmpty) {
+              await _store.write(_secretId(d, key), v);
+              _secrets[_secretId(d, key)] = v;
+            }
+            d.values.remove(key);
+            moved = true;
+          }
+        }
+      }
+    } catch (_) {
+      _secretsOk = false;
+    }
+    if (moved) await _saveDeployments();
   }
 
   ThemeMode get themeMode => ThemeMode.values.asNameMap()[_str('themeMode', 'system')] ?? ThemeMode.system;
@@ -203,9 +276,21 @@ class AppSettings extends ChangeNotifier {
   /// Removes [id]. The connected deployment can't be removed.
   Future<void> removeDeployment(String id) async {
     if (id == _activeId) return;
+    final removed = _deployments.where((d) => d.id == id).toList();
     _deployments.removeWhere((d) => d.id == id);
     await _saveDeployments();
     notifyListeners();
+    for (final d in removed) {
+      for (final key in secretKeys) {
+        if (_secrets.remove(_secretId(d, key)) != null && _secretsOk) {
+          try {
+            await _store.delete(_secretId(d, key));
+          } catch (_) {
+            _secretsOk = false;
+          }
+        }
+      }
+    }
   }
 
   /// A new, unused deployment id.

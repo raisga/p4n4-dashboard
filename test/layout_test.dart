@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
+import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
@@ -22,7 +23,7 @@ void main() {
   }) async {
     SharedPreferences.setMockInitialValues({'edgeDemo': true, 'themeMode': mode.name, 'role': ?role?.name});
     final brand = loadBrand(brandId);
-    final settings = await AppSettings.load(defaults: brand.defaults);
+    final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
     final session = await Session.load();
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;

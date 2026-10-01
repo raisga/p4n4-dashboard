@@ -55,6 +55,7 @@ Only the applied brand is bundled, so one client's build never contains another'
 
 ## Platform notes
 
+- **Credentials.** The Letta server password is kept in the platform's secure storage (`flutter_secure_storage`): Keychain on iOS/macOS, Keystore-backed encryption on Android, Credential Manager on Windows, and the Secret Service on Linux. Linux builds need `libsecret-1-dev`, and running needs a keyring service (GNOME Keyring, KWallet). Without one, the password is kept only until the app closes, and the settings page says so. macOS uses the legacy keychain, so no Keychain Sharing entitlement or provisioning profile is needed.
 - **Grafana embedding.** `webview_flutter` only supports Android, iOS and macOS. On Windows and Linux the Grafana tab shows an *Open in browser* button.
 - **Plain HTTP.** The p4n4 services use HTTP on the LAN, so cleartext is allowed:
   - Android: `usesCleartextTraffic`
