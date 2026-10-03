@@ -1,0 +1,32 @@
+# Optional HTTPS front end (Caddy) for p4n4-dashboard:
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# Serve Grafana through the dashboard too (GRAFANA_UPSTREAM, DASHBOARD_GRAFANA_BASE
+# in .env), or browsers block its http:// frame on the https:// page.
+services:
+  dashboard:
+    # Only Caddy talks to it now
+    ports: !reset []
+  tls:
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    container_name: p4n4-dashboard-tls
+    restart: unless-stopped
+    depends_on: [dashboard]
+    ports:
+      - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_TLS_PORT:-443}:443"
+      - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_HTTP_PORT:-80}:80"   # HTTP → HTTPS redirect, ACME
+    environment:
+      DASHBOARD_TLS_SITE: ${DASHBOARD_TLS_SITE:-localhost}
+      DASHBOARD_TLS: ${DASHBOARD_TLS:-internal}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data          # certificates and Caddy's local CA
+      - caddy-config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      - p4n4-net
+
+volumes:
+  caddy-data:
+  caddy-config:

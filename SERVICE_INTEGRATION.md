@@ -2,6 +2,41 @@
 
 _Written 2026-09-29, against Flutter 3.47.2 and the repos as they are on `main` today._
 
+> **Status (2026-10-02): Phases 1–7 are done.** Phase 7 added:
+> - **Basic auth** (`DASHBOARD_BASIC_AUTH`, `19-basic-auth.envsh`, `make htpasswd`). It conflicted with the app's own bearer tokens (one `Authorization` header per request), so behind the proxy the app sends them in `X-Upstream-Authorization`, which nginx moves back. `<link rel="manifest">` is sent with credentials.
+> - **HTTPS** via an optional Caddy overlay (`docker-compose.tls.yml`, `make up-tls`), plus an optional same-origin Grafana route (`GRAFANA_UPSTREAM`, `/grafana/`, app setting `grafanaBase`, `GRAFANA_SUB_PATH` in the IoT stack and the template) so nothing is mixed content.
+> - **CSP enforced** after a Chromium pass over every tab found no violations from the app. All the report-only violations came from Grafana pages under `/grafana/`, which no longer get the dashboard's CSP. Added `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'self'`.
+> - **Pinned base images** (debian, nginx-unprivileged, caddy) by multi-arch digest, with Dependabot. The image workflow's smoke test also checks the CSP header, the Grafana route being off by default, and basic auth.
+> - Not done: per-user accounts and roles (they need p4n4-api auth in the app).
+>
+> Before that, Phases 1–6: What's left needs a release: tag `v1.1.0` so `image.yml` publishes `ghcr.io/raisga/p4n4-dashboard:1.1.0`, release p4n4-lib 0.2.0 before the CLI, then bump the submodule pointers (rollout order below). Nothing has run on GitHub Actions yet.
+>
+> Phases 4–6, differences from the plan below:
+> - `image.yml` builds the amd64 image, smoke-tests it (`/healthz`, `/config.json`, the SPA fallback, a clean `502` with no upstreams), scans it with Trivy (critical, fixed), then builds amd64+arm64 and pushes (`edge` on main; `X.Y.Z`, `X.Y`, `latest` on tags). A tag must match `pubspec.yaml`. `ci.yml` also runs on `v*` tags.
+> - p4n4-lib: `dashboard` layer (copies `docker-compose.yml`; requires `DASHBOARD_VERSION`, `DASHBOARD_PORT`), version 0.2.0.
+> - p4n4-cli: `--layer dashboard`, `--source-dashboard`, `all` built from `LAYERS`, URL printed after `up`. With the dashboard enabled, the IoT `.env` gets `GRAFANA_ALLOW_EMBEDDING=true`.
+> - p4n4-iot: `GRAFANA_ALLOW_EMBEDDING` passthrough, default `false` (not `true` as 5.4 suggested; `p4n4 init` turns it on with the dashboard).
+> - p4n4-api: CORS already existed, and `/stacks` picks up the layer unchanged. Not containerized yet.
+> - p4n4-emu: `dashboard` stack with a 5 % CPU / 1 % memory share.
+> - 5.6 (a Dashboard entry in the app's own catalog) is skipped.
+> - Docs: `web/docs/stacks/dashboard.md`, ADR-003, the security guide, port tables, and the root README's repository map (which still said `client/`, `shared/`, `demo/`).
+>
+> Phases 2–3, differences from the plan below:
+> - **Build stage:** `ghcr.io/cirruslabs/flutter` has no tags for 3.45 or later, so the build stage is `debian:bookworm-slim` with Flutter cloned at `FLUTTER_VERSION` (keep it in step with `ci.yml`). It declares `ARG BUILDPLATFORM=linux/amd64` so the legacy builder works too; BuildKit sets the real value.
+> - **Themes:** client brands aren't in the repo, so `make image THEME=<project>` installs the theme into `brands/` (gitignored) and builds with `BRAND=<id>`. The brand tool gained `--web-only` (the context has no native folders) and `id <path>`.
+> - **Upstream names:** Docker's DNS doesn't serve `extra_hosts` entries, so nginx (which resolves per request) couldn't find `host.docker.internal`. `docker/nginx/18-upstream-hosts.envsh` swaps such hosts for their `/etc/hosts` address before the template is rendered.
+> - **nginx details:** the `/etc/nginx/conf.d` tmpfs is mounted with `uid=101,gid=101` (the image's nginx user), or the template can't be rendered. Security headers are an include (`security_headers.conf`), so `index.html` keeps the CSP when its location sets `Cache-Control`.
+> - **Compose:** `DASHBOARD_BIND` (from 7.1) is in the port mapping already.
+> - **Dev server:** `web_dev_config.yaml` mirrors the nginx routes, and `make run` passes `--dart-define=P4N4_DEV_PROXY=true` so the app uses them without a `config.json`.
+> - **Version:** `pubspec.yaml` is 1.1.0+2, the version the compose file pins (`DASHBOARD_VERSION=1.1.0`). That image exists once Phase 4 publishes it; until then use `make up-local`.
+>
+> Phase 1, differences from the plan below:
+> - Platform code is in `lib/platform/html_view.dart` (`HtmlIFrame`, `HtmlImage`) and `lib/platform/probe.dart`, each with a stub/`_io` and a `_web` file. `MjpegView` and the Grafana tab pick the web path with `kIsWeb`, and the pure-Dart MJPEG decoder stays in `lib/widgets/mjpeg_view.dart`.
+> - `google_fonts` was already gone (fonts are bundled), so 1.7 needed only `--no-web-resources-cdn`. A Chromium network log showed no app requests outside the LAN.
+> - Grafana's `X-Frame-Options` can't be detected from the page, so a blocked frame stays blank; the toolbar keeps *Open in browser*. The `mqtt-influx-grafana` template has `GRAFANA_ALLOW_EMBEDDING`.
+> - Ollama chat isn't streamed on web: `package:http` buffers the response in the browser. A `fetch`-based client would fix it.
+>
+
 ## Goal
 
 Run `p4n4-dashboard` as a first-class p4n4 service, like the IoT, AI and Edge stacks:
@@ -457,7 +492,7 @@ To show the dashboard itself on the Services tab and Home, add a `ServiceDef('Da
 
 ### Phase 7 — Security and operations
 
-- **There's no authentication yet.** Anyone who can reach `:8088` can pick the admin role. This is already true of the native app (`TODO.md`), but a web service is easier to reach. Until p4n4-api issues JWTs:
+- **There's no authentication yet.** *(Done since: the dashboard signs in to p4n4-api accounts; the role picker only remains when the API has auth off or is unreachable.)* Anyone who can reach `:8088` can pick the admin role. This is already true of the native app (`TODO.md`), but a web service is easier to reach. Until p4n4-api issues JWTs:
   - Offer optional nginx basic auth (`DASHBOARD_BASIC_AUTH` → htpasswd file mounted read-only).
   - Document binding to a LAN interface only: `"${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT}:8080"`.
 - **TLS and mixed content.** If the dashboard is served over HTTPS (Caddy, Traefik, or nginx with certs), browsers block the `http://` Grafana iframe and camera `<img>`. Either proxy those through the same HTTPS origin too (Grafana under `/grafana/` needs `GF_SERVER_ROOT_URL` + `GF_SERVER_SERVE_FROM_SUB_PATH=true`), or serve everything over HTTPS. Document both.

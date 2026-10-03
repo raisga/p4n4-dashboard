@@ -1,0 +1,16 @@
+# Dev server proxy (`flutter run -d chrome` / `-d web-server`, or `make run`):
+# the same routes as the container's nginx, so dev and production use the
+# same same-origin paths and the services need no CORS. `make run` also
+# passes --dart-define=P4N4_DEV_PROXY=true so the app uses these paths.
+server:
+  proxy:
+    - prefix: /api/
+      target: http://localhost:8000/
+    - prefix: /health
+      target: http://localhost:8000/
+    - prefix: /ollama/
+      target: http://localhost:11434/
+      replace: /
+    - prefix: /letta/
+      target: http://localhost:8283/
+      replace: /

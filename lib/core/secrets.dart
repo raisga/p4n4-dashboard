@@ -1,6 +1,4 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Key-value storage for credentials, kept out of shared_preferences.
@@ -17,7 +15,7 @@ abstract interface class SecretStore {
 class PlatformSecretStore implements SecretStore {
   // macOS: the legacy keychain needs no Keychain Sharing entitlement, which
   // would require a provisioning profile tied to the building Mac.
-  final _storage = !kIsWeb && Platform.isMacOS
+  final _storage = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS
       ? const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false))
       : const FlutterSecureStorage();
 

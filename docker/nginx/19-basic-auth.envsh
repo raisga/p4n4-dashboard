@@ -1,0 +1,12 @@
+#!/bin/sh
+# Sourced by the nginx image's entrypoint before the config template is
+# rendered. DASHBOARD_BASIC_AUTH holds htpasswd lines (`user:hash`, several
+# separated by spaces or commas; `make htpasswd` prints one). Set, it puts the
+# whole dashboard behind HTTP basic auth (except /healthz); empty, it's off.
+if [ -n "${DASHBOARD_BASIC_AUTH:-}" ]; then
+    printf '%s\n' $(printf '%s' "$DASHBOARD_BASIC_AUTH" | tr ',' ' ') > /tmp/htpasswd
+    export DASHBOARD_AUTH_REALM="${DASHBOARD_AUTH_REALM:-p4n4 dashboard}"
+    echo "19-basic-auth.envsh: basic auth on for $(wc -l < /tmp/htpasswd) user(s)"
+else
+    export DASHBOARD_AUTH_REALM=off
+fi

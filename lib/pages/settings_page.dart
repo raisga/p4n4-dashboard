@@ -78,7 +78,15 @@ class SettingsPage extends StatelessWidget {
                         '${brand.platform}-api base URL',
                         s.apiBase,
                         (v) => s.apiBase = v,
-                        hint: s.url(8000).toString(),
+                        hint: s.url(8000, '/').toString(),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: s.resetConnection,
+                          icon: const Icon(Icons.restart_alt, size: 18),
+                          label: const Text('RESET CONNECTION TO DEFAULTS'),
+                        ),
                       ),
                     ]),
                     if (brand.tabs.contains(DashTab.edge))
@@ -87,7 +95,7 @@ class SettingsPage extends StatelessWidget {
                           'Metrics URL',
                           s.edgeMetricsUrl,
                           (v) => s.edgeMetricsUrl = v,
-                          hint: s.apiUri.resolve('/api/v1/edge/metrics').toString(),
+                          hint: s.apiUri.resolve('api/v1/edge/metrics').toString(),
                           help: 'Endpoint returning the edge metrics JSON (see README).',
                         ),
                         SwitchListTile(
@@ -100,6 +108,20 @@ class SettingsPage extends StatelessWidget {
                       ]),
                     if (brand.tabs.contains(DashTab.agent))
                       _section('agent', [
+                        _Field(
+                          'Ollama base URL',
+                          s.ollamaBase,
+                          (v) => s.ollamaBase = v,
+                          hint: s.url(11434, '/').toString(),
+                          help: 'Leave empty for port 11434 on the host. A path like /ollama/ goes through a proxy.',
+                        ),
+                        _Field(
+                          'Letta base URL',
+                          s.lettaBase,
+                          (v) => s.lettaBase = v,
+                          hint: s.url(8283, '/').toString(),
+                          help: 'Leave empty for port 8283 on the host.',
+                        ),
                         _Field(
                           'Letta server password',
                           s.lettaToken,
@@ -114,11 +136,18 @@ class SettingsPage extends StatelessWidget {
                     if (brand.tabs.contains(DashTab.grafana))
                       _section('grafana', [
                         _Field(
+                          'Grafana base URL',
+                          s.grafanaBase,
+                          (v) => s.grafanaBase = v,
+                          hint: s.url(3000, '/').toString(),
+                          help: 'Leave empty for port 3000 on the host. /grafana/ goes through the dashboard\'s proxy.',
+                        ),
+                        _Field(
                           'Dashboard path',
                           s.grafanaPath,
                           (v) => s.grafanaPath = v,
                           hint: '/d/<uid>/<slug>',
-                          help: 'Path on ${s.url(3000)} to open in the Grafana tab.',
+                          help: 'Page to open in the Grafana tab, under the base URL.',
                         ),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
@@ -162,9 +191,21 @@ class SettingsPage extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Signed in as ${admin ? 'administrator' : 'client'}',
-                            style: p4.display(size: 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(switch (session.username) {
+                                final user? => 'Signed in as $user',
+                                null => 'Signed in without an account',
+                              }, style: p4.display(size: 14)),
+                              Text(
+                                '${admin ? 'administrator' : 'client'} view · ${switch (session.mode) {
+                                  SignInMode.api => '${brand.platform}-api account',
+                                  _ => 'role picked at sign-in',
+                                }}',
+                                style: p4.mono(),
+                              ),
+                            ],
                           ),
                         ),
                         OutlinedButton.icon(
@@ -256,6 +297,14 @@ class _FieldState extends State<_Field> {
 
   void _commit() {
     if (_ctrl.text.trim() != widget.value) widget.onCommit(_ctrl.text);
+  }
+
+  /// Shows values changed elsewhere (e.g. a connection reset), unless the
+  /// user is editing this field.
+  @override
+  void didUpdateWidget(_Field old) {
+    super.didUpdateWidget(old);
+    if (widget.value != old.value && !_focus.hasFocus) _ctrl.text = widget.value;
   }
 
   @override

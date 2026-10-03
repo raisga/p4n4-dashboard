@@ -1,6 +1,6 @@
 # TODO
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-10-02_
 
 ## Original scope
 
@@ -10,7 +10,7 @@ _Last updated: 2026-09-29_
 - [x] Tab for Grafana
 - [x] Tab for video feed
 - [x] Light/dark theme support (follows the system setting; can be set by hand)
-- [x] White-label support (`brands/`, `dart run tool/brand.dart apply <id>`)
+- [x] White-label support (`brands/p4n4`, client themes installed from their project with `dart run tool/brand.dart install <project>`)
 - [x] Admin and client views (role picked at sign-in; see README)
 
 ## Current status
@@ -20,12 +20,16 @@ _Last updated: 2026-09-29_
 | Services | ✅ Working | Launcher for every service. Status comes from p4n4-api `GET /api/v1/stacks`; if the API is unreachable, each service's port is probed directly. |
 | Edge metrics | ⚠️ UI only | Polls `/api/v1/edge/metrics` every 2 s. **That endpoint doesn't exist in p4n4-api v0.1**, so the tab shows an error until it's added or pointed at another URL. A demo mode generates synthetic data. The JSON it expects is in `README.md`. |
 | Agent chat | ✅ Ollama / ⚠️ Letta | Ollama streaming chat and model list work against a live server. The Letta client is written to the Letta REST API but has not been run against a real Letta server. |
-| Grafana | ✅ Android/iOS/macOS, ↗ Windows/Linux | Embedded web view in kiosk mode. On Windows and Linux there's no Flutter web view, so the tab opens Grafana in the browser. |
+| Grafana | ✅ Android/iOS/macOS/web, ↗ Windows/Linux | Embedded web view in kiosk mode; an `<iframe>` on web (Grafana needs `GF_SECURITY_ALLOW_EMBEDDING=true`). On Windows and Linux there's no Flutter web view, so the tab opens Grafana in the browser. |
 | Video | ✅ Working | MJPEG streams and JPEG snapshots, decoded in pure Dart. Several named cameras per deployment: one at a time (dropdown) or all in a grid; each camera's stream stays connected when switching views. Admins add/edit/delete cameras; clients see names only. Dropped streams reconnect automatically (backoff 2 s → 30 s). A single `videoUrl` (older settings or a brand default) shows up as one camera. |
 | Theme | ✅ Working | Light and dark palettes (`P4Colors` in `lib/core/theme.dart`), with a toggle in the app bar and on the settings page. Every text color meets WCAG AA (≥ 4.5:1) on all surfaces in both modes. |
-| White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only the applied brand is bundled. Guide: `brands/README.md`. |
-| Admin/client views | ⚠️ Placeholder auth | Role picker on a sign-in screen, persisted locally; no real authentication until p4n4-api has it. Admin: all tabs + Clients (deployment list with live status) + stack-controls menu (disabled) + client-view config. Client: Home overview + admin-chosen tabs, with URLs, ports and config controls hidden. |
+| White-label | ✅ Working | Per-brand name, wordmark or logo, platform prefix (`acme-iot`), fonts, color overrides per mode, visible tabs, links, first-run defaults, native app name/IDs on all 5 platforms, and launcher icons. The tool validates brands, including WCAG contrast. Only `p4n4` is committed; client brands are themes in their project (`.p4n4.json` `dashboard.theme`), installed into gitignored `brands/<id>/`. `acme` is a test fixture. Only the applied brand is bundled. Guide: `brands/README.md`. |
+| Admin/client views | ✅ Working | Sign-in with p4n4-api accounts (per deployment; role from the account; refresh token in secure storage; single-flight refresh; tokens added by `AuthClient`, via `X-Upstream-Authorization` behind the proxy). Role picker only when the API has auth off or is unreachable. Checked end to end on Linux against a real API (wrong password, admin/operator, restart, sign-out revocation). |
+| Web | ✅ Working (Phase 1 of SERVICE_INTEGRATION.md) | `web/` platform, brand tool patches its title/manifest/icons, `lib/platform/` conditional imports (`<iframe>` Grafana, `<img>` video, `no-cors` probes), runtime `config.json` defaults and page-host fallback, path-safe base URLs with Ollama/Letta base settings, CanvasKit bundled (`--no-web-resources-cdn`). Checked in Chromium against the `mqtt-influx-grafana` template: client Home, Services, edge metrics and embedded Grafana; no app requests leave the LAN. Ollama replies aren't streamed on web. |
+| Web service | ✅ Working (Phases 2–3 of SERVICE_INTEGRATION.md) | `Dockerfile` (Flutter build stage cloned at the pinned version; nginx-unprivileged, ~38 MB), nginx proxy for `/api/`, `/ollama/`, `/letta/` with runtime `/config.json`, `/healthz` and security headers, `docker-compose.yml` on port 8088 (read-only, no capabilities), `docker-compose.build.yml`, `.env.example`, `Makefile`, dev-server proxy (`web_dev_config.yaml`). Checked: the image built with the legacy builder, the container healthy and serving the app in Chromium with every API call through the proxy, a `make image THEME=…` image containing only that theme, and the dev proxy. Not checked: BuildKit/multi-arch (`docker buildx` isn't installed here), arm64, a Pi. |
+| Release | ⏳ Ready | `image.yml` (multi-arch GHCR image, smoke test, Trivy) and the `v*` trigger in `ci.yml` exist but haven't run on GitHub. Tag `v1.1.0` (matches `pubspec.yaml`) to publish the image the compose file pins. |
 | Settings | ✅ Working | Host, API URL, metrics URL, agent backend/model, Letta password (in secure storage, not shared_preferences), Grafana path/kiosk and cameras are stored per deployment (connection profile) and switch together on **Connect**; theme and client tabs are app-wide. Settings from before profiles are migrated into the deployment on the current host. |
+| Project settings | ✅ Working (needs API auth off) | Reads `.p4n4.json` via p4n4-api `GET /api/v1/project` on connect (`lib/api/project.dart`, retries every 30 s): `layers` narrows the stacks shown, `dashboard.tabs` hides other tabs, `dashboard.grafana_path` sets the Grafana page ahead of brand defaults. Checked on Linux against the `mqtt-influx-grafana` template with the `verdant` brand. |
 
 ## What was checked
 
@@ -66,6 +70,8 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 
 **Not checked:**
 
+- Web: the Agent tab (Ollama/Letta) and Video against real cameras in a browser; Firefox and Safari; served from a Raspberry Pi to a phone on the LAN.
+
 - Running the app on Android, iOS, macOS or Windows. All five platforms build in CI (first green run: 2026-09-30), but only Linux has been run.
 - The embedded Grafana web view, which only runs on those untested platforms.
 - Letta chat against a real server.
@@ -88,13 +94,14 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
   - The Linux window icon isn't set.
   - The binary name (`p4n4_dashboard`) and the Android Kotlin package don't change per brand.
   - The service catalog (names, ports, which services exist) is shared by all brands. Only the `p4n4` prefix is replaced.
-- **No authentication.** Nothing sends a JWT yet, because p4n4-api has no auth yet either. Anyone can pick the admin role on the sign-in screen, so the client view hides configuration but is not a security boundary.
+- **No authentication in the app.** Nothing sends a JWT yet. Anyone can pick the admin role on the sign-in screen, so the client view hides configuration but is not a security boundary. The web container can sit behind HTTP basic auth (`DASHBOARD_BASIC_AUTH`) and HTTPS (`make up-tls`) meanwhile.
 
 ## Future work
 
 ### Needs p4n4-api changes
 - [ ] Implement `GET /api/v1/edge/metrics` (or pick an existing exporter and adapt `EdgeMetrics.fromJson`)
 - [ ] Route agent chat through the API's planned `/api/v1/agents/*` endpoints instead of calling Ollama and Letta directly
+- [x] Sign in to p4n4-api so project settings, status and edge metrics work with auth on
 - [ ] Add JWT auth (`/api/v1/auth/token`) once the API supports it, store the token securely, and take the admin/client role from it instead of the sign-in picker
 - [ ] Enable the stack-controls menu (start/restart/stop) once the API has stack endpoints
 - [ ] Serve the Clients tab's deployment list from the API instead of local settings
@@ -152,4 +159,4 @@ On **Linux only** (Manjaro, Flutter 3.47.2):
 - [ ] Per-brand service catalog (rename/hide services, custom ports) in `brand.json`
 - [ ] Linux window icon, plus optional per-brand binary name
 - [ ] Per-brand Android signing and iOS team/provisioning configuration
-- [ ] Remove or replace the example `acme` brand before shipping
+- [x] Keep client brands out of the repo: only `p4n4` is committed, `acme` moved to `test/fixtures/brands/`, and client themes are installed from their project (`tool/brand.dart install`)

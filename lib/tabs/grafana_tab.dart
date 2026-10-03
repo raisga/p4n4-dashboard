@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -7,10 +6,16 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../platform/html_view.dart';
 import '../widgets/common.dart';
 
-/// webview_flutter ships implementations for Android, iOS and macOS only.
-bool get webViewSupported => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+/// webview_flutter ships implementations for Android, iOS and macOS only,
+/// registered at startup (so never in widget tests). On web, Grafana goes in
+/// an `<iframe>` instead; Linux and Windows open it in the browser.
+bool get webViewSupported =>
+    !kIsWeb &&
+    const {TargetPlatform.android, TargetPlatform.iOS, TargetPlatform.macOS}.contains(defaultTargetPlatform) &&
+    WebViewPlatform.instance != null;
 
 /// Embedded Grafana (kiosk mode by default).
 class GrafanaTab extends StatefulWidget {
@@ -27,6 +32,9 @@ class _GrafanaTabState extends State<GrafanaTab> {
   Uri? _loaded;
   int _progress = 0;
   String? _error;
+
+  /// Web: bumped by Home/Reload to recreate the `<iframe>`.
+  int _frame = 0;
 
   @override
   void didChangeDependencies() {
@@ -66,6 +74,12 @@ class _GrafanaTabState extends State<GrafanaTab> {
           Expanded(
             child: Text(admin ? uri.toString() : 'dashboards', overflow: TextOverflow.ellipsis, style: p4.mono()),
           ),
+          if (kIsWeb)
+            IconButton(
+              tooltip: 'Reload',
+              onPressed: () => setState(() => _frame++),
+              icon: const Icon(Icons.refresh, size: 18),
+            ),
           if (_controller != null) ...[
             IconButton(
               tooltip: 'Back',
@@ -95,15 +109,18 @@ class _GrafanaTabState extends State<GrafanaTab> {
     return Column(
       children: [
         toolbar,
-        if (_controller != null && _progress < 100)
+        if (!kIsWeb && _controller != null && _progress < 100)
           LinearProgressIndicator(value: _progress / 100, minHeight: 2, color: p4.accent, backgroundColor: p4.bg2)
         else
           const Divider(height: 2, thickness: 2),
         Expanded(
           child: switch ((_controller, _error)) {
+            // Grafana must allow framing (GF_SECURITY_ALLOW_EMBEDDING=true), or
+            // the frame stays blank; Open in browser still works.
+            _ when kIsWeb => HtmlIFrame(key: ValueKey((uri, _frame)), uri: uri),
             (null, _) => EmptyState(
               icon: Icons.desktop_windows_outlined,
-              title: 'Embedded view not available on ${Platform.operatingSystem}',
+              title: 'Embedded view not available on ${defaultTargetPlatform.name}',
               message:
                   'Flutter\'s WebView supports Android, iOS and macOS. '
                   'On this platform Grafana opens in your default browser.',

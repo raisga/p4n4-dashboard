@@ -1,0 +1,15 @@
+#!/bin/sh
+# Sourced by the nginx image's entrypoint before the config template is
+# rendered. nginx resolves upstreams per request through Docker's DNS
+# (127.0.0.11), which doesn't serve /etc/hosts entries from `extra_hosts`
+# such as host.docker.internal. Swap those hosts for their address.
+for var in P4N4_API_UPSTREAM OLLAMA_UPSTREAM LETTA_UPSTREAM GRAFANA_UPSTREAM; do
+    eval "url=\${$var:-}"
+    host=$(printf '%s' "$url" | sed -E 's#^[a-zA-Z]+://([^/:]+).*#\1#')
+    [ -n "$host" ] || continue
+    ip=$(awk -v h="$host" '$1 !~ /^#/ { for (i = 2; i <= NF; i++) if ($i == h) { print $1; exit } }' /etc/hosts)
+    if [ -n "$ip" ]; then
+        export "$var=$(printf '%s' "$url" | sed "s#://$host#://$ip#")"
+        echo "18-upstream-hosts.envsh: $var: $host -> $ip"
+    fi
+done

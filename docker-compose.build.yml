@@ -1,0 +1,11 @@
+# Builds the image from this checkout instead of pulling it:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# or `make up-local`. Not for scaffolded projects.
+services:
+  dashboard:
+    image: p4n4-dashboard:${BRAND:-p4n4}
+    build:
+      context: .
+      args:
+        BRAND: ${BRAND:-p4n4}
+        VERSION: local

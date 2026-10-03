@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:p4n4_dashboard/api/agent_client.dart';
 import 'package:p4n4_dashboard/api/edge_metrics.dart';
 import 'package:p4n4_dashboard/api/services.dart';
@@ -66,5 +68,39 @@ void main() {
 
   test('ChatMessage serializes for Ollama', () {
     expect(ChatMessage('user', 'hi').toJson(), {'role': 'user', 'content': 'hi'});
+  });
+
+  group('Letta auth behind the dashboard proxy', () {
+    Future<Map<String, String>> headersOf(LettaClient c) async {
+      late Map<String, String> seen;
+      await http.runWithClient(
+        c.listOptions,
+        () => MockClient((r) async {
+          seen = r.headers;
+          return http.Response('[]', 200);
+        }),
+      );
+      return seen;
+    }
+
+    test('directly, the token is a normal bearer header', () async {
+      final h = await headersOf(LettaClient(Uri.parse('http://pi:8283/'), token: 'pw'));
+      expect(h['Authorization'], 'Bearer pw');
+      expect(h.containsKey(upstreamAuthorizationHeader), isFalse);
+    });
+
+    test('through the proxy, Authorization is left to its basic auth', () async {
+      final h = await headersOf(LettaClient(Uri.parse('http://pi:8088/letta/'), token: 'pw', viaProxy: true));
+      expect(h[upstreamAuthorizationHeader], 'Bearer pw');
+      expect(h.containsKey('Authorization'), isFalse);
+    });
+
+    test('only same-origin http(s) URLs count as the page proxy', () {
+      final page = Uri.parse('http://pi:8088/');
+      expect(viaPageProxy(Uri.parse('http://pi:8088/letta/'), page: page), isTrue);
+      expect(viaPageProxy(Uri.parse('http://pi:8283/'), page: page), isFalse);
+      expect(viaPageProxy(Uri.parse('https://pi:8088/letta/'), page: page), isFalse);
+      expect(viaPageProxy(Uri.parse('http://pi:8088/'), page: Uri.parse('file:///app/')), isFalse);
+    });
   });
 }

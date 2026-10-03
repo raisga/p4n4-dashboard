@@ -1,0 +1,43 @@
+# p4n4-dashboard as a p4n4 service: the web build behind nginx on port 8088,
+# proxying p4n4-api, Ollama and Letta so the browser talks to one origin.
+# Image-only, so p4n4 projects can use this file as is.
+#
+#   cp .env.example .env && docker compose up -d     # http://<host>:8088
+#   make up-local                                    # build the image from source instead
+services:
+  dashboard:
+    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.1.0}
+    container_name: p4n4-dashboard
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-8088}:8080"
+    environment:
+      P4N4_API_UPSTREAM: ${P4N4_API_UPSTREAM:-http://host.docker.internal:8000}
+      OLLAMA_UPSTREAM: ${OLLAMA_UPSTREAM:-http://p4n4-ollama:11434}
+      LETTA_UPSTREAM: ${LETTA_UPSTREAM:-http://p4n4-letta:8283}
+      GRAFANA_UPSTREAM: ${GRAFANA_UPSTREAM:-}
+      DASHBOARD_GRAFANA_BASE: ${DASHBOARD_GRAFANA_BASE:-}
+      DASHBOARD_HOST: ${DASHBOARD_HOST:-}
+      DASHBOARD_BASIC_AUTH: ${DASHBOARD_BASIC_AUTH:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # p4n4-api v0.1 runs on the host
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /etc/nginx/conf.d:uid=101,gid=101      # rendered from templates at start, as the image's nginx user
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - p4n4-net
+
+networks:
+  p4n4-net:
+    external: true
+    name: p4n4-net

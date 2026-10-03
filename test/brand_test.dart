@@ -22,7 +22,7 @@ Map<String, dynamic> _minimal([Map<String, dynamic> extra = const {}]) => {
 
 void main() {
   for (final id in brandIds()) {
-    test('brands/$id parses', () {
+    test('brand $id parses', () {
       final brand = loadBrand(id);
       expect(brand.id, id);
       expect(brand.tabs, isNotEmpty);
@@ -30,12 +30,12 @@ void main() {
   }
 
   for (final id in brandIds()) {
-    test('brands/$id ships its fonts', () {
+    test('brand $id ships its fonts', () {
       final brand = loadBrand(id);
       for (final family in {brand.displayFont, brand.monoFont}) {
-        final file = File('brands/$id/fonts/${family.replaceAll(' ', '')}-Regular.ttf');
+        final file = File('${brandDir(id).path}/fonts/${family.replaceAll(' ', '')}-Regular.ttf');
         expect(file.existsSync(), isTrue, reason: 'run `dart run tool/brand.dart fonts $id`');
-        final license = File('brands/$id/fonts/${family.replaceAll(' ', '')}-LICENSE.txt');
+        final license = File('${brandDir(id).path}/fonts/${family.replaceAll(' ', '')}-LICENSE.txt');
         expect(license.existsSync(), isTrue, reason: 'run `dart run tool/brand.dart fonts $id`');
       }
     });

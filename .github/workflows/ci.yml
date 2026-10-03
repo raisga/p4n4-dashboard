@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    # A release tag (vX.Y.Z, matching pubspec.yaml) builds every platform's
+    # artifacts; image.yml publishes the web image for it.
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -30,14 +33,23 @@ jobs:
       - name: Format
         run: dart format --output=none --set-exit-if-changed lib test tool
       - run: flutter analyze
+      # Shared code must compile for the web: platform code goes behind
+      # conditional imports in lib/platform/ instead.
+      - name: No dart:io in lib/
+        run: "! grep -rn \"import 'dart:io'\" lib/"
       - run: flutter test
+      # The web implementations (lib/platform/*_web.dart), in Chrome.
+      - run: flutter test --platform chrome test/web
+      # p4n4 is the only committed brand. Client brands are themes that live with
+      # their project; test/fixtures/brands/ holds example themes (acme) that
+      # exercise every option through `install`.
       - name: Validate every brand
         id: brands
         # Lists folders directly: `dart run` can print build-hook progress to stdout.
         run: |
-          brands=$(find brands -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
-          for id in $brands; do dart run tool/brand.dart check "$id"; done
-          echo "list=$(echo "$brands" | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+          dirs=$(find brands test/fixtures/brands -mindepth 1 -maxdepth 1 -type d | sort)
+          for dir in $dirs; do dart run tool/brand.dart check "$dir"; done
+          echo "list=$(for dir in $dirs; do basename "$dir"; done | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
       # The repository ships with p4n4 applied; re-applying it must be a no-op.
       - name: Committed files match the p4n4 brand
         run: |
@@ -53,6 +65,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # CanvasKit is bundled instead of loaded from Google's CDN, so the
+          # build works on an offline LAN.
+          - platform: web
+            os: ubuntu-latest
+            command: flutter build web --release --no-web-resources-cdn
+            artifact: build/web
           - platform: linux
             os: ubuntu-latest
             command: flutter build linux --release
@@ -114,7 +132,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart run tool/brand.dart apply ${{ matrix.brand }}
+      - name: Apply ${{ matrix.brand }}
+        run: |
+          if [ -d "brands/${{ matrix.brand }}" ]; then
+            dart run tool/brand.dart apply ${{ matrix.brand }}
+          else
+            dart run tool/brand.dart install test/fixtures/brands/${{ matrix.brand }} --apply
+          fi
       # Layout tests render the applied brand, so they cover its tabs and palette.
       - run: flutter test
       - run: flutter build linux --release

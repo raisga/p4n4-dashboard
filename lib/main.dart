@@ -1,11 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
+import 'api/agent_client.dart' show viaPageProxy;
+import 'api/auth.dart';
+import 'api/project.dart';
 import 'api/status_monitor.dart';
 import 'core/brand.dart';
+import 'core/runtime_config.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
 import 'core/theme.dart';
 import 'pages/login_page.dart';
+import 'platform/http_client.dart';
 import 'pages/settings_page.dart';
 import 'tabs/agent_tab.dart';
 import 'tabs/clients_tab.dart';
@@ -17,20 +24,40 @@ import 'tabs/video_tab.dart';
 import 'widgets/common.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final brand = await Brand.load()
-    ..registerFontLicenses();
-  final settings = await AppSettings.load(defaults: brand.defaults);
-  final session = await Session.load();
-  runApp(
-    BrandScope(
-      brand: brand,
-      child: SettingsScope(
-        settings: settings,
-        child: SessionScope(session: session, child: const DashboardApp()),
+  final credentials = _SessionCredentials();
+  // Every request goes through AuthClient, which adds the signed-in user's
+  // token to the connected deployment's p4n4-api calls (lib/api/auth.dart).
+  await http.runWithClient(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    final brand = await Brand.load()
+      ..registerFontLicenses();
+    // Lowest priority first: brand < config.json (web) < what the user saved.
+    final runtime = kIsWeb ? await loadRuntimeDefaults(Uri.base) : const <String, Object>{};
+    final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime});
+    final session = credentials.session = await Session.load(settings);
+    ProjectWatcher(settings); // lives as long as the app
+    runApp(
+      BrandScope(
+        brand: brand,
+        child: SettingsScope(
+          settings: settings,
+          child: SessionScope(session: session, child: const DashboardApp()),
+        ),
       ),
-    ),
-  );
+    );
+  }, () => AuthClient(newHttpClient(), credentials, viaProxy: (url) => kIsWeb && viaPageProxy(url)));
+}
+
+/// The session once it's loaded: requests made before that (config.json, the
+/// first project fetch) go out without a token.
+class _SessionCredentials implements ApiCredentials {
+  Session? session;
+
+  @override
+  String? accessTokenFor(Uri url) => session?.accessTokenFor(url);
+
+  @override
+  Future<String?> refreshFor(Uri url) => session?.refreshFor(url) ?? Future.value();
 }
 
 class DashboardApp extends StatefulWidget {
@@ -102,11 +129,15 @@ const _dests = {
 };
 
 /// Screens for [role]: admins get every brand tab plus Clients; clients get
-/// Home plus the brand tabs an admin has enabled for them.
-List<Screen> screensFor(Role role, Brand brand, AppSettings settings) => switch (role) {
-  Role.admin => [...brand.tabs.map(Screen.of), Screen.clients],
-  Role.client => [Screen.home, ...brand.tabs.where(settings.clientTabs.contains).map(Screen.of)],
-};
+/// Home plus the brand tabs an admin has enabled for them. Either way, tabs the
+/// connected project doesn't serve (its `.p4n4.json` `dashboard.tabs`) are left out.
+List<Screen> screensFor(Role role, Brand brand, AppSettings settings) {
+  final tabs = brand.tabs.where(settings.projectAllows);
+  return switch (role) {
+    Role.admin => [...tabs.map(Screen.of), Screen.clients],
+    Role.client => [Screen.home, ...tabs.where(settings.clientTabs.contains).map(Screen.of)],
+  };
+}
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});

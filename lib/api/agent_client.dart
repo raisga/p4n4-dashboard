@@ -18,6 +18,18 @@ class AgentOption {
   final String label;
 }
 
+/// Carries a service's own `Authorization` value through the dashboard
+/// container's proxy (docker/nginx/default.conf.template), leaving
+/// `Authorization` to the proxy's basic auth.
+const upstreamAuthorizationHeader = 'X-Upstream-Authorization';
+
+/// Whether [uri] goes through the proxy that served this page: web only, same origin.
+bool viaPageProxy(Uri uri, {Uri? page}) {
+  page ??= Uri.base;
+  if (!page.isScheme('http') && !page.isScheme('https')) return false;
+  return uri.scheme == page.scheme && uri.host == page.host && uri.port == page.port;
+}
+
 abstract interface class AgentClient {
   /// Models (Ollama) or agents (Letta) the user can pick from.
   Future<List<AgentOption>> listOptions();
@@ -35,7 +47,7 @@ class OllamaClient implements AgentClient {
 
   @override
   Future<List<AgentOption>> listOptions() async {
-    final res = await http.get(base.resolve('/api/tags')).timeout(const Duration(seconds: 5));
+    final res = await http.get(base.resolve('api/tags')).timeout(const Duration(seconds: 5));
     _check(res.statusCode, res.body);
     final models = (jsonDecode(res.body)['models'] as List).cast<Map<String, dynamic>>();
     return [for (final m in models) AgentOption(m['name'] as String, m['name'] as String)];
@@ -45,7 +57,7 @@ class OllamaClient implements AgentClient {
   Stream<String> send(String model, List<ChatMessage> history) async* {
     final client = http.Client();
     try {
-      final req = http.Request('POST', base.resolve('/api/chat'))
+      final req = http.Request('POST', base.resolve('api/chat'))
         ..headers['Content-Type'] = 'application/json'
         ..body = jsonEncode({
           'model': model,
@@ -77,19 +89,24 @@ class OllamaClient implements AgentClient {
 /// Letta REST API. Letta keeps conversation state server-side, so only the
 /// latest user message is sent.
 class LettaClient implements AgentClient {
-  LettaClient(this.base, {this.token = ''});
+  LettaClient(this.base, {this.token = '', this.viaProxy = false});
 
   final Uri base;
   final String token;
 
+  /// Through the dashboard container's proxy, which may itself ask for HTTP
+  /// basic auth: the browser's credentials then need `Authorization`, so the
+  /// token goes in [upstreamAuthorizationHeader] and nginx moves it back.
+  final bool viaProxy;
+
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    if (token.isNotEmpty) (viaProxy ? upstreamAuthorizationHeader : 'Authorization'): 'Bearer $token',
   };
 
   @override
   Future<List<AgentOption>> listOptions() async {
-    final res = await http.get(base.resolve('/v1/agents/'), headers: _headers).timeout(const Duration(seconds: 5));
+    final res = await http.get(base.resolve('v1/agents/'), headers: _headers).timeout(const Duration(seconds: 5));
     _check(res.statusCode, res.body);
     final agents = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
     return [for (final a in agents) AgentOption(a['id'] as String, (a['name'] ?? a['id']) as String)];
@@ -100,7 +117,7 @@ class LettaClient implements AgentClient {
     final last = history.lastWhere((m) => m.role == 'user');
     final res = await http
         .post(
-          base.resolve('/v1/agents/$agentId/messages'),
+          base.resolve('v1/agents/$agentId/messages'),
           headers: _headers,
           body: jsonEncode({
             'messages': [last.toJson()],

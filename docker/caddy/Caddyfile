@@ -1,0 +1,14 @@
+# HTTPS in front of p4n4-dashboard (docker-compose.tls.yml).
+#   DASHBOARD_TLS_SITE  the address browsers use: a domain (dashboard.example.com),
+#                       a LAN name or IP (pi.lan, 192.168.1.20). Default localhost.
+#   DASHBOARD_TLS       "internal" (Caddy's own CA; install its root on clients)
+#                       or an email address (Let's Encrypt; needs a public domain).
+{$DASHBOARD_TLS_SITE:localhost} {
+	tls {$DASHBOARD_TLS:internal}
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Grafana Live websockets and the agents' streaming pass straight through.
+	reverse_proxy dashboard:8080 {
+		flush_interval -1
+	}
+}

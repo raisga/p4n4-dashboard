@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
@@ -24,7 +25,8 @@ void main() {
     SharedPreferences.setMockInitialValues({'edgeDemo': true, 'themeMode': mode.name, 'role': ?role?.name});
     final brand = loadBrand(brandId);
     final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
-    final session = await Session.load();
+    // p4n4-api "runs without auth", so sign-in is the role picker.
+    final session = await Session.load(settings, probe: (_) async => AuthMode.off);
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -144,7 +146,8 @@ void main() {
     expect(find.text('Host'), findsNothing);
     expect(find.text('p4n4-api base URL'), findsNothing);
     expect(find.textContaining('CLIENT VIEW', findRichText: true), findsNothing);
-    expect(find.text('Signed in as client'), findsOneWidget);
+    expect(find.text('Signed in without an account'), findsOneWidget);
+    expect(find.text('client view · role picked at sign-in'), findsOneWidget);
 
     await tester.ensureVisible(find.text('LICENSES'));
     await tester.tap(find.text('LICENSES'));
@@ -183,6 +186,12 @@ void main() {
     await tester.pump();
 
     expect(settings.deployment.name, 'Site');
+    // Each deployment has its own p4n4-api and accounts: sign in there first.
+    expect(find.byType(LoginPage), findsOneWidget);
+    await tester.pump(); // the API check
+    await tester.tap(find.text('Administrator'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('// Site · 10.0.0.2'), findsOneWidget);
   });
 

@@ -76,7 +76,7 @@ class _ServicesTabState extends State<ServicesTab> {
                 children: [
                   _header(settings, status),
                   const SizedBox(height: 32),
-                  for (final stack in stacks) ...[
+                  for (final stack in stacks.where(settings.showsStack)) ...[
                     _stackSection(stack, settings, status.report),
                     const SizedBox(height: 36),
                   ],

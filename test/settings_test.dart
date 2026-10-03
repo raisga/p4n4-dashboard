@@ -25,7 +25,7 @@ void main() {
     expect(s.deployments, hasLength(1));
     expect(s.host, 'edge.local');
     expect(s.grafanaPath, '/d/x');
-    expect(s.apiUri, Uri.parse('http://edge.local:8000'));
+    expect(s.apiUri, Uri.parse('http://edge.local:8000/'));
   });
 
   test('connecting switches every connection setting but not app-wide ones', () async {
@@ -52,8 +52,8 @@ void main() {
   test('a deployment can use an API that is not on port 8000', () async {
     final s = await _load({});
     final d = Deployment(id: 'x', name: 'X', values: {'host': 'x.lan', 'apiBase': 'https://api.x.lan'});
-    expect(s.apiUriOf(d), Uri.parse('https://api.x.lan'));
-    expect(s.apiUriOf(d.copyWith(values: {'host': 'x.lan'})), Uri.parse('http://x.lan:8000'));
+    expect(s.apiUriOf(d), Uri.parse('https://api.x.lan/'));
+    expect(s.apiUriOf(d.copyWith(values: {'host': 'x.lan'})), Uri.parse('http://x.lan:8000/'));
   });
 
   test('the connected deployment cannot be removed; others can', () async {

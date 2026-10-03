@@ -46,3 +46,12 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Client brands installed from their project's theme (dart run tool/brand.dart
+# install <project>); only the built-in p4n4 brand is committed
+/brands/*
+!/brands/p4n4/
+!/brands/README.md
+
+# Local settings for docker-compose.yml (copy of .env.example)
+.env

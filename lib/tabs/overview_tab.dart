@@ -86,10 +86,14 @@ class _OverviewTabState extends State<OverviewTab> {
     super.dispose();
   }
 
+  /// Edge readings, when both the brand and the connected project have the Edge tab.
+  bool get _showsDevice =>
+      BrandScope.of(context).tabs.contains(DashTab.edge) && SettingsScope.of(context).projectAllows(DashTab.edge);
+
   Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics()).wait;
 
   Future<void> _fetchMetrics() async {
-    if (_metricsLoading || !BrandScope.of(context).tabs.contains(DashTab.edge)) return;
+    if (_metricsLoading || !_showsDevice) return;
     final s = SettingsScope.of(context);
     final key = _metricsKey;
     // Not setState: this can run from didChangeDependencies, mid-build.
@@ -113,6 +117,7 @@ class _OverviewTabState extends State<OverviewTab> {
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
+    final settings = SettingsScope.of(context);
     return RefreshIndicator(
       color: p4.accent,
       onRefresh: _refresh,
@@ -143,8 +148,11 @@ class _OverviewTabState extends State<OverviewTab> {
                   const SizedBox(height: 24),
                   _summary(),
                   const SizedBox(height: 16),
-                  _grid([for (final st in stacks.where((st) => st.suffix != 'api')) _stackTile(st)], minWidth: 220),
-                  if (brand.tabs.contains(DashTab.edge)) ...[const SizedBox(height: 16), _device()],
+                  _grid([
+                    for (final st in stacks.where((st) => st.suffix != 'api' && settings.showsStack(st)))
+                      _stackTile(st),
+                  ], minWidth: 220),
+                  if (_showsDevice) ...[const SizedBox(height: 16), _device()],
                   if (widget.shortcuts.isNotEmpty) ...[
                     const SizedBox(height: 36),
                     const SectionHeader(tag: 'go to', title: SizedBox.shrink()),

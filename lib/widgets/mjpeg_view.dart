@@ -2,15 +2,22 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/theme.dart';
+import '../platform/html_view.dart';
 
-/// Pure-Dart video viewer that works on every platform.
+/// Video viewer for MJPEG streams and JPEG snapshots.
 ///
+/// Native: decoded in pure Dart.
 /// * `multipart/x-mixed-replace` (MJPEG) streams are decoded frame by frame.
 /// * A plain `image/*` response is treated as a snapshot and re-polled.
+///
+/// Web: the browser decodes it in an `<img>` ([_BrowserStream]), which needs
+/// no CORS headers from the camera. The response type can't be read there, so
+/// URLs that look like a still image ([looksLikeSnapshot]) are re-polled.
 ///
 /// Dropped connections are retried with exponential backoff while [active].
 class MjpegView extends StatefulWidget {
@@ -29,6 +36,18 @@ class MjpegView extends StatefulWidget {
 
   @override
   State<MjpegView> createState() => MjpegViewState();
+}
+
+/// Whether [uri] looks like a still image rather than a stream: used on web,
+/// where the response's content type can't be read.
+@visibleForTesting
+bool looksLikeSnapshot(Uri uri) {
+  final path = uri.path.toLowerCase();
+  return path.endsWith('.jpg') ||
+      path.endsWith('.jpeg') ||
+      path.endsWith('.png') ||
+      path.contains('snapshot') ||
+      uri.queryParameters['action'] == 'snapshot';
 }
 
 class MjpegViewState extends State<MjpegView> {
@@ -54,12 +73,13 @@ class MjpegViewState extends State<MjpegView> {
   @override
   void initState() {
     super.initState();
-    if (widget.active) _connect();
+    if (widget.active && !kIsWeb) _connect();
   }
 
   @override
   void didUpdateWidget(MjpegView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (kIsWeb) return;
     if (oldWidget.uri != widget.uri || oldWidget.active != widget.active) {
       _disconnect();
       if (widget.active) _connect();
@@ -73,6 +93,7 @@ class MjpegViewState extends State<MjpegView> {
   }
 
   void reconnect() {
+    if (kIsWeb) return;
     _disconnect();
     _backoff = _minBackoff;
     _connect();
@@ -225,6 +246,9 @@ class MjpegViewState extends State<MjpegView> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return _BrowserStream(uri: widget.uri, active: widget.active, snapshotInterval: widget.snapshotInterval);
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -279,6 +303,117 @@ class MjpegViewState extends State<MjpegView> {
                     style: p4.mono(size: 10, color: P4Colors.dark.text),
                   ),
                 ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Web: [MjpegView] as an `<img>`. Errors retry with the same 2 s → 30 s
+/// backoff, and snapshots are re-requested with a cache-busting query.
+class _BrowserStream extends StatefulWidget {
+  const _BrowserStream({required this.uri, required this.active, required this.snapshotInterval});
+
+  final Uri uri;
+  final bool active;
+  final Duration snapshotInterval;
+
+  @override
+  State<_BrowserStream> createState() => _BrowserStreamState();
+}
+
+class _BrowserStreamState extends State<_BrowserStream> {
+  late Uri _src = widget.uri;
+  bool _loaded = false;
+  bool _failed = false;
+  Timer? _timer;
+  Duration _backoff = MjpegViewState._minBackoff;
+
+  bool get _snapshot => looksLikeSnapshot(widget.uri);
+
+  @override
+  void didUpdateWidget(_BrowserStream old) {
+    super.didUpdateWidget(old);
+    if (old.uri != widget.uri || old.active != widget.active) {
+      _timer?.cancel();
+      _src = widget.uri;
+      _loaded = _failed = false;
+      _backoff = MjpegViewState._minBackoff;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Uri _fresh() => widget.uri.replace(
+    queryParameters: {...widget.uri.queryParameters, '_t': '${DateTime.now().millisecondsSinceEpoch}'},
+  );
+
+  void _onLoad() {
+    if (!mounted || !widget.active) return;
+    _backoff = MjpegViewState._minBackoff;
+    setState(() {
+      _loaded = true;
+      _failed = false;
+    });
+    if (_snapshot) {
+      _timer?.cancel();
+      _timer = Timer(widget.snapshotInterval, () => setState(() => _src = _fresh()));
+    }
+  }
+
+  void _onError() {
+    if (!mounted || !widget.active) return;
+    setState(() => _failed = true);
+    _timer?.cancel();
+    _timer = Timer(_backoff, () => setState(() => _src = _fresh()));
+    _backoff = Duration(milliseconds: min(_backoff.inMilliseconds * 2, MjpegViewState._maxBackoff.inMilliseconds));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: Colors.black),
+        // An empty src closes the connection while the tab is hidden.
+        HtmlImage(uri: widget.active ? _src : Uri(), onLoad: _onLoad, onError: _onError),
+        if (widget.active && !_loaded && !_failed) Center(child: CircularProgressIndicator(color: p4.accent)),
+        if (_failed)
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              color: p4.bg.withValues(alpha: 0.85),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.videocam_off_outlined, color: p4.err),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Camera unavailable\nreconnecting…',
+                    style: p4.mono(size: 11, color: p4.text),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_loaded && !_failed)
+          Positioned(
+            left: 12,
+            top: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              color: Colors.black54,
+              child: Text(
+                'LIVE · ${_snapshot ? 'SNAPSHOT' : 'MJPEG'}',
+                style: p4.mono(size: 10, color: P4Colors.dark.text),
               ),
             ),
           ),

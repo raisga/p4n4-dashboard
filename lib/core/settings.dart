@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/camera.dart';
 import '../api/fleet.dart';
+import '../api/project.dart';
+import '../api/services.dart' show StackDef;
 import '../api/status_monitor.dart';
 import 'brand.dart';
 import 'secrets.dart';
@@ -17,21 +19,38 @@ enum AgentBackend { ollama, letta }
 const profileKeys = {
   'host',
   'apiBase',
+  'ollamaBase',
+  'lettaBase',
   'edgeMetricsUrl',
   'edgeDemo',
   'agentBackend',
   'ollamaModel',
   'lettaAgentId',
   'lettaToken',
+  'grafanaBase',
   'grafanaPath',
   'grafanaKiosk',
   'videoUrl',
   'cameras',
+  'session',
+};
+
+/// Profile keys that say where the services are, cleared by
+/// [AppSettings.resetConnection].
+const connectionKeys = {
+  'host',
+  'apiBase',
+  'ollamaBase',
+  'lettaBase',
+  'edgeMetricsUrl',
+  'grafanaBase',
+  'grafanaPath',
+  'grafanaKiosk',
 };
 
 /// Profile keys whose values are credentials: kept in the platform's secure
 /// storage ([SecretStore]) instead of shared_preferences.
-const secretKeys = {'lettaToken'};
+const secretKeys = {'lettaToken', 'apiRefreshToken'};
 
 /// User-editable settings, persisted with shared_preferences.
 ///
@@ -93,14 +112,33 @@ class AppSettings extends ChangeNotifier {
     _ => _default(key) ?? fallback,
   };
 
-  T? _default<T>(String key) => switch (_defaults[key]) {
+  /// The connected project's defaults win over the brand's.
+  T? _default<T>(String key) => switch (_project?.defaults[key] ?? _defaults[key]) {
     T v => v,
     null => null,
     final v => throw FormatException('Brand default "$key" should be a $T, got ${v.runtimeType}'),
   };
 
+  /// The connected deployment's project (`.p4n4.json`), kept current by
+  /// [ProjectWatcher]. Null until p4n4-api has answered, or without the API.
+  /// Its defaults (e.g. the Grafana page) apply until the user sets a value.
+  ProjectInfo? get project => _project;
+  ProjectInfo? _project;
+  set project(ProjectInfo? v) {
+    if (v == null && _project == null) return;
+    _project = v;
+    notifyListeners();
+  }
+
+  /// Whether the connected project can serve [tab]. Without project info,
+  /// every tab is allowed.
+  bool projectAllows(DashTab tab) => _project?.tabs?.contains(tab) ?? true;
+
+  /// Whether the connected project runs [stack]; every stack without project info.
+  bool showsStack(StackDef stack) => _project?.hasStack(stack.suffix) ?? true;
+
   Future<void> _set(String key, Object value) async {
-    if (secretKeys.contains(key)) return _setSecret(key, value as String);
+    if (secretKeys.contains(key)) return _setSecret(key, value as String, deployment);
     if (profileKeys.contains(key)) {
       deployment.values[key] = value;
       await _saveDeployments();
@@ -115,12 +153,12 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _setSecret(String key, String value) async {
-    final id = _secretId(deployment, key);
+  Future<void> _setSecret(String key, String value, Deployment d, {bool notify = true}) async {
+    final id = _secretId(d, key);
     value.isEmpty ? _secrets.remove(id) : _secrets[id] = value;
     // Drop any plain-text copy left from before secure storage.
-    if (deployment.values.remove(key) != null) await _saveDeployments();
-    notifyListeners();
+    if (d.values.remove(key) != null) await _saveDeployments();
+    if (notify) notifyListeners();
     if (!_secretsOk) return;
     try {
       value.isEmpty ? await _store.delete(id) : await _store.write(id, value);
@@ -165,6 +203,15 @@ class AppSettings extends ChangeNotifier {
   /// Builds `http://<host>:<port><path>`.
   Uri url(int port, [String path = '']) => Uri.parse('http://$host:$port$path');
 
+  /// A service base URL ending in `/`, so clients can resolve relative paths
+  /// (`api/tags`) under it and keep a proxy prefix such as `/ollama/`. A
+  /// relative value resolves against the page's URL (web, behind a proxy).
+  static Uri baseUri(String value) {
+    var uri = Uri.parse(value.trim());
+    if (!uri.hasScheme) uri = Uri.base.resolveUri(uri);
+    return uri.path.endsWith('/') ? uri : uri.replace(path: '${uri.path}/');
+  }
+
   // p4n4-api gateway
   String get apiBase => _str('apiBase', '');
   set apiBase(String v) => _set('apiBase', v.trim());
@@ -174,7 +221,7 @@ class AppSettings extends ChangeNotifier {
   String get edgeMetricsUrl => _str('edgeMetricsUrl', '');
   set edgeMetricsUrl(String v) => _set('edgeMetricsUrl', v.trim());
   Uri get edgeMetricsUri =>
-      edgeMetricsUrl.isNotEmpty ? Uri.parse(edgeMetricsUrl) : apiUri.resolve('/api/v1/edge/metrics');
+      edgeMetricsUrl.isNotEmpty ? Uri.parse(edgeMetricsUrl) : apiUri.resolve('api/v1/edge/metrics');
 
   bool get edgeDemo => _bool('edgeDemo', false);
   set edgeDemo(bool v) => _set('edgeDemo', v);
@@ -183,6 +230,16 @@ class AppSettings extends ChangeNotifier {
   AgentBackend get agentBackend =>
       AgentBackend.values.asNameMap()[_str('agentBackend', 'ollama')] ?? AgentBackend.ollama;
   set agentBackend(AgentBackend v) => _set('agentBackend', v.name);
+
+  /// Ollama and Letta base URLs; empty means `http://<host>:11434/` and
+  /// `http://<host>:8283/`. Set them to reach the services through a proxy.
+  String get ollamaBase => _str('ollamaBase', '');
+  set ollamaBase(String v) => _set('ollamaBase', v.trim());
+  Uri get ollamaUri => ollamaBase.isNotEmpty ? baseUri(ollamaBase) : url(11434, '/');
+
+  String get lettaBase => _str('lettaBase', '');
+  set lettaBase(String v) => _set('lettaBase', v.trim());
+  Uri get lettaUri => lettaBase.isNotEmpty ? baseUri(lettaBase) : url(8283, '/');
 
   String get ollamaModel => _str('ollamaModel', '');
   set ollamaModel(String v) => _set('ollamaModel', v.trim());
@@ -194,6 +251,12 @@ class AppSettings extends ChangeNotifier {
   set lettaToken(String v) => _set('lettaToken', v.trim());
 
   // Grafana
+
+  /// Grafana's base URL; empty means `http://<host>:3000/`. Behind the
+  /// container's proxy it's `/grafana/` (same origin, so it works over HTTPS).
+  String get grafanaBase => _str('grafanaBase', '');
+  set grafanaBase(String v) => _set('grafanaBase', v.trim());
+
   String get grafanaPath => _str('grafanaPath', '/');
   set grafanaPath(String v) => _set('grafanaPath', v.trim().isEmpty ? '/' : v.trim());
 
@@ -201,7 +264,9 @@ class AppSettings extends ChangeNotifier {
   set grafanaKiosk(bool v) => _set('grafanaKiosk', v);
 
   Uri get grafanaUri {
-    final u = url(3000).resolve(grafanaPath);
+    final base = grafanaBase.isNotEmpty ? baseUri(grafanaBase) : url(3000, '/');
+    // Relative to the base, so a proxy prefix (/grafana/) is kept.
+    final u = base.resolve(grafanaPath.replaceFirst(RegExp('^/+'), ''));
     if (!grafanaKiosk) return u;
     return u.replace(queryParameters: {...u.queryParameters, 'kiosk': '1'});
   }
@@ -224,6 +289,37 @@ class AppSettings extends ChangeNotifier {
 
   /// A camera id not used by any of [cameras].
   String newCameraId() => _newId(cameras.map((c) => c.id));
+
+  // Sign-in (see Session)
+
+  /// [d]'s p4n4-api refresh token, kept in secure storage; empty when not
+  /// signed in with p4n4-api.
+  String apiRefreshTokenOf(Deployment d) => _str('apiRefreshToken', '', d);
+
+  /// Stores (or, empty, forgets) [d]'s refresh token. Tokens rotate on every
+  /// refresh, so this doesn't notify listeners.
+  Future<void> setApiRefreshToken(Deployment d, String token) => _setSecret('apiRefreshToken', token, d, notify: false);
+
+  /// Who is signed in to [d] and how (see `Session`), or null.
+  Map<String, Object?>? sessionOf(Deployment d) => switch (d.values['session']) {
+    Map m => m.cast<String, Object?>(),
+    _ => null,
+  };
+
+  Future<void> setSessionOf(Deployment d, Map<String, Object?>? session) async {
+    session == null ? d.values.remove('session') : d.values['session'] = session;
+    await _saveDeployments();
+    notifyListeners();
+  }
+
+  /// The deployment whose p4n4-api serves [url], if any.
+  Deployment? deploymentForApi(Uri url) {
+    final target = url.toString();
+    for (final d in _deployments) {
+      if (target.startsWith(apiUriOf(d).toString())) return d;
+    }
+    return null;
+  }
 
   /// Brand tabs shown in the client view, after Home. Set by admins.
   List<DashTab> get clientTabs {
@@ -248,7 +344,7 @@ class AppSettings extends ChangeNotifier {
 
   Uri apiUriOf(Deployment d) {
     final base = _str('apiBase', '', d);
-    return base.isNotEmpty ? Uri.parse(base) : Uri.parse('http://${hostOf(d)}:8000');
+    return base.isNotEmpty ? baseUri(base) : Uri.parse('http://${hostOf(d)}:8000/');
   }
 
   /// Where [d]'s service status comes from (see [StatusMonitor]).
@@ -256,6 +352,17 @@ class AppSettings extends ChangeNotifier {
 
   /// The connected deployment's [targetOf].
   StatusTarget get statusTarget => targetOf(deployment);
+
+  /// Forgets the connected deployment's saved [connectionKeys], so the
+  /// defaults apply again (brand, `config.json` on web, the project's). Use it
+  /// after the operator changes where the services are.
+  Future<void> resetConnection() async {
+    final values = deployment.values;
+    if (!connectionKeys.any(values.containsKey)) return;
+    values.removeWhere((k, _) => connectionKeys.contains(k));
+    await _saveDeployments();
+    notifyListeners();
+  }
 
   /// Switches every connection setting to [id]'s.
   Future<void> connect(String id) async {

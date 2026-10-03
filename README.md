@@ -1,18 +1,18 @@
 # p4n4-dashboard
 
-Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs on Android, iOS, Windows, Linux and macOS, and supports white-labeling: name, logo, colors, fonts, tabs, defaults, bundle IDs and icons are set per brand (see [White-label](#white-label)).
+Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs in the browser and on Android, iOS, Windows, Linux and macOS, and supports white-labeling: name, logo, colors, fonts, tabs, defaults, bundle IDs and icons are set per brand (see [White-label](#white-label)).
 
 | Tab | What it does | Talks to |
 |-----|--------------|----------|
 | **Services** | Launcher for every p4n4 service, with live status | `p4n4-api` `GET /api/v1/stacks`, or a direct HTTP probe of each port when the API is down |
 | **Edge** | CPU, memory, SoC temperature and inference latency, with 2 minutes of history | Configurable metrics URL (see [below](#edge-metrics-contract)); a demo mode is built in |
-| **Agent** | Chat with a local model or a stateful agent | Ollama `/api/chat` (streaming), or Letta `/v1/agents/{id}/messages` |
-| **Grafana** | Embedded Grafana, in kiosk mode by default | `http://<host>:3000` |
+| **Agent** | Chat with a local model or a stateful agent | Ollama `/api/chat` (streaming), or Letta `/v1/agents/{id}/messages`; base URLs are configurable for proxies |
+| **Grafana** | Embedded Grafana, in kiosk mode by default (an `<iframe>` on web) | `http://<host>:3000` |
 | **Video** | Live camera feeds from the edge device: pick one, or see them all in a grid | Any MJPEG stream (`multipart/x-mixed-replace`) or JPEG snapshot URL |
 
 ## Admin and client views
 
-On launch you pick a role on the sign-in screen. The role is saved until you sign out (app bar or settings). p4n4-api has no authentication yet, so the picker is a placeholder; once the API issues JWTs, the role will come from the token (`lib/core/session.dart`).
+On launch you sign in to the connected deployment's p4n4-api with a username and password; the role comes from the account (`admin` → admin view, `operator` → client view). Sign-in is per deployment, the refresh token is kept in secure storage, and expired access tokens are refreshed automatically. If the API runs with `P4N4_API_AUTH=off` or can't be reached, the screen offers a role picker instead, which is dropped once the API requires sign-in (`lib/core/session.dart`, `lib/api/auth.dart`).
 
 | | Admin | Client |
 |---|---|---|
@@ -27,41 +27,94 @@ On phones the bottom bar holds at most five destinations; any extras (e.g. admin
 
 Connection settings (host, API, metrics, agent, Grafana and cameras) live behind the ⚙ button (cameras on the Video tab), belong to the connected deployment, and persist between launches. Theme and client tabs are app-wide. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
 
-## Run
+## Project settings
+
+On connect, the dashboard reads the deployment's `.p4n4.json` through p4n4-api (`GET /api/v1/project`, in `lib/api/project.dart`). It retries every 30 s while the API is unreachable:
+
+- `layers`: Services and Home show only those stacks (plus the API).
+- `dashboard.tabs`: brand tabs outside the list are hidden while connected.
+- `dashboard.grafana_path`: the Grafana tab's page, used ahead of the brand default and unless the deployment sets its own.
+
+Without the API, every brand tab and stack is shown, as before. Status, project info and edge metrics use the signed-in account's token. The [greenhouse use case](https://github.com/raisga/p4n4-docs/blob/main/use-cases/greenhouse-telemetry.md) shows it end to end with the `mqtt-influx-grafana` template and the `verdant` brand.
+
+## Run as a service (web)
+
+The default way to run the dashboard: a container on port 8088 that serves the web build and proxies p4n4-api (`/api/`), Ollama (`/ollama/`) and Letta (`/letta/`), so the browser talks to one origin and the services need no CORS.
+
+```bash
+cp .env.example .env
+docker compose up -d                   # the released image (ghcr.io/raisga/p4n4-dashboard:$DASHBOARD_VERSION)
+make up-local                          # or build it from this checkout (BRAND=…)
+curl -fsS localhost:8088/healthz       # then open http://<host>:8088 from any device on the LAN
+```
+
+- **p4n4-api** runs on the host in v0.1, and the container reaches it at `host.docker.internal` (the Docker bridge address). Start the API listening there: `P4N4_API_HOST=172.17.0.1` (the `docker0` address) or `0.0.0.0`. Create accounts with `p4n4-api users add <name> --role admin|operator`; the dashboard signs in with them (admins get the admin view, operators the client view).
+- **Ollama and Letta** are reached by container name on the `p4n4-net` network (`p4n4-ollama`, `p4n4-letta`); change `OLLAMA_UPSTREAM` / `LETTA_UPSTREAM` otherwise. While they're down, the UI still loads and the Agent tab shows an error.
+- **Grafana and cameras** are loaded by the browser directly (`<iframe>`, `<img>`), at `DASHBOARD_HOST` or the host the page came from. Grafana needs `GF_SECURITY_ALLOW_EMBEDDING=true`.
+- The container runs nginx as a non-root user, with a read-only filesystem, no capabilities and `no-new-privileges`. `/healthz` is its health check, and `/config.json` hands the app its defaults (rendered from the `DASHBOARD_*` variables in `.env.example`).
+- **Sign-in** uses p4n4-api accounts. Only if the API runs with `P4N4_API_AUTH=off` or can't be reached does the sign-in screen fall back to a role picker, so keep auth on. Set `DASHBOARD_BIND` to a LAN address to keep it off other networks, and use the options below.
+
+Security options (all in `.env`, see `.env.example`):
+
+| Option | How | Notes |
+|---|---|---|
+| Basic auth | `DASHBOARD_BASIC_AUTH='user:$2y$…'` (from `make htpasswd NAME=admin`; single quotes) | Covers the app and every proxied route; `/healthz` stays open. The credentials are stripped before forwarding. Tokens the app sends itself (Letta, later p4n4-api) travel in `X-Upstream-Authorization` behind the proxy and become `Authorization` again upstream |
+| HTTPS | `make up-tls` (Caddy, `docker-compose.tls.yml`): `DASHBOARD_TLS_SITE`, `DASHBOARD_TLS=internal` or an email | Port 8088 is no longer published. `internal` uses Caddy's own CA; install its root (`caddy-data` volume) on clients |
+| Grafana on the same origin | `GRAFANA_UPSTREAM=http://p4n4-grafana:3000`, `DASHBOARD_GRAFANA_BASE=/grafana/`, and `GRAFANA_SUB_PATH=/grafana/` in the IoT `.env` | Needed behind HTTPS (an `http://` frame on an `https://` page is blocked). Cameras still load directly, so use HTTPS cameras there |
+| Content Security Policy | Always on (`docker/nginx/security_headers.conf`) | Enforced and checked against every tab; also stops other sites from framing the dashboard. Not applied to `/grafana/` |
+
+Base images are pinned by digest, and Dependabot (`.github/dependabot.yml`) bumps them along with GitHub Actions and Dart packages. `image.yml` scans every image with Trivy.
+
+Build an image for a brand or a client theme. Only that brand goes into the image:
+
+```bash
+make image                                         # p4n4-dashboard:p4n4
+make image THEME=~/projects/greenhouse             # installs the project's theme, builds p4n4-dashboard:verdant
+docker build --build-arg BRAND=<id> -t <tag> .     # without make; the theme must be installed in brands/ first
+```
+
+## Develop
 
 ```bash
 flutter pub get
-flutter run -d linux      # or macos, windows, android, ios
+make run                  # web dev server on :8088, proxying the services like the container (web_dev_config.yaml)
+make run PLATFORM=linux   # or chrome, macos, windows, android, ios
+make build PLATFORM=web   # web release (CanvasKit bundled, no CDN); or apk, appbundle, linux, macos, windows, ios, ipa
+make check                # what CI runs
 ```
+
+Without `make` (e.g. on Windows), run the commands it wraps: `flutter run -d web-server --web-port 8088 --dart-define=P4N4_DEV_PROXY=true`, `flutter run -d linux`, `flutter build web --release --no-web-resources-cdn`. `P4N4_DEV_PROXY` makes the app use the proxied paths (`/api/`, `/ollama/`, `/letta/`), which `web_dev_config.yaml` forwards to `localhost:8000`, `:11434` and `:8283`. Run with plain `flutter run -d chrome` instead to call the services directly. They then need CORS for the page's origin: `P4N4_API_CORS_ORIGINS` for p4n4-api, `OLLAMA_ORIGINS` for Ollama.
 
 Build release artifacts with `flutter build apk --split-per-abi | ios | macos | windows | linux`. `--split-per-abi` gives one APK per CPU architecture (arm64 ≈ 20 MB) instead of one universal APK (≈ 55 MB); for Play Store use `flutter build appbundle`.
 
 ```bash
 flutter analyze
 flutter test
+flutter test --platform chrome test/web   # the web implementations; set CHROME_EXECUTABLE for Chromium
 ```
 
 ## White-label
 
-Brands live in [`brands/`](brands/README.md). Pick one before building:
+The repository ships only the `p4n4` brand. A client's brand is a theme that lives in the client's p4n4 project (`.p4n4.json` → `dashboard.theme`). Install it and apply it before building:
 
 ```bash
-dart run tool/brand.dart apply acme   # copies brands/acme into assets/brand/ (fonts included), patches native projects, regenerates icons
+dart run tool/brand.dart install ~/projects/greenhouse --apply   # copies the project's theme to brands/<id>/ (gitignored), bundles it, patches native projects, regenerates icons
 flutter run -d linux
-dart run tool/brand.dart apply p4n4   # back to the default
+dart run tool/brand.dart apply p4n4                              # back to the default
 ```
 
-Only the applied brand is bundled, so one client's build never contains another's branding. See [brands/README.md](brands/README.md) for the `brand.json` reference.
+Only the applied brand is bundled, so one client's build never contains another's branding. See [brands/README.md](brands/README.md) for the commands and the `brand.json` reference.
 
 ## Platform notes
 
 - **Credentials.** The Letta server password is kept in the platform's secure storage (`flutter_secure_storage`): Keychain on iOS/macOS, Keystore-backed encryption on Android, Credential Manager on Windows, and the Secret Service on Linux. Linux builds need `libsecret-1-dev`, and running needs a keyring service (GNOME Keyring, KWallet). Without one, the password is kept only until the app closes, and the settings page says so. macOS uses the legacy keychain, so no Keychain Sharing entitlement or provisioning profile is needed.
-- **Grafana embedding.** `webview_flutter` only supports Android, iOS and macOS. On Windows and Linux the Grafana tab shows an *Open in browser* button.
+- **Grafana embedding.** `webview_flutter` only supports Android, iOS and macOS. On web, Grafana is an `<iframe>` (needs `GF_SECURITY_ALLOW_EMBEDDING=true`; otherwise it stays blank and *Open in browser* still works). On Windows and Linux the Grafana tab shows an *Open in browser* button.
+- **Web.** Platform code lives behind conditional imports in `lib/platform/` (no `dart:io` in `lib/`, checked in CI). Settings are stored in `localStorage` and the Letta password via `flutter_secure_storage`'s web implementation, which isn't real protection against scripts on the same origin. On web, the default host is the machine that served the page, and an optional `config.json` next to the app sets defaults (`host`, `apiBase`, `ollamaBase`, `lettaBase`; paths resolve against the page). Settings → Connection → *Reset connection to defaults* re-applies them. Ollama replies arrive all at once rather than streamed, because `package:http` buffers responses in the browser.
 - **Plain HTTP.** The p4n4 services use HTTP on the LAN, so cleartext is allowed:
   - Android: `usesCleartextTraffic`
   - iOS: `NSAllowsArbitraryLoads` / `NSAllowsLocalNetworking`
   - macOS: the `network.client` entitlement
-- **Video.** Streams are decoded in pure Dart (JPEG SOI/EOI framing), so no native video plugin is needed. Known-good sources:
+- **Video.** Streams are decoded in pure Dart (JPEG SOI/EOI framing), so no native video plugin is needed. On web, the browser decodes them in an `<img>` (no CORS needed); URLs that look like a still image (`.jpg`, `snapshot`) are re-polled as snapshots. Known-good sources:
   - mjpg-streamer: `/?action=stream`
   - motion
   - go2rtc: `/api/stream.mjpeg?src=…`
@@ -118,16 +171,22 @@ Only `cpu_percent` and `mem_percent` are required. Tiles for the other fields on
 ## Layout
 
 ```
-brands/                    # one folder per white-label brand (not bundled)
+brands/                    # p4n4 (committed) + client themes installed from their projects (gitignored)
+test/fixtures/brands/      # acme: example theme for tests and CI
 assets/brand/              # the applied brand (written by tool/brand.dart)
-tool/brand.dart            # brand list / check / apply
+tool/brand.dart            # brand list / check / fonts / install / remove / apply
+Dockerfile, docker/nginx/    # web image: Flutter build + nginx (proxy, /config.json, /healthz)
+docker-compose*.yml        # the p4n4-dashboard service (port 8088); .build.yml builds from source
+Makefile                   # run / build / image / up …, web by default
+web_dev_config.yaml        # dev server proxy, mirroring nginx
 lib/
 ├── main.dart              # app shell: NavigationRail (≥800px) / NavigationBar
 ├── core/
 │   ├── brand.dart         # white-label config (assets/brand/brand.json)
 │   ├── theme.dart         # light/dark palettes (P4Colors ThemeExtension) + fonts
 │   └── settings.dart      # persisted connection settings (SettingsScope)
-├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, Ollama/Letta clients
+├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, project, Ollama/Letta clients
+├── platform/              # web vs native: <iframe>/<img> views, port probes (conditional imports)
 ├── tabs/                  # one file per tab
 ├── pages/                 # settings page
 └── widgets/               # shared UI, sparkline, MJPEG viewer

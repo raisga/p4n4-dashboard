@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/theme.dart';
+import '../platform/probe.dart';
 
 class ServiceDef {
   const ServiceDef(this.name, this.desc, this.port, this.icon, {this.path = '', this.tcpOnly = false});
@@ -65,7 +66,7 @@ class ComposeService {
 
 /// `GET /api/v1/stacks` → Compose service status, keyed by lowercase service name.
 Future<Map<String, ComposeService>> fetchComposeStatus(Uri apiBase) async {
-  final res = await http.get(apiBase.resolve('/api/v1/stacks')).timeout(const Duration(seconds: 5));
+  final res = await http.get(apiBase.resolve('api/v1/stacks')).timeout(const Duration(seconds: 5));
   if (res.statusCode != 200) throw http.ClientException('HTTP ${res.statusCode}', res.request?.url);
   final body = jsonDecode(res.body) as Map<String, dynamic>;
   return {
@@ -95,16 +96,6 @@ ComposeService? statusFor(ServiceDef def, Map<String, ComposeService> status) {
     }
   }
   return null;
-}
-
-/// Fallback when p4n4-api is down: any HTTP response means the port is serving.
-Future<bool> probeHttp(Uri uri) async {
-  try {
-    await http.get(uri).timeout(const Duration(seconds: 3));
-    return true;
-  } catch (_) {
-    return false;
-  }
 }
 
 /// Status of every HTTP catalog entry on one host.

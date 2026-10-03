@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -37,12 +38,16 @@ class _AgentTabState extends State<AgentTab> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final s = SettingsScope.of(context);
-    final key = '${s.agentBackend}|${s.host}|${s.lettaToken}';
+    final key = '${s.agentBackend}|${s.ollamaUri}|${s.lettaUri}|${s.lettaToken}';
     if (key != _clientKey) {
       _clientKey = key;
       _client = switch (s.agentBackend) {
-        AgentBackend.ollama => OllamaClient(s.url(11434)),
-        AgentBackend.letta => LettaClient(s.url(8283), token: s.lettaToken),
+        AgentBackend.ollama => OllamaClient(s.ollamaUri),
+        AgentBackend.letta => LettaClient(
+          s.lettaUri,
+          token: s.lettaToken,
+          viaProxy: kIsWeb && viaPageProxy(s.lettaUri),
+        ),
       };
       _loadOptions();
     }
@@ -257,7 +262,7 @@ class _AgentTabState extends State<AgentTab> {
       return EmptyState(
         icon: Icons.cloud_off_outlined,
         title: '${ollama ? 'Ollama' : 'Letta'} unreachable',
-        message: '${s.url(ollama ? 11434 : 8283)}\n$_optionsError',
+        message: '${ollama ? s.ollamaUri : s.lettaUri}\n$_optionsError',
         actions: [OutlinedButton(onPressed: _loadOptions, child: const Text('RETRY'))],
       );
     }
