@@ -10,12 +10,13 @@ import '../api/project.dart';
 import '../api/services.dart' show StackDef;
 import '../api/status_monitor.dart';
 import 'brand.dart';
+import 'role.dart';
 import 'secrets.dart';
 
 enum AgentBackend { ollama, letta }
 
 /// Settings that belong to a deployment, so switching deployments switches
-/// them all. Everything else (theme, client tabs) is app-wide.
+/// them all. Everything else (theme, each view's tabs) is app-wide.
 const profileKeys = {
   'host',
   'apiBase',
@@ -321,16 +322,26 @@ class AppSettings extends ChangeNotifier {
     return null;
   }
 
-  /// Brand tabs shown in the client view, after Home. Set by admins.
-  List<DashTab> get clientTabs {
-    final names = _str('clientTabs', 'agent,grafana,video').split(',');
+  /// Brand tabs an admin lets power users and normies see (normies get Home
+  /// first). Admins always see every tab.
+  List<DashTab> tabsFor(Role view) {
+    final names = switch (view) {
+      Role.admin => [for (final t in DashTab.values) t.name],
+      Role.power => _str('powerTabs', DashTab.values.map((t) => t.name).join(',')).split(','),
+      // `clientTabs` is the setting (and brand default) from before there were three views.
+      Role.normie => _str('normieTabs', _str('clientTabs', 'agent,grafana,video')).split(','),
+    };
     return [
       for (final t in DashTab.values)
         if (names.contains(t.name)) t,
     ];
   }
 
-  set clientTabs(List<DashTab> v) => _set('clientTabs', v.map((t) => t.name).join(','));
+  Future<void> setTabsFor(Role view, List<DashTab> tabs) => switch (view) {
+    Role.admin => throw ArgumentError('Admins always see every tab'),
+    Role.power => _set('powerTabs', tabs.map((t) => t.name).join(',')),
+    Role.normie => _set('normieTabs', tabs.map((t) => t.name).join(',')),
+  };
 
   // Deployments
 

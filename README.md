@@ -10,22 +10,26 @@ Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs in the brow
 | **Grafana** | Embedded Grafana, in kiosk mode by default (an `<iframe>` on web) | `http://<host>:3000` |
 | **Video** | Live camera feeds from the edge device: pick one, or see them all in a grid | Any MJPEG stream (`multipart/x-mixed-replace`) or JPEG snapshot URL |
 
-## Admin and client views
+## Admin, power and normie views
 
-On launch you sign in to the connected deployment's p4n4-api with a username and password; the role comes from the account (`admin` → admin view, `operator` → client view). Sign-in is per deployment, the refresh token is kept in secure storage, and expired access tokens are refreshed automatically. If the API runs with `P4N4_API_AUTH=off` or can't be reached, the screen offers a role picker instead, which is dropped once the API requires sign-in (`lib/core/session.dart`, `lib/api/auth.dart`).
+On launch you sign in to the connected deployment's p4n4-api with a username and password; the role comes from the account (`admin` → admin view, `operator` → power view, `normie` → normie view). Sign-in is per deployment, the refresh token is kept in secure storage, and expired access tokens are refreshed automatically. If the API runs with `P4N4_API_AUTH=off` or can't be reached, the screen offers a role picker instead, which is dropped once the API requires sign-in (`lib/core/role.dart`, `lib/core/session.dart`, `lib/api/auth.dart`).
 
-| | Admin | Client |
-|---|---|---|
-| Tabs | Every brand tab, plus **Clients** | **Home**, plus the brand tabs an admin enables (default: Agent, Grafana, Video) |
-| Home | — | Overall health, per-stack status, edge device readings and shortcuts. No hosts, ports or URLs |
-| Clients | Client deployments, each a connection profile (name, host, optional API URL), with live status from each one's API, or port probes as a fallback. **Connect** switches the dashboard, with all its connection settings, to that deployment | — |
-| Services | Launcher, plus a stack-controls menu (start/restart/stop, disabled until the API has stack endpoints) | Only if enabled; no stack controls |
-| Tabs' config controls | Add/edit/remove cameras, Grafana URL, agent backend, edge demo toggle | Hidden (clients see camera names, not URLs); errors are shown in plain language |
-| Settings | Everything, plus a **Client view** section to choose client tabs | Appearance, account and about only |
+| | Admin | Power | Normie |
+|---|---|---|---|
+| Tabs | Every brand tab, plus **Clients** | The brand tabs an admin enables (default: all); **Home** if none | **Home**, plus the brand tabs an admin enables (default: Agent, Grafana, Video) |
+| Home | — | — (unless no tabs are enabled) | One large "everything is working / something needs attention" card, the edge device's readings and large shortcuts. No service names, hosts, ports or URLs |
+| Clients | Client deployments, each a connection profile (name, host, optional API URL), with live status from each one's API, or port probes as a fallback. **Connect** switches the dashboard, with all its connection settings, to that deployment | — | — |
+| Services | Launcher, plus a stack-controls menu (start/restart/stop) | Launcher; no stack controls | Only if enabled; no stack controls |
+| Tabs' config and details | Hosts in the app bar, URLs and raw errors; add/edit/remove cameras, Grafana URL, agent backend, edge demo toggle | Same as admin | Hidden (camera names, not URLs); errors are shown in plain language |
+| Settings | Everything, plus **Views** (each view's tabs, and a preview of it), **Users** (p4n4-api accounts and their views) and **Diagnostics** (sign-in, token and service checks, a settings dump with secrets hidden) | Appearance, connection (switch to another saved deployment, or edit this one), edge metrics, agent, Grafana, video, account and about | Appearance, account and about only |
+
+Admins can **preview** the power or normie view from Settings → Views: the dashboard switches to that view under a banner with **Back to admin**. The preview is only on that device and ends on sign-out, restart or switching deployment; it doesn't change the account.
+
+The views decide what the dashboard shows. p4n4-api enforces what each role can do: normies can only read status and chat with agents, and the API turns down anything else they try, whatever the dashboard shows.
 
 On phones the bottom bar holds at most five destinations; any extras (e.g. admin **Clients**) open from an app-bar button.
 
-Connection settings (host, API, metrics, agent, Grafana and cameras) live behind the ⚙ button (cameras on the Video tab), belong to the connected deployment, and persist between launches. Theme and client tabs are app-wide. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
+Connection settings (host, API, metrics, agent, Grafana and cameras) live behind the ⚙ button (cameras on the Video tab), belong to the connected deployment, and persist between launches. Theme and each view's tabs are app-wide. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
 
 ## Project settings
 
@@ -48,7 +52,7 @@ make up-local                          # or build it from this checkout (BRAND=�
 curl -fsS localhost:8088/healthz       # then open http://<host>:8088 from any device on the LAN
 ```
 
-- **p4n4-api** runs on the host in v0.1, and the container reaches it at `host.docker.internal` (the Docker bridge address). Start the API listening there: `P4N4_API_HOST=172.17.0.1` (the `docker0` address) or `0.0.0.0`. Create accounts with `p4n4-api users add <name> --role admin|operator`; the dashboard signs in with them (admins get the admin view, operators the client view).
+- **p4n4-api** runs on the host in v0.1, and the container reaches it at `host.docker.internal` (the Docker bridge address). Start the API listening there: `P4N4_API_HOST=172.17.0.1` (the `docker0` address) or `0.0.0.0`. Create accounts with `p4n4-api users add <name> --role admin|operator|normie` (or from Settings → Users as an admin); the dashboard signs in with them (admins get the admin view, operators the power view, normies the normie view).
 - **Ollama and Letta** are reached by container name on the `p4n4-net` network (`p4n4-ollama`, `p4n4-letta`); change `OLLAMA_UPSTREAM` / `LETTA_UPSTREAM` otherwise. While they're down, the UI still loads and the Agent tab shows an error.
 - **Grafana and cameras** are loaded by the browser directly (`<iframe>`, `<img>`), at `DASHBOARD_HOST` or the host the page came from. Grafana needs `GF_SECURITY_ALLOW_EMBEDDING=true`.
 - The container runs nginx as a non-root user, with a read-only filesystem, no capabilities and `no-new-privileges`. `/healthz` is its health check, and `/config.json` hands the app its defaults (rendered from the `DASHBOARD_*` variables in `.env.example`).
@@ -83,7 +87,9 @@ make build PLATFORM=web   # web release (CanvasKit bundled, no CDN); or apk, app
 make check                # what CI runs
 ```
 
-Without `make` (e.g. on Windows), run the commands it wraps: `flutter run -d web-server --web-port 8088 --dart-define=P4N4_DEV_PROXY=true`, `flutter run -d linux`, `flutter build web --release --no-web-resources-cdn`. `P4N4_DEV_PROXY` makes the app use the proxied paths (`/api/`, `/ollama/`, `/letta/`), which `web_dev_config.yaml` forwards to `localhost:8000`, `:11434` and `:8283`. Run with plain `flutter run -d chrome` instead to call the services directly. They then need CORS for the page's origin: `P4N4_API_CORS_ORIGINS` for p4n4-api, `OLLAMA_ORIGINS` for Ollama.
+Without `make` (e.g. on Windows), run the commands it wraps: `flutter run -d web-server --web-port 8088 --dart-define=P4N4_DEV_PROXY=true --dart-define=P4N4_DEV_USERS=true`, `flutter run -d linux --dart-define=P4N4_DEV_USERS=true`, `flutter build web --release --no-web-resources-cdn`. `P4N4_DEV_PROXY` makes the app use the proxied paths (`/api/`, `/ollama/`, `/letta/`), which `web_dev_config.yaml` forwards to `localhost:8000`, `:11434` and `:8283`. Run with plain `flutter run -d chrome` instead to call the services directly. They then need CORS for the page's origin: `P4N4_API_CORS_ORIGINS` for p4n4-api, `OLLAMA_ORIGINS` for Ollama.
+
+**Dev accounts.** To try all three views, start p4n4-api with `P4N4_API_DEV_USERS=true` (or run `p4n4-api users dev` once). That creates `admin`, `power` and `normie`, all with the password `p4n4`. `make run` (`P4N4_DEV_USERS`) adds **Admin / Power / Normie** buttons under the sign-in form that sign in as each one. Release builds never show them, and the password is public, so don't create these accounts on a deployment others can reach.
 
 Build release artifacts with `flutter build apk --split-per-abi | ios | macos | windows | linux`. `--split-per-abi` gives one APK per CPU architecture (arm64 ≈ 20 MB) instead of one universal APK (≈ 55 MB); for Play Store use `flutter build appbundle`.
 

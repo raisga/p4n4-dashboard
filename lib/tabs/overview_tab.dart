@@ -12,8 +12,9 @@ import '../widgets/common.dart';
 
 const _interval = Duration(seconds: 30);
 
-/// Client home: system health at a glance, a device summary and shortcuts to
-/// the other tabs. Deliberately free of hosts, ports and URLs.
+/// Normie home: one big "is everything OK" card, the device's readings in
+/// plain language and large shortcuts to the other tabs. Deliberately free of
+/// service and stack names, hosts, ports and URLs.
 class OverviewTab extends StatefulWidget {
   const OverviewTab({super.key, required this.active, required this.shortcuts, required this.onOpen});
 
@@ -117,7 +118,6 @@ class _OverviewTabState extends State<OverviewTab> {
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
-    final settings = SettingsScope.of(context);
     return RefreshIndicator(
       color: p4.accent,
       onRefresh: _refresh,
@@ -131,7 +131,7 @@ class _OverviewTabState extends State<OverviewTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SectionHeader(
-                    tag: 'overview',
+                    tag: 'home',
                     title: Text(brand.appName, style: p4.display(size: 28, weight: FontWeight.w800, spacing: -1)),
                     trailing: IconButton(
                       tooltip: 'Refresh status',
@@ -147,17 +147,12 @@ class _OverviewTabState extends State<OverviewTab> {
                   ),
                   const SizedBox(height: 24),
                   _summary(),
-                  const SizedBox(height: 16),
-                  _grid([
-                    for (final st in stacks.where((st) => st.suffix != 'api' && settings.showsStack(st)))
-                      _stackTile(st),
-                  ], minWidth: 220),
                   if (_showsDevice) ...[const SizedBox(height: 16), _device()],
                   if (widget.shortcuts.isNotEmpty) ...[
                     const SizedBox(height: 36),
                     const SectionHeader(tag: 'go to', title: SizedBox.shrink()),
                     const SizedBox(height: 12),
-                    _grid([for (final t in widget.shortcuts) _shortcut(t)], minWidth: 220),
+                    _grid([for (final t in widget.shortcuts) _shortcut(t)], minWidth: 280),
                   ],
                 ],
               ),
@@ -184,56 +179,39 @@ class _OverviewTabState extends State<OverviewTab> {
         'We can\'t reach your system',
         'Check that the device is on and connected.',
       ),
-      _ when r.online == r.known => (
-        Health.up,
-        'All systems operational',
-        '${r.online} of ${r.known} services running.',
-      ),
+      _ when r.online == r.known => (Health.up, 'Everything is working', 'Your system is running normally.'),
       _ => (
         Health.down,
-        '${r.known - r.online} service${r.known - r.online == 1 ? ' needs' : 's need'} attention',
-        '${r.online} of ${r.known} services running. Contact your administrator if this persists.',
+        'Something needs attention',
+        'Part of your system isn\'t working right now. Contact your administrator if this persists.',
       ),
     };
-    final color = switch (health) {
-      Health.up => p4.ok,
-      Health.down => p4.err,
-      _ => p4.warn,
+    final (color, icon) = switch (health) {
+      Health.up => (p4.ok, Icons.check_circle_outline),
+      Health.down => (p4.err, Icons.error_outline),
+      Health.pending => (p4.warn, Icons.hourglass_empty),
+      _ => (p4.warn, Icons.help_outline),
     };
     return Panel(
       accent: color,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(28),
+      child: Row(
         children: [
-          StatusIndicator(health),
-          const SizedBox(height: 12),
-          Text(title, style: p4.display(size: 22, weight: FontWeight.w800, spacing: -0.8)),
-          const SizedBox(height: 6),
-          Text(
-            sub,
-            style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
+          Icon(icon, size: 56, color: color),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: p4.display(size: 26, weight: FontWeight.w800, spacing: -0.8)),
+                const SizedBox(height: 6),
+                Text(
+                  sub,
+                  style: p4.display(size: 15, color: p4.muted, weight: FontWeight.w400, spacing: 0),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stackTile(StackDef st) {
-    final r = _report;
-    final (online, known) = r?.of(st) ?? (0, 0);
-    final health = r == null
-        ? Health.pending
-        : known == 0
-        ? Health.unknown
-        : (online == known ? Health.up : Health.down);
-    return Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(st.label, style: p4.display()),
-          const SizedBox(height: 10),
-          StatusIndicator(health, label: r == null || known == 0 ? null : '$online / $known online'),
         ],
       ),
     );
@@ -245,7 +223,7 @@ class _OverviewTabState extends State<OverviewTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Edge device', style: p4.display()),
+          Text('Your device', style: p4.display()),
           const SizedBox(height: 14),
           if (m == null)
             Text(
@@ -291,20 +269,20 @@ class _OverviewTabState extends State<OverviewTab> {
         onTap: () => widget.onOpen(tab),
         hoverColor: p4.bg3,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(28),
           child: Row(
             children: [
-              Icon(icon, color: p4.accent, size: 24),
-              const SizedBox(width: 14),
+              Icon(icon, color: p4.accent, size: 36),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: p4.display()),
+                    Text(title, style: p4.display(size: 18)),
                     const SizedBox(height: 4),
                     Text(
                       desc,
-                      style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
+                      style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                     ),
                   ],
                 ),

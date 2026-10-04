@@ -47,14 +47,30 @@ void main() {
       ('phone', const Size(390, 844), true),
       ('desktop', const Size(1280, 800), false),
     ]) {
-      testWidgets('client $name layout in ${mode.name} mode renders every tab', (tester) async {
-        await pumpAt(tester, size, mode, role: Role.client);
+      testWidgets('normie $name layout in ${mode.name} mode renders every tab', (tester) async {
+        await pumpAt(tester, size, mode, role: Role.normie);
         expect(find.byType(NavigationDestination), bottomNav ? findsNWidgets(4) : findsNothing);
         for (final tab in ['SERVICES', 'EDGE', 'CLIENTS']) {
           expect(find.text(tab), findsNothing, reason: tab);
         }
+        expect(find.textContaining('localhost'), findsNothing, reason: 'no hosts for normies');
         expect(find.byTooltip('Sign out'), findsOneWidget);
         for (final tab in ['HOME', 'AGENT', 'GRAFANA', 'VIDEO']) {
+          await tester.tap(find.text(tab).last);
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(tester.takeException(), isNull, reason: tab);
+        }
+      });
+
+      testWidgets('power $name layout in ${mode.name} mode renders every tab but Clients', (tester) async {
+        await pumpAt(tester, size, mode, role: Role.power);
+        expect(find.byType(NavigationDestination), bottomNav ? findsNWidgets(5) : findsNothing);
+        expect(find.byType(NavigationRail), bottomNav ? findsNothing : findsOneWidget);
+        expect(find.text('HOME'), findsNothing);
+        expect(find.text('CLIENTS'), findsNothing);
+        expect(find.byTooltip('Clients'), findsNothing);
+        if (!bottomNav) expect(find.text('// localhost'), findsOneWidget);
+        for (final tab in ['SERVICES', 'EDGE', 'AGENT', 'GRAFANA', 'VIDEO']) {
           await tester.tap(find.text(tab).last);
           await tester.pump(const Duration(milliseconds: 300));
           expect(tester.takeException(), isNull, reason: tab);
@@ -119,12 +135,21 @@ void main() {
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(HomeShell), findsNothing);
 
-    await tester.tap(find.text('Client'));
+    await tester.tap(find.text('Normie'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(HomeShell), findsOneWidget);
     expect(find.text('HOME'), findsOneWidget);
     expect(find.text('SERVICES'), findsNothing);
+
+    await tester.tap(find.byTooltip('Sign out'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Power user'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('SERVICES'), findsOneWidget);
+    expect(find.text('CLIENTS'), findsNothing);
 
     await tester.tap(find.byTooltip('Sign out'));
     await tester.pump();
@@ -139,15 +164,15 @@ void main() {
     expect(find.text('HOME'), findsNothing);
   });
 
-  testWidgets('client settings hide connection and admin-only sections', (tester) async {
-    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.client);
+  testWidgets('normie settings hide connection and admin-only sections', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Host'), findsNothing);
     expect(find.text('p4n4-api base URL'), findsNothing);
-    expect(find.textContaining('CLIENT VIEW', findRichText: true), findsNothing);
+    expect(find.textContaining('VIEWS', findRichText: true), findsNothing);
     expect(find.text('Signed in without an account'), findsOneWidget);
-    expect(find.text('client view · role picked at sign-in'), findsOneWidget);
+    expect(find.text('normie view · role picked at sign-in'), findsOneWidget);
 
     await tester.ensureVisible(find.text('LICENSES'));
     await tester.tap(find.text('LICENSES'));
@@ -156,20 +181,66 @@ void main() {
     expect(find.byType(LicensePage), findsOneWidget);
   });
 
-  testWidgets('admins choose which tabs the client view shows', (tester) async {
-    await pumpAt(tester, const Size(1280, 2000), ThemeMode.light); // tall enough for every settings section
-    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+  testWidgets('power settings have connection and endpoints but no admin sections', (tester) async {
+    await pumpAt(tester, const Size(1280, 2000), ThemeMode.light, role: Role.power);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
+    expect(find.text('Host'), findsOneWidget);
+    expect(find.text('Ollama base URL'), findsOneWidget);
+    for (final tag in ['VIEWS', 'USERS', 'DIAGNOSTICS']) {
+      expect(find.textContaining(tag, findRichText: true), findsNothing, reason: tag);
+    }
+    expect(find.text('power view · role picked at sign-in'), findsOneWidget);
+  });
 
-    await tester.tap(find.widgetWithText(FilterChip, 'VIDEO'));
-    await tester.tap(find.widgetWithText(FilterChip, 'EDGE'));
+  testWidgets('admins choose which tabs each view shows', (tester) async {
+    await pumpAt(tester, const Size(1280, 4000), ThemeMode.light); // tall enough for every settings section
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
-    expect(settings.clientTabs, [DashTab.edge, DashTab.agent, DashTab.grafana]);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.tap(find.byKey(const ValueKey('normie-video')));
+    await tester.tap(find.byKey(const ValueKey('normie-edge')));
+    await tester.tap(find.byKey(const ValueKey('power-services')));
+    await tester.pump();
+    expect(settings.tabsFor(Role.normie), [DashTab.edge, DashTab.agent, DashTab.grafana]);
+    expect(settings.tabsFor(Role.power), [DashTab.edge, DashTab.agent, DashTab.grafana, DashTab.video]);
 
     final brand = loadBrand('p4n4');
-    expect(screensFor(Role.client, brand, settings), [Screen.home, Screen.edge, Screen.agent, Screen.grafana]);
+    expect(screensFor(Role.normie, brand, settings), [Screen.home, Screen.edge, Screen.agent, Screen.grafana]);
+    expect(screensFor(Role.power, brand, settings), [Screen.edge, Screen.agent, Screen.grafana, Screen.video]);
     expect(screensFor(Role.admin, brand, settings), [...brand.tabs.map(Screen.of), Screen.clients]);
+
+    await settings.setTabsFor(Role.power, []);
+    expect(screensFor(Role.power, brand, settings), [Screen.home], reason: 'never an empty dashboard');
+  });
+
+  testWidgets('a brand\'s old clientTabs default still sets the normie tabs', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await AppSettings.load(defaults: {'clientTabs': 'grafana'}, secrets: MemorySecretStore());
+    expect(settings.tabsFor(Role.normie), [DashTab.grafana]);
+  });
+
+  testWidgets('admins preview the normie view and come back', (tester) async {
+    await pumpAt(tester, const Size(1280, 4000), ThemeMode.light);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('PREVIEW NORMIE'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Previewing the normie view'), findsOneWidget);
+    expect(find.text('HOME'), findsOneWidget);
+    expect(find.text('SERVICES'), findsNothing);
+    expect(find.text('NORMIE'), findsOneWidget); // the badge
+
+    await tester.tap(find.text('BACK TO ADMIN'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Previewing the normie view'), findsNothing);
+    expect(find.text('CLIENTS'), findsOneWidget);
   });
 
   testWidgets('connecting to a deployment in Clients switches the dashboard to it', (tester) async {
@@ -221,8 +292,8 @@ void main() {
     expect(find.byTooltip('All cameras'), findsOneWidget);
   });
 
-  testWidgets('clients see camera names but no URLs or camera controls', (tester) async {
-    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.client);
+  testWidgets('normies see camera names but no URLs or camera controls', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
     SettingsScope.of(tester.element(find.byType(HomeShell))).cameras = cameras;
     await tester.tap(find.text('VIDEO'));
     await tester.pump(const Duration(milliseconds: 300));

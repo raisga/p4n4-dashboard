@@ -72,13 +72,17 @@ class OllamaClient implements AgentClient {
         _check(res.statusCode, await res.stream.bytesToString());
       }
       final lines = res.stream.transform(utf8.decoder).transform(const LineSplitter());
+      // Read to the end even after `done` (Ollama closes the stream right after it):
+      // cancelling first can beat the stream's own end, and browsers then report the
+      // request as aborted (net::ERR_ABORTED).
+      var done = false;
       await for (final line in lines) {
-        if (line.trim().isEmpty) continue;
+        if (done || line.trim().isEmpty) continue;
         final chunk = jsonDecode(line) as Map<String, dynamic>;
         if (chunk['error'] != null) throw AgentException(chunk['error'].toString());
         final text = (chunk['message'] as Map?)?['content'] as String?;
         if (text != null && text.isNotEmpty) yield text;
-        if (chunk['done'] == true) break;
+        done = chunk['done'] == true;
       }
     } finally {
       client.close();

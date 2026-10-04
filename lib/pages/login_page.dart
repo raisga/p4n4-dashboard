@@ -18,7 +18,10 @@ import '../widgets/common.dart';
 /// - unreachable → an error with retry, and the picker behind "continue
 ///   without signing in", since the dashboard is still useful without the API.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.offerDevUsers = devUsers});
+
+  /// One-tap sign-in with p4n4-api's dev accounts, under the form.
+  final bool offerDevUsers;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -61,6 +64,12 @@ class _LoginPageState extends State<LoginPage> {
     _password.dispose();
     _passwordFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _signInAs(String user, String password) {
+    _user.text = user;
+    _password.text = password;
+    return _signIn();
   }
 
   Future<void> _signIn() async {
@@ -183,6 +192,7 @@ class _LoginPageState extends State<LoginPage> {
               ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.onAccent))
               : const Text('SIGN IN'),
         ),
+        if (widget.offerDevUsers) ...[const SizedBox(height: 24), _devUsers()],
       ],
     ),
   );
@@ -213,6 +223,35 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  /// Dev builds only (see [devUsers]): needs the API started with
+  /// `P4N4_API_DEV_USERS=true`, or `p4n4-api users dev`.
+  Widget _devUsers() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text('DEV ACCOUNTS', textAlign: TextAlign.center, style: p4.mono(size: 10)),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          for (final (i, (user, view)) in devAccounts.indexed) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : () => _signInAs(user, devPassword),
+                child: Text(view.name.toUpperCase()),
+              ),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'Needs ${BrandScope.of(context).platform}-api with P4N4_API_DEV_USERS=true',
+        textAlign: TextAlign.center,
+        style: p4.mono(size: 10, spacing: 0),
+      ),
+    ],
+  );
+
   Widget _picker(String title, String note) {
     final session = SessionScope.of(context);
     return Column(
@@ -223,15 +262,22 @@ class _LoginPageState extends State<LoginPage> {
         _RoleCard(
           icon: Icons.admin_panel_settings_outlined,
           title: 'Administrator',
-          desc: 'Every service, client deployments, stack controls and connection settings.',
+          desc: 'Every service, client deployments, stack controls, users and diagnostics.',
           onTap: () => session.signInLocal(Role.admin),
         ),
         const SizedBox(height: 12),
         _RoleCard(
+          icon: Icons.engineering_outlined,
+          title: 'Power user',
+          desc: 'Every service and connection setting, without managing deployments or users.',
+          onTap: () => session.signInLocal(Role.power),
+        ),
+        const SizedBox(height: 12),
+        _RoleCard(
           icon: Icons.person_outline,
-          title: 'Client',
+          title: 'Normie',
           desc: 'System health at a glance, dashboards, camera and assistant.',
-          onTap: () => session.signInLocal(Role.client),
+          onTap: () => session.signInLocal(Role.normie),
         ),
         const SizedBox(height: 16),
         Text(note, textAlign: TextAlign.center, style: p4.mono(size: 10, spacing: 0)),

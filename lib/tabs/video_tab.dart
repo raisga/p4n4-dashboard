@@ -63,8 +63,8 @@ class _VideoTabState extends State<VideoTab> {
   Widget build(BuildContext context) {
     final s = SettingsScope.of(context);
     final cameras = s.cameras;
-    // Only admins see URLs or change cameras.
-    final admin = SessionScope.of(context).isAdmin;
+    // Only admins and power users see URLs or change cameras.
+    final technical = SessionScope.of(context).isTechnical;
     final selected = cameras.where((c) => c.id == _selectedId).firstOrNull ?? cameras.firstOrNull;
     final grid = _grid && cameras.length > 1;
     final shown = grid ? cameras : [?selected];
@@ -78,7 +78,7 @@ class _VideoTabState extends State<VideoTab> {
             children: [
               Icon(Icons.videocam_outlined, color: p4.accent, size: 18),
               const SizedBox(width: 10),
-              Expanded(child: _title(cameras, selected, grid, admin)),
+              Expanded(child: _title(cameras, selected, grid, technical)),
               if (shown.isNotEmpty) ...[
                 IconButton(
                   tooltip: _paused ? 'Resume' : 'Pause',
@@ -97,7 +97,7 @@ class _VideoTabState extends State<VideoTab> {
                   onPressed: () => setState(() => _grid = !grid),
                   icon: Icon(grid ? Icons.crop_square : Icons.grid_view, size: 18),
                 ),
-              if (admin) ...[
+              if (technical) ...[
                 if (!grid && selected != null)
                   IconButton(
                     tooltip: 'Edit camera',
@@ -115,10 +115,10 @@ class _VideoTabState extends State<VideoTab> {
             null => EmptyState(
               icon: Icons.videocam_off_outlined,
               title: 'No cameras',
-              message: admin
+              message: technical
                   ? 'Add the URL of an MJPEG stream or JPEG snapshot from your edge camera.'
                   : 'No camera has been set up yet. Ask your administrator to add one.',
-              actions: [if (admin) FilledButton(onPressed: () => _edit(s), child: const Text('ADD CAMERA'))],
+              actions: [if (technical) FilledButton(onPressed: () => _edit(s), child: const Text('ADD CAMERA'))],
             ),
             _ when grid => _gridView(cameras),
             final c => _view(c),
@@ -128,13 +128,13 @@ class _VideoTabState extends State<VideoTab> {
     );
   }
 
-  Widget _title(List<Camera> cameras, Camera? selected, bool grid, bool admin) {
+  Widget _title(List<Camera> cameras, Camera? selected, bool grid, bool technical) {
     final style = p4.mono();
     if (selected == null) return Text('no cameras configured', style: style);
     if (grid) return Text('${cameras.length} cameras', style: style);
-    final url = admin ? Text(selected.url, overflow: TextOverflow.ellipsis, style: style) : null;
+    final url = technical ? Text(selected.url, overflow: TextOverflow.ellipsis, style: style) : null;
     if (cameras.length == 1) {
-      return admin ? url! : Text(selected.name, overflow: TextOverflow.ellipsis, style: style);
+      return technical ? url! : Text(selected.name, overflow: TextOverflow.ellipsis, style: style);
     }
     return Row(
       children: [

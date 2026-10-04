@@ -5,10 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/auth.dart' as auth;
 import '../api/fleet.dart';
+import 'role.dart';
 import 'settings.dart';
 
-/// Which view of the dashboard the user gets.
-enum Role { admin, client }
+export 'role.dart';
 
 /// How the connected deployment was signed in to.
 enum SignInMode {
@@ -19,10 +19,6 @@ enum SignInMode {
   /// auth or can't be reached. Dropped as soon as the API requires sign-in.
   local,
 }
-
-/// p4n4-api roles → dashboard views: admins get the admin view, operators
-/// the client view.
-Role roleForApi(String apiRole) => apiRole == 'admin' ? Role.admin : Role.client;
 
 /// Who is signed in to the connected deployment.
 ///
@@ -60,7 +56,7 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
     final session = Session(settings, probe: probe, refreshApi: refreshApi);
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getString('role') case final String legacy) {
-      if (Role.values.asNameMap()[legacy] case final role? when settings.sessionOf(settings.deployment) == null) {
+      if (Role.named(legacy) case final role? when settings.sessionOf(settings.deployment) == null) {
         await settings.setSessionOf(settings.deployment, {'mode': SignInMode.local.name, 'role': role.name});
       }
       await prefs.remove('role');
@@ -71,8 +67,32 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
 
   Map<String, Object?>? get _info => settings.sessionOf(settings.deployment);
 
-  Role? get role => Role.values.asNameMap()[_info?['role']];
+  /// The role signed in with.
+  Role? get signedInRole => Role.named(_info?['role']);
+
+  /// The view shown: [signedInRole], or the one an admin is previewing.
+  Role? get role => switch (signedInRole) {
+    Role.admin => _preview ?? Role.admin,
+    final r => r,
+  };
+
   bool get isAdmin => role == Role.admin;
+
+  /// Hosts, URLs, raw errors and endpoint settings (admin and power).
+  bool get isTechnical => role?.technical ?? false;
+
+  /// Lets an admin see the dashboard as [view] (null to stop) without
+  /// changing their account. Kept in memory: a restart, sign-out or switching
+  /// deployment ends it.
+  set preview(Role? view) {
+    final next = signedInRole == Role.admin && view != Role.admin ? view : null;
+    if (next == _preview) return;
+    _preview = next;
+    notifyListeners();
+  }
+
+  Role? get preview => signedInRole == Role.admin ? _preview : null;
+  Role? _preview;
   SignInMode? get mode => SignInMode.values.asNameMap()[_info?['mode']];
   String? get username => _info?['user'] as String?;
 
@@ -92,6 +112,7 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
       settings.setSessionOf(settings.deployment, {'mode': SignInMode.local.name, 'role': role.name});
 
   Future<void> signOut() async {
+    _preview = null;
     final d = settings.deployment;
     final refresh = settings.apiRefreshTokenOf(d);
     _access.remove(d.id);
@@ -161,9 +182,10 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
 
   /// The role lives in settings, so every settings change may change it.
   void _onSettings() {
-    notifyListeners();
-    if (settings.deployment.id == _active) return;
+    if (settings.deployment.id == _active) return notifyListeners();
     _active = settings.deployment.id;
+    _preview = null;
+    notifyListeners();
     unawaited(verify());
   }
 

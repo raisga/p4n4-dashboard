@@ -29,7 +29,7 @@ help:
 	@echo "  ════════════════════════════════════════════"
 	@echo ""
 	@printf "  $(BOLD)Develop:$(NC)\n"
-	@printf "    $(GREEN)make run$(NC)                  Web dev server on :$(WEB_PORT), proxying the services (web_dev_config.yaml)\n"
+	@printf "    $(GREEN)make run$(NC)                  Web dev server on :$(WEB_PORT), proxying the services (web_dev_config.yaml); dev-account sign-in\n"
 	@printf "    $(GREEN)make run PLATFORM=linux$(NC)   Any device: chrome, linux, macos, windows, android, ios\n"
 	@printf "    $(GREEN)make build$(NC)                Release build; PLATFORM=web|apk|appbundle|linux|macos|windows|ios|ipa\n"
 	@printf "    $(GREEN)make check$(NC)                Format, analyze and test, as CI does\n"
@@ -53,9 +53,9 @@ help:
 
 run:
 ifeq ($(PLATFORM),web)
-	flutter run -d web-server --web-hostname 0.0.0.0 --web-port $(WEB_PORT) --dart-define=P4N4_DEV_PROXY=true
+	flutter run -d web-server --web-hostname 0.0.0.0 --web-port $(WEB_PORT) --dart-define=P4N4_DEV_PROXY=true --dart-define=P4N4_DEV_USERS=true
 else
-	flutter run -d $(PLATFORM)
+	flutter run -d $(PLATFORM) --dart-define=P4N4_DEV_USERS=true
 endif
 
 build:

@@ -103,7 +103,7 @@ class _Dest {
 }
 
 /// A navigation destination: one of the brand's tabs, or a screen that only
-/// one view has (Home for clients, Clients for admins).
+/// some views have (Home for normies, Clients for admins).
 enum Screen {
   home,
   clients,
@@ -128,16 +128,25 @@ const _dests = {
   Screen.video: _Dest('Video', Icons.videocam_outlined, Icons.videocam),
 };
 
-/// Screens for [role]: admins get every brand tab plus Clients; clients get
-/// Home plus the brand tabs an admin has enabled for them. Either way, tabs the
-/// connected project doesn't serve (its `.p4n4.json` `dashboard.tabs`) are left out.
+/// Screens for [role]: admins get every brand tab plus Clients; power users
+/// the brand tabs an admin has enabled for them (Home if none); normies Home
+/// plus theirs. Tabs the connected project doesn't serve (its `.p4n4.json`
+/// `dashboard.tabs`) are always left out.
 List<Screen> screensFor(Role role, Brand brand, AppSettings settings) {
-  final tabs = brand.tabs.where(settings.projectAllows);
+  final tabs = brand.tabs.where(settings.projectAllows).where(settings.tabsFor(role).contains).map(Screen.of);
   return switch (role) {
-    Role.admin => [...tabs.map(Screen.of), Screen.clients],
-    Role.client => [Screen.home, ...tabs.where(settings.clientTabs.contains).map(Screen.of)],
+    Role.admin => [...tabs, Screen.clients],
+    Role.power => tabs.isEmpty ? [Screen.home] : tabs.toList(),
+    Role.normie => [Screen.home, ...tabs],
   };
 }
+
+/// Each view's badge colour.
+Color roleColor(P4Colors p4, Role role) => switch (role) {
+  Role.admin => p4.amber,
+  Role.power => p4.blue,
+  Role.normie => p4.accent,
+};
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -170,8 +179,8 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final session = SessionScope.of(context);
-    final admin = session.isAdmin;
-    final all = screensFor(session.role!, brand, SettingsScope.of(context));
+    final role = session.role!;
+    final all = screensFor(role, brand, SettingsScope.of(context));
     final wide = MediaQuery.sizeOf(context).width >= 800;
     // A phone bottom bar fits five destinations; the rest open from the app bar.
     final screens = wide ? all : all.take(5).toList();
@@ -207,9 +216,9 @@ class _HomeShellState extends State<HomeShell> {
         title: const Wordmark(),
         actions: [
           if (wide) ...[
-            if (admin) Center(child: Text('// ${_connection(SettingsScope.of(context))}', style: p4.mono())),
+            if (role.technical) Center(child: Text('// ${_connection(SettingsScope.of(context))}', style: p4.mono())),
             const SizedBox(width: 12),
-            Center(child: TagBadge(admin ? 'admin' : 'client', color: admin ? p4.amber : p4.accent)),
+            Center(child: TagBadge(role.name, color: roleColor(p4, role))),
             const SizedBox(width: 8),
           ],
           for (final s in extra)
@@ -232,27 +241,30 @@ class _HomeShellState extends State<HomeShell> {
           const SizedBox(width: 8),
         ],
       ),
-      body: wide && nav
-          ? Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: index,
-                  onDestinationSelected: (i) => setState(() => _index = i),
-                  labelType: NavigationRailLabelType.all,
-                  destinations: [
-                    for (final d in screens.map((s) => _dests[s]!))
-                      NavigationRailDestination(
-                        icon: Icon(d.icon),
-                        selectedIcon: Icon(d.selectedIcon),
-                        label: Text(d.label.toUpperCase()),
-                      ),
-                  ],
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: body),
-              ],
-            )
-          : body,
+      body: _withPreviewBanner(
+        session,
+        wide && nav
+            ? Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: index,
+                    onDestinationSelected: (i) => setState(() => _index = i),
+                    labelType: NavigationRailLabelType.all,
+                    destinations: [
+                      for (final d in screens.map((s) => _dests[s]!))
+                        NavigationRailDestination(
+                          icon: Icon(d.icon),
+                          selectedIcon: Icon(d.selectedIcon),
+                          label: Text(d.label.toUpperCase()),
+                        ),
+                    ],
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: body),
+                ],
+              )
+            : body,
+      ),
       bottomNavigationBar: wide || !nav
           ? null
           : NavigationBar(
@@ -268,6 +280,45 @@ class _HomeShellState extends State<HomeShell> {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// While an admin previews another view, a banner above it says so and leads back.
+Widget _withPreviewBanner(Session session, Widget body) => switch (session.preview) {
+  null => body,
+  final view => Column(
+    children: [
+      _PreviewBanner(view, onExit: () => session.preview = null),
+      Expanded(child: body),
+    ],
+  ),
+};
+
+class _PreviewBanner extends StatelessWidget {
+  const _PreviewBanner(this.view, {required this.onExit});
+
+  final Role view;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return Material(
+      color: roleColor(p4, view).withValues(alpha: 0.15),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_outlined, size: 16, color: roleColor(p4, view)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Previewing the ${view.name} view', style: p4.mono(color: p4.text)),
+            ),
+            TextButton(onPressed: onExit, child: const Text('BACK TO ADMIN')),
+          ],
+        ),
+      ),
     );
   }
 }

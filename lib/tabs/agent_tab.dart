@@ -167,7 +167,7 @@ class _AgentTabState extends State<AgentTab> {
   Widget _toolbar(AppSettings s) {
     final opts = _options;
     final selected = _selected(s);
-    final admin = SessionScope.of(context).isAdmin;
+    final technical = SessionScope.of(context).isTechnical;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Wrap(
@@ -175,8 +175,8 @@ class _AgentTabState extends State<AgentTab> {
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // Choosing the backend is admin configuration; clients chat with whatever is set.
-          if (admin)
+          // Choosing the backend is configuration; normies chat with whatever is set.
+          if (technical)
             SegmentedButton<AgentBackend>(
               showSelectedIcon: false,
               style: SegmentedButton.styleFrom(
@@ -245,7 +245,7 @@ class _AgentTabState extends State<AgentTab> {
 
   Widget _empty(AppSettings s) {
     final ollama = s.agentBackend == AgentBackend.ollama;
-    if (!SessionScope.of(context).isAdmin) {
+    if (!SessionScope.of(context).isTechnical) {
       final (icon, title, message) = switch ((_optionsError, _options)) {
         (_?, _) => (Icons.cloud_off_outlined, 'Assistant unavailable', 'The assistant can\'t be reached right now.'),
         (_, []) => (Icons.inbox_outlined, 'No assistant set up', 'Ask your administrator to set one up.'),

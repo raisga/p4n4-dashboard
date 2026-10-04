@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -102,5 +104,52 @@ void main() {
       expect(viaPageProxy(Uri.parse('https://pi:8088/letta/'), page: page), isFalse);
       expect(viaPageProxy(Uri.parse('http://pi:8088/'), page: Uri.parse('file:///app/')), isFalse);
     });
+  });
+
+  test('OllamaClient reads the reply stream to its end, past done', () async {
+    // onCancel also runs after a normal close; what matters is whether the reader
+    // gave up before the stream ended
+    var cancelledEarly = false;
+    late final StreamController<List<int>> body;
+    body = StreamController<List<int>>(onCancel: () => cancelledEarly = !body.isClosed);
+    final mock = MockClient.streaming((request, _) async {
+      () async {
+        for (final line in [
+          {
+            'message': {'content': 'Hel'},
+            'done': false,
+          },
+          {
+            'message': {'content': 'lo'},
+            'done': false,
+          },
+          {
+            'message': {'content': ''},
+            'done': true,
+          },
+        ]) {
+          body.add(utf8.encode('${jsonEncode(line)}\n'));
+        }
+        // The stream ends a moment after done, as over a network
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        // Anything after done is read but not shown
+        body.add(
+          utf8.encode(
+            '${jsonEncode({
+              'message': {'content': ' (after done)'},
+            })}\n',
+          ),
+        );
+        await body.close();
+      }();
+      return http.StreamedResponse(body.stream, 200);
+    });
+    final reply = await http.runWithClient(
+      () => OllamaClient(Uri.parse('http://ollama/')).send('m', [ChatMessage('user', 'hi')]).join(),
+      () => mock,
+    );
+    expect(reply, 'Hello');
+    // Cancelling before the stream's own end is what browsers report as net::ERR_ABORTED
+    expect(cancelledEarly, isFalse);
   });
 }

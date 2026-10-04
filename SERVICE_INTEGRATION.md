@@ -9,7 +9,7 @@ _Written 2026-09-29, against Flutter 3.47.2 and the repos as they are on `main` 
 > - **Pinned base images** (debian, nginx-unprivileged, caddy) by multi-arch digest, with Dependabot. The image workflow's smoke test also checks the CSP header, the Grafana route being off by default, and basic auth.
 > - Not done: per-user accounts and roles (they need p4n4-api auth in the app).
 >
-> Before that, Phases 1–6: What's left needs a release: tag `v1.1.0` so `image.yml` publishes `ghcr.io/raisga/p4n4-dashboard:1.1.0`, release p4n4-lib 0.2.0 before the CLI, then bump the submodule pointers (rollout order below). Nothing has run on GitHub Actions yet.
+> Before that, Phases 1–6: What's left needs a release: tag `v1.1.0` so `image.yml` publishes `ghcr.io/raisga/p4n4-dashboard:1.1.0`, release p4n4-lib 0.2.0 before the CLI, then bump the submodule pointers (rollout order below). `image.yml` has run on `main` (the `:edge` image); no release tag has been pushed yet. Make the GHCR package public after the first tag, so `docker pull` works signed out.
 >
 > Phases 4–6, differences from the plan below:
 > - `image.yml` builds the amd64 image, smoke-tests it (`/healthz`, `/config.json`, the SPA fallback, a clean `502` with no upstreams), scans it with Trivy (critical, fixed), then builds amd64+arm64 and pushes (`edge` on main; `X.Y.Z`, `X.Y`, `latest` on tags). A tag must match `pubspec.yaml`. `ci.yml` also runs on `v*` tags.
@@ -19,7 +19,7 @@ _Written 2026-09-29, against Flutter 3.47.2 and the repos as they are on `main` 
 > - p4n4-api: CORS already existed, and `/stacks` picks up the layer unchanged. Not containerized yet.
 > - p4n4-emu: `dashboard` stack with a 5 % CPU / 1 % memory share.
 > - 5.6 (a Dashboard entry in the app's own catalog) is skipped.
-> - Docs: `web/docs/stacks/dashboard.md`, ADR-003, the security guide, port tables, and the root README's repository map (which still said `client/`, `shared/`, `demo/`).
+> - Docs: `docs/stacks/dashboard.md`, ADR-003, the security guide, port tables, and the root README's repository map (which still said `client/`, `shared/`, `demo/`).
 >
 > Phases 2–3, differences from the plan below:
 > - **Build stage:** `ghcr.io/cirruslabs/flutter` has no tags for 3.45 or later, so the build stage is `debian:bookworm-slim` with Flutter cloned at `FLUTTER_VERSION` (keep it in step with `ci.yml`). It declares `ARG BUILDPLATFORM=linux/amd64` so the legacy builder works too; BuildKit sets the real value.
@@ -314,7 +314,7 @@ curl -fsS localhost:8088/healthz && curl -fsS localhost:8088/config.json | jq .
 ```yaml
 services:
   dashboard:
-    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.0.0}
+    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.1.0}
     container_name: p4n4-dashboard
     restart: unless-stopped
     ports:
@@ -356,7 +356,7 @@ networks:
 **3.2 `.env.example`**
 
 ```dotenv
-DASHBOARD_VERSION=1.0.0
+DASHBOARD_VERSION=1.1.0
 DASHBOARD_PORT=8088
 # Leave empty to use the host the browser loaded the dashboard from.
 DASHBOARD_HOST=
@@ -485,10 +485,10 @@ To show the dashboard itself on the Services tab and Home, add a `ServiceDef('Da
 | `clients/dashboard/README.md` | Lead with **Run as a service (web)** (`docker compose up -d` / `p4n4 up dashboard`), then **Develop** (`make run`, `PLATFORM=`), then native builds. Add web to *Platform notes* (iframe, `<img>` video, proxy paths, runtime `config.json`) |
 | `clients/dashboard/TODO.md` | Add web to *Current status* and *What was checked*. Remove items this work resolves |
 | Root `README.md` | Add `8088` to *Service URLs*. Update the Repository Map (`clients/`, not `client/`) |
-| `web/docs/stacks/` | New `dashboard.md`: purpose, ports, env vars, proxy routes, security notes |
-| `web/docs/reference/architecture.md`, `cli-reference.md` | Add the dashboard layer and `--layer dashboard` |
-| `web/docs/decisions/adr/` | **ADR-003**: *Dashboard ships as a web container by default*. Record the same-origin proxy, runtime config, build-time brand and why Wasm is deferred |
-| `web/docs/guides/security.md` | The dashboard has no auth yet, plus how to put it behind TLS or basic auth |
+| `docs/stacks/` | New `dashboard.md`: purpose, ports, env vars, proxy routes, security notes |
+| `docs/reference/architecture.md`, `cli-reference.md` | Add the dashboard layer and `--layer dashboard` |
+| `docs/decisions/adr/` | **ADR-003**: *Dashboard ships as a web container by default*. Record the same-origin proxy, runtime config, build-time brand and why Wasm is deferred |
+| `docs/guides/security.md` | The dashboard has no auth yet, plus how to put it behind TLS or basic auth |
 
 ### Phase 7 — Security and operations
 
@@ -512,7 +512,7 @@ Order matters: the lib and CLI need a published image to point at.
 4. **p4n4-lib**: `dashboard` layer, then release 0.2.0.
 5. **p4n4-cli**: `--layer dashboard`, `all` built from `LAYERS`, then release.
 6. **p4n4-api**: CORS allowlist. Containerization can follow separately.
-7. **tools/emu**, **web/docs**, root README.
+7. **tools/emu**, **docs**, root README.
 8. **Root repo**: bump the submodule pointers last.
 
 ## Definition of done

@@ -11,6 +11,7 @@ import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
+import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/pages/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,7 +85,7 @@ void main() {
           return _json(_tokens('1', role: 'operator'));
         }),
       );
-      expect(session.role, Role.client, reason: 'operators get the client view');
+      expect(session.role, Role.power, reason: 'operators get the power view');
       expect(session.mode, SignInMode.api);
       expect(session.username, 'ana');
       expect(store.values.values, contains('refresh-1'));
@@ -159,7 +160,7 @@ void main() {
     test('a role picked before sign-in existed moves to the connected deployment', () async {
       final (settings, _) = await _settings({'role': 'client'});
       final session = await Session.load(settings, probe: (_) async => AuthMode.off);
-      expect(session.role, Role.client);
+      expect(session.role, Role.normie, reason: 'the client view is now the normie view');
       expect(session.mode, SignInMode.local);
       expect((await SharedPreferences.getInstance()).getString('role'), isNull);
     });
@@ -172,9 +173,53 @@ void main() {
 
       await settings.connect('b');
       expect(session.role, isNull, reason: 'B has its own p4n4-api and accounts');
-      await session.signInLocal(Role.client);
+      await session.signInLocal(Role.normie);
       await settings.connect(settings.deployments.first.id);
       expect(session.role, Role.admin);
+    });
+
+    test('API roles map to views, and back', () {
+      expect(roleForApi('admin'), Role.admin);
+      expect(roleForApi('operator'), Role.power);
+      expect(roleForApi('normie'), Role.normie);
+      expect(roleForApi('something-new'), Role.normie, reason: 'unknown roles get the least');
+      for (final r in Role.values) {
+        expect(roleForApi(apiRoleFor(r)), r);
+      }
+    });
+
+    test('a stored client session reads as normie', () async {
+      final (settings, _) = await _settings();
+      await settings.setSessionOf(settings.deployment, {'mode': 'api', 'role': 'client', 'user': 'ana'});
+      expect(Session(settings).role, Role.normie);
+    });
+
+    test('admins preview other views without changing their account', () async {
+      final (settings, _) = await _settings();
+      final session = Session(settings, probe: (_) async => AuthMode.off);
+      await session.signInLocal(Role.admin);
+
+      session.preview = Role.normie;
+      expect(session.role, Role.normie);
+      expect(session.signedInRole, Role.admin);
+      expect(session.isAdmin, isFalse);
+      expect(session.isTechnical, isFalse);
+      session.preview = Role.power;
+      expect((session.role, session.isTechnical), (Role.power, true));
+      session.preview = null;
+      expect(session.role, Role.admin);
+
+      // Switching deployment ends a preview.
+      session.preview = Role.normie;
+      await settings.saveDeployment(Deployment(id: 'b', name: 'B', values: {'host': 'b.lan'}));
+      await settings.connect('b');
+      await session.signInLocal(Role.admin);
+      expect(session.role, Role.admin);
+
+      // Only admins can preview.
+      await session.signInLocal(Role.power);
+      session.preview = Role.normie;
+      expect(session.role, Role.power);
     });
 
     test('signing out forgets the tokens and revokes the sign-in', () async {
@@ -293,5 +338,61 @@ void main() {
         return body['password'] == 'right' ? _json(_tokens('1')) : _json({'detail': 'Invalid'}, 401);
       }),
     );
+  });
+
+  Future<Session> pumpLogin(WidgetTester tester, {required bool offerDevUsers}) async {
+    SharedPreferences.setMockInitialValues({});
+    final brand = loadBrand('p4n4');
+    final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
+    final session = Session(settings, probe: (_) async => AuthMode.required);
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      BrandScope(
+        brand: brand,
+        child: SettingsScope(
+          settings: settings,
+          child: SessionScope(
+            session: session,
+            child: MaterialApp(
+              theme: buildTheme(brand.light),
+              home: LoginPage(offerDevUsers: offerDevUsers),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    return session;
+  }
+
+  testWidgets('dev builds sign in with a dev account in one tap', (tester) async {
+    final sent = <Map>[];
+    await http.runWithClient(
+      () async {
+        final session = await pumpLogin(tester, offerDevUsers: true);
+        expect(find.text('DEV ACCOUNTS'), findsOneWidget);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'POWER'));
+        await tester.pump();
+        await tester.pump();
+        expect(session.role, Role.power);
+      },
+      () => MockClient((r) async {
+        sent.add(jsonDecode(r.body) as Map);
+        return _json(_tokens('1', role: 'operator', user: 'power'));
+      }),
+    );
+    expect(sent, [
+      {'username': 'power', 'password': devPassword},
+    ]);
+  });
+
+  testWidgets('other builds don\'t offer dev accounts', (tester) async {
+    await pumpLogin(tester, offerDevUsers: false);
+    expect(find.text('SIGN IN'), findsOneWidget);
+    expect(find.text('DEV ACCOUNTS'), findsNothing);
+    expect(devUsers, isFalse, reason: 'only `make run` defines P4N4_DEV_USERS');
   });
 }

@@ -7,6 +7,7 @@ import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
+import 'admin_sections.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -17,8 +18,10 @@ class SettingsPage extends StatelessWidget {
     final s = SettingsScope.of(context);
     final brand = BrandScope.of(context);
     final session = SessionScope.of(context);
-    // Clients only get appearance, account and about; everything else is admin configuration.
+    // Normies get appearance, account and about. Power users also get the
+    // connection and endpoint settings; admins also manage views and users.
     final admin = session.isAdmin;
+    final technical = session.isTechnical;
     return Scaffold(
       appBar: AppBar(title: const Text('settings')),
       body: ListView(
@@ -61,13 +64,33 @@ class SettingsPage extends StatelessWidget {
                       onSelectionChanged: (v) => s.themeMode = v.first,
                     ),
                   ]),
-                  if (admin) ...[
+                  if (technical) ...[
                     _section('connection', [
                       Text(
-                        'This section and the ones below belong to the "${s.deployment.name}" deployment. '
-                        'Switch deployments from the Clients tab.',
+                        'This section and the ones below belong to the "${s.deployment.name}" deployment.'
+                        '${admin ? ' Add and remove deployments from the Clients tab.' : ''}',
                         style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                       ),
+                      if (s.deployments.length > 1)
+                        DropdownButtonFormField<String>(
+                          key: ValueKey(s.deployment.id),
+                          initialValue: s.deployment.id,
+                          decoration: const InputDecoration(
+                            labelText: 'Deployment',
+                            helperText: 'Each deployment has its own accounts: switching may ask you to sign in.',
+                          ),
+                          dropdownColor: p4.bg3,
+                          style: p4.mono(size: 13, color: p4.text, spacing: 0),
+                          items: [
+                            for (final d in s.deployments)
+                              DropdownMenuItem(value: d.id, child: Text('${d.name} · ${s.hostOf(d)}')),
+                          ],
+                          onChanged: (id) {
+                            if (id == null || id == s.deployment.id) return;
+                            Navigator.of(context).popUntil((r) => r.isFirst);
+                            s.connect(id);
+                          },
+                        ),
                       _Field(
                         'Host',
                         s.host,
@@ -165,27 +188,18 @@ class SettingsPage extends StatelessWidget {
                           style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                         ),
                       ]),
-                    _section('client view', [
+                  ],
+                  if (admin) ...[
+                    _section('views', [
                       Text(
-                        'Tabs clients see after Home. Clients never see connection settings.',
+                        'Tabs each view shows. Power users get the admin layout without Clients, stack controls or '
+                        'user management; normies get Home first, in plain language, and never see connection settings.',
                         style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
                       ),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final t in brand.tabs)
-                            FilterChip(
-                              label: Text(t.name.toUpperCase()),
-                              selected: s.clientTabs.contains(t),
-                              onSelected: (on) => s.clientTabs = [
-                                for (final c in DashTab.values)
-                                  if (c == t ? on : s.clientTabs.contains(c)) c,
-                              ],
-                            ),
-                        ],
-                      ),
+                      for (final view in [Role.power, Role.normie]) _viewTabs(context, s, brand, session, view),
                     ]),
+                    _section('users', [const UsersSection()]),
+                    _section('diagnostics', [const DiagnosticsSection()]),
                   ],
                   _section('account', [
                     Row(
@@ -199,7 +213,7 @@ class SettingsPage extends StatelessWidget {
                                 null => 'Signed in without an account',
                               }, style: p4.display(size: 14)),
                               Text(
-                                '${admin ? 'administrator' : 'client'} view · ${switch (session.mode) {
+                                '${session.signedInRole?.name} view · ${switch (session.mode) {
                                   SignInMode.api => '${brand.platform}-api account',
                                   _ => 'role picked at sign-in',
                                 }}',
@@ -251,6 +265,49 @@ class SettingsPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// One view's tab chips, and a button to preview that view.
+  Widget _viewTabs(BuildContext context, AppSettings s, Brand brand, Session session, Role view) {
+    final p4 = context.p4;
+    final tabs = s.tabsFor(view);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(view.name.toUpperCase(), style: p4.mono(size: 11, color: p4.text)),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                session.preview = view;
+              },
+              icon: const Icon(Icons.visibility_outlined, size: 16),
+              label: Text('PREVIEW ${view.name.toUpperCase()}'),
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in brand.tabs)
+              FilterChip(
+                key: ValueKey('${view.name}-${t.name}'),
+                label: Text(t.name.toUpperCase()),
+                selected: tabs.contains(t),
+                // Read at tap time: two taps can land before a rebuild.
+                onSelected: (on) => s.setTabsFor(view, [
+                  for (final c in DashTab.values)
+                    if (c == t ? on : s.tabsFor(view).contains(c)) c,
+                ]),
+              ),
+          ],
+        ),
+      ],
     );
   }
 

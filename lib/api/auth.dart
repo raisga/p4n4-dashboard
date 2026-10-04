@@ -25,7 +25,7 @@ class ApiTokens {
   final String refresh;
   final String username;
 
-  /// p4n4-api role: `admin` or `operator`.
+  /// p4n4-api role: `admin`, `operator` or `normie`.
   final String role;
 }
 
