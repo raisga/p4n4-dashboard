@@ -99,6 +99,13 @@ Future<ApiTokens> _tokens(Uri url, Map<String, String> body) async {
   };
 }
 
+/// Whether [uri] goes through the proxy that served this page: web only, same origin.
+bool viaPageProxy(Uri uri, {Uri? page}) {
+  page ??= Uri.base;
+  if (!page.isScheme('http') && !page.isScheme('https')) return false;
+  return uri.scheme == page.scheme && uri.host == page.host && uri.port == page.port;
+}
+
 /// Where [AuthClient] gets tokens: implemented by `Session`.
 abstract interface class ApiCredentials {
   /// The access token for the p4n4-api that serves [url], if signed in to it.
@@ -113,8 +120,8 @@ abstract interface class ApiCredentials {
 /// refreshes it once when the API answers 401.
 ///
 /// Installed for the whole app with `http.runWithClient` (main.dart), so the
-/// API calls elsewhere stay plain `http.get`s. Other URLs (Ollama, cameras,
-/// Grafana) pass through untouched.
+/// API calls elsewhere stay plain `http.get`s. Other URLs (cameras, Grafana)
+/// pass through untouched.
 class AuthClient extends http.BaseClient {
   AuthClient(this._inner, this._credentials, {bool Function(Uri)? viaProxy}) : _viaProxy = viaProxy ?? ((_) => false);
 

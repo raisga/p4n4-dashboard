@@ -12,6 +12,7 @@ import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
+import 'package:p4n4_dashboard/l10n/app_localizations.dart';
 import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/pages/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -319,7 +320,7 @@ void main() {
 
         await tester.enterText(find.widgetWithText(TextField, 'Username'), 'ana');
         await tester.enterText(find.widgetWithText(TextField, 'Password'), 'wrong');
-        await tester.tap(find.text('SIGN IN'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
         await tester.pump();
         await tester.pump();
         expect(find.text('Wrong username or password.'), findsOneWidget);
@@ -327,11 +328,15 @@ void main() {
         expect(password.focusNode?.hasFocus, isTrue, reason: 'ready to retype');
 
         await tester.enterText(find.widgetWithText(TextField, 'Password'), 'right');
-        await tester.tap(find.text('SIGN IN'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.byType(HomeShell), findsOneWidget);
-        expect(find.text('CLIENTS'), findsOneWidget, reason: 'admin account → admin view');
+        expect(
+          find.descendant(of: find.byType(NavigationRail), matching: find.text('Clients')),
+          findsOneWidget,
+          reason: 'admin account → admin view',
+        );
       },
       () => MockClient((r) async {
         final body = jsonDecode(r.body) as Map;
@@ -357,6 +362,8 @@ void main() {
             session: session,
             child: MaterialApp(
               theme: buildTheme(brand.light),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               home: LoginPage(offerDevUsers: offerDevUsers),
             ),
           ),
@@ -373,8 +380,8 @@ void main() {
     await http.runWithClient(
       () async {
         final session = await pumpLogin(tester, offerDevUsers: true);
-        expect(find.text('DEV ACCOUNTS'), findsOneWidget);
-        await tester.tap(find.widgetWithText(OutlinedButton, 'POWER'));
+        expect(find.text('Dev accounts'), findsOneWidget);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Power user'));
         await tester.pump();
         await tester.pump();
         expect(session.role, Role.power);
@@ -391,8 +398,8 @@ void main() {
 
   testWidgets('other builds don\'t offer dev accounts', (tester) async {
     await pumpLogin(tester, offerDevUsers: false);
-    expect(find.text('SIGN IN'), findsOneWidget);
-    expect(find.text('DEV ACCOUNTS'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    expect(find.text('Dev accounts'), findsNothing);
     expect(devUsers, isFalse, reason: 'only `make run` defines P4N4_DEV_USERS');
   });
 }

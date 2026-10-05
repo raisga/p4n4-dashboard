@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
+import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/project.dart';
 import 'package:p4n4_dashboard/api/services.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
@@ -64,6 +65,56 @@ void main() {
       expect(p.tabs, isNull);
     });
 
+    test('reads cameras: an absolute url, or a port and path on the connected host', () {
+      final p = ProjectInfo.fromJson({
+        'project': 'shop',
+        'dashboard': {
+          'cameras': [
+            {'id': 'floor', 'name': 'Sales floor', 'port': 1984, 'path': '/api/stream.mjpeg?src=floor'},
+            {'id': 'door', 'name': 'Door', 'url': 'http://10.0.0.9:8080/?action=stream'},
+            {'id': 'root', 'name': 'Root', 'port': 8081},
+          ],
+        },
+      });
+      expect(
+        [for (final c in p.cameras) c.on('shop.local').url],
+        [
+          'http://shop.local:1984/api/stream.mjpeg?src=floor',
+          'http://10.0.0.9:8080/?action=stream',
+          'http://shop.local:8081/',
+        ],
+      );
+      expect(
+        [for (final c in p.cameras) (c.id, c.name)],
+        [('floor', 'Sales floor'), ('door', 'Door'), ('root', 'Root')],
+      );
+    });
+
+    test('malformed cameras are skipped, not fatal', () {
+      final p = ProjectInfo.fromJson({
+        'project': 'odd',
+        'dashboard': {
+          'cameras': [
+            {'name': 'No id', 'port': 1984},
+            {'id': 'x', 'name': 'No source'},
+            {'id': 'y', 'name': 'Bad port', 'port': 70000},
+            {'id': 'z', 'name': 'Bad url', 'url': 'rtsp://cam/stream'},
+            {'id': 'w', 'name': 'Relative path', 'port': 1984, 'path': 'stream'},
+            'not a camera',
+            {'id': 'ok', 'name': 'Fine', 'port': 1984, 'path': '/s'},
+          ],
+        },
+      });
+      expect([for (final c in p.cameras) c.id], ['ok']);
+      expect(
+        ProjectInfo.fromJson({
+          'project': 'p',
+          'dashboard': {'cameras': 'floor'},
+        }).cameras,
+        isEmpty,
+      );
+    });
+
     test('stacks follow the layers; the API stack always shows', () {
       final p = ProjectInfo.fromJson(_templateProject);
       expect([for (final st in stacks) st.suffix].where(p.hasStack), ['iot', 'api']);
@@ -87,13 +138,55 @@ void main() {
       expect(s.grafanaPath, '/d/mine/custom');
     });
 
+    test('project cameras apply until cameras are saved; they beat the brand videoUrl', () async {
+      final s = await _load(defaults: {'videoUrl': 'http://brand-cam/stream'});
+      expect([for (final c in s.cameras) c.url], ['http://brand-cam/stream']);
+
+      s.host = 'shop.local';
+      s.project = ProjectInfo.fromJson({
+        'project': 'shop',
+        'dashboard': {
+          'cameras': [
+            {'id': 'floor', 'name': 'Sales floor', 'port': 1984, 'path': '/api/stream.mjpeg?src=floor'},
+          ],
+        },
+      });
+      expect(
+        [for (final c in s.cameras) (c.id, c.url)],
+        [('floor', 'http://shop.local:1984/api/stream.mjpeg?src=floor')],
+      );
+
+      // Editing the list saves it, and the saved list wins from then on
+      s.cameras = [...s.cameras, const Camera(id: 'mine', name: 'Mine', url: 'http://10.0.0.5/snapshot.jpg')];
+      s.project = ProjectInfo.fromJson({'project': 'shop'});
+      expect([for (final c in s.cameras) c.id], ['floor', 'mine']);
+    });
+
+    test("a camera the user stored beats the project's, and survives the first edit", () async {
+      // A videoUrl saved by a version before camera lists (moved into the deployment)
+      final s = await _load(prefs: {'host': 'shop.local', 'videoUrl': 'http://10.0.0.7/mine.mjpeg'});
+      s.project = ProjectInfo.fromJson({
+        'project': 'shop',
+        'dashboard': {
+          'cameras': [
+            {'id': 'floor', 'name': 'Sales floor', 'port': 1984, 'path': '/api/stream.mjpeg?src=floor'},
+          ],
+        },
+      });
+      expect([for (final c in s.cameras) c.url], ['http://10.0.0.7/mine.mjpeg']);
+
+      s.cameras = [...s.cameras, const Camera(id: 'yard', name: 'Yard', url: 'http://10.0.0.8/yard.jpg')];
+      expect([for (final c in s.cameras) c.url], ['http://10.0.0.7/mine.mjpeg', 'http://10.0.0.8/yard.jpg']);
+      expect(s.deployment.values, isNot(contains('videoUrl')));
+    });
+
     test('tabs and stacks are only narrowed while project info is known', () async {
       final s = await _load();
       expect(DashTab.values.every(s.projectAllows), isTrue);
       expect(stacks.every(s.showsStack), isTrue);
 
       s.project = ProjectInfo.fromJson(_templateProject);
-      expect(DashTab.values.where(s.projectAllows), [DashTab.services, DashTab.edge, DashTab.grafana]);
+      expect(DashTab.values.where(s.projectAllows), [DashTab.grafana, DashTab.edge, DashTab.services]);
       expect([for (final st in stacks.where(s.showsStack)) st.suffix], ['iot', 'api']);
     });
   });
@@ -196,19 +289,23 @@ void main() {
       ),
     );
     await tester.pump();
-    for (final tab in ['SERVICES', 'EDGE', 'AGENT', 'GRAFANA', 'VIDEO', 'CLIENTS']) {
-      expect(find.text(tab), findsOneWidget, reason: tab);
+    Finder nav(String label) => find.descendant(of: find.byType(NavigationRail), matching: find.text(label));
+    for (final tab in ['Home', 'Assistant', 'Charts', 'Cameras', 'Device', 'Services', 'Clients']) {
+      expect(nav(tab), findsOneWidget, reason: tab);
     }
-    final aiStack = find.text('p4n4-ai', findRichText: true);
+    await tester.tap(nav('Services'));
+    await tester.pump(const Duration(milliseconds: 300));
+    final aiStack = find.text('AI stack');
     expect(aiStack, findsOneWidget); // the Services tab's AI section
 
     settings.project = ProjectInfo.fromJson(_templateProject);
     await tester.pump();
-    for (final tab in ['SERVICES', 'EDGE', 'GRAFANA', 'CLIENTS']) {
-      expect(find.text(tab), findsOneWidget, reason: tab);
+    // Services stays open though tabs before it went away.
+    for (final tab in ['Home', 'Charts', 'Device', 'Services', 'Clients']) {
+      expect(nav(tab), findsOneWidget, reason: tab);
     }
-    for (final tab in ['AGENT', 'VIDEO']) {
-      expect(find.text(tab), findsNothing, reason: tab);
+    for (final tab in ['Assistant', 'Cameras']) {
+      expect(nav(tab), findsNothing, reason: tab);
     }
     expect(aiStack, findsNothing);
     expect(tester.takeException(), isNull);

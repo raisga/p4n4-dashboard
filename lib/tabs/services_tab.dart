@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/services.dart';
+import '../api/stack_control.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 
-/// Service launcher with live Compose status from p4n4-api.
+/// Service launcher with live Compose status from p4n4-api. Admins can also
+/// start, restart and stop stacks; viewers (if an admin gives them this tab)
+/// see only the apps they can open, without hosts or ports.
 class ServicesTab extends StatefulWidget {
   const ServicesTab({super.key, required this.active});
 
@@ -21,6 +25,7 @@ class ServicesTab extends StatefulWidget {
 
 class _ServicesTabState extends State<ServicesTab> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   late StatusMonitor _monitor;
   late StatusTarget _target;
@@ -62,248 +67,250 @@ class _ServicesTabState extends State<ServicesTab> {
   Widget build(BuildContext context) {
     final settings = SettingsScope.of(context);
     final status = StatusScope.of(context).statusOf(_target);
-    return RefreshIndicator(
-      color: p4.accent,
-      onRefresh: _refresh,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _header(settings, status),
-                  const SizedBox(height: 32),
-                  for (final stack in stacks.where(settings.showsStack)) ...[
-                    _stackSection(stack, settings, status.report),
-                    const SizedBox(height: 36),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _header(AppSettings settings, TargetStatus status) {
+    final technical = SessionScope.of(context).isTechnical;
     final brand = BrandScope.of(context);
     final viaApi = status.report?.viaApi;
-    final loading = status.checking;
-    final apiLabel = switch (viaApi) {
-      false => '${brand.platform}-api unreachable — probing service ports directly',
-      true => 'Live status from ${settings.apiUri.authority}',
-      null => 'Contacting ${settings.apiUri.authority}…',
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return PageBody(
+      onRefresh: _refresh,
       children: [
-        SectionHeader(
-          tag: 'dashboard',
-          title: Text.rich(
-            TextSpan(
-              children: [
-                const TextSpan(text: 'Service '),
-                TextSpan(
-                  text: 'Launcher',
-                  style: TextStyle(color: p4.accent),
-                ),
-              ],
-            ),
-            style: p4.display(size: 32, weight: FontWeight.w800, spacing: -1.5),
-          ),
-          trailing: IconButton(
-            tooltip: 'Refresh status',
-            onPressed: loading ? null : _refresh,
-            icon: loading
-                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
-                : Icon(Icons.refresh, color: p4.muted),
-          ),
+        PageHeader(
+          title: l.servicesTitle,
+          subtitle: technical ? l.servicesSubtitle(settings.host) : l.servicesSubtitlePlain,
+          trailing: RefreshButton(busy: status.checking, onPressed: _refresh),
         ),
-        const SizedBox(height: 10),
-        Text(
-          'Direct access to all running ${brand.platform} services across the IoT, AI, and Edge stacks on ${settings.host}.',
-          style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-        ),
-        const SizedBox(height: 10),
-        Text(apiLabel, style: p4.mono(color: viaApi == false ? p4.warn : p4.muted)),
+        if (technical) ...[
+          const SizedBox(height: 8),
+          Text(switch (viaApi) {
+            false => l.servicesApiUnreachable(brand.platform),
+            true => l.servicesLiveFrom(settings.apiUri.authority),
+            null => l.servicesContacting(settings.apiUri.authority),
+          }, style: p4.body(size: 13, color: viaApi == false ? p4.warn : p4.muted)),
+        ],
+        const SizedBox(height: 28),
+        for (final stack in stacks.where(settings.showsStack))
+          // Viewers only get what they can open: no gateway, no TCP-only brokers.
+          if (technical || stack.suffix != 'api') ...[
+            _stackSection(stack, settings, status.report, technical),
+            const SizedBox(height: 32),
+          ],
       ],
     );
   }
 
-  Widget _stackSection(StackDef stack, AppSettings settings, ServiceReport? report) {
-    final n = stack.services.length;
+  Widget _stackSection(StackDef stack, AppSettings settings, ServiceReport? report, bool technical) {
+    final services = [
+      for (final s in stack.services)
+        if (technical || !s.tcpOnly) s,
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          tag: stack.label,
-          tagColor: stack.tone(p4),
-          title: Row(
-            children: [
-              StackName(stack.suffix),
-              const SizedBox(width: 12),
-              TagBadge('$n ${stack.suffix == 'api' ? 'endpoint' : 'service'}${n == 1 ? '' : 's'}'),
+        Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: stack.tone(p4), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 10),
+            Flexible(child: Text(l.stackLabel(stack), style: p4.display(size: 18))),
+            if (technical) ...[
+              const SizedBox(width: 10),
+              TagBadge(stack.suffix == 'api' ? l.endpointCount(services.length) : l.serviceCount(services.length)),
             ],
-          ),
-          trailing: SessionScope.of(context).isAdmin && stack.suffix != 'api' ? const _StackControls() : null,
+            const Spacer(),
+            if (SessionScope.of(context).isAdmin && stack.suffix != 'api') _StackControls(stack, onDone: _refresh),
+          ],
         ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, c) {
-            final cols = (c.maxWidth / 260).floor().clamp(1, 4);
-            final w = (c.maxWidth - 2 - (cols - 1)) / cols - 0.01;
-            return Container(
-              color: p4.border,
-              padding: const EdgeInsets.all(1),
-              child: Wrap(
-                spacing: 1,
-                runSpacing: 1,
-                children: [
-                  for (final svc in stack.services)
-                    SizedBox(width: w, child: _ServiceCard(svc, stack.tone(p4), _healthOf(svc, report), settings)),
-                ],
-              ),
-            );
-          },
+        const SizedBox(height: 14),
+        TileGrid(
+          minWidth: 260,
+          children: [
+            for (final svc in services)
+              _ServiceCard(svc, stack.tone(p4), _healthOf(svc, report), settings, technical: technical),
+          ],
         ),
       ],
     );
   }
 }
 
-/// Start/restart/stop menu for a stack. The actions stay disabled until
-/// p4n4-api has state-changing stack endpoints; wire them up then.
-class _StackControls extends StatelessWidget {
-  const _StackControls();
+/// Start, restart and stop for one stack (admins only; the API checks too).
+/// Stopping and restarting ask first: they take services away from everyone.
+class _StackControls extends StatefulWidget {
+  const _StackControls(this.stack, {required this.onDone});
+
+  final StackDef stack;
+  final Future<void> Function() onDone;
+
+  @override
+  State<_StackControls> createState() => _StackControlsState();
+}
+
+class _StackControlsState extends State<_StackControls> {
+  bool _running = false;
+
+  Future<void> _run(StackAction action) async {
+    final l = context.l10n;
+    final name = l.stackLabel(widget.stack);
+    final confirm = switch (action) {
+      StackAction.up => null,
+      StackAction.restart => (l.stackConfirmRestart(name), l.stackConfirmRestartBody, l.stackRestart),
+      StackAction.down => (l.stackConfirmStop(name), l.stackConfirmStopBody, l.stackStop),
+    };
+    if (confirm case (final title, final body, final verb)) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(verb)),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    final api = SettingsScope.of(context).apiUri;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _running = true);
+    messenger.showSnackBar(SnackBar(content: Text(l.stackJobRunning(name))));
+    String result;
+    try {
+      final job = await runStackAction(api, widget.stack.suffix, action);
+      result = job.failed ? l.stackJobFailed(name, job.output.lastOrNull ?? job.status) : l.stackJobDone(name);
+    } catch (e) {
+      result = l.stackJobFailed(name, '$e');
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(result)));
+    if (mounted) setState(() => _running = false);
+    await widget.onDone();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
-    return PopupMenuButton<void>(
-      tooltip: 'Stack controls',
-      icon: Icon(Icons.more_vert, color: p4.muted),
-      color: p4.bg3,
+    final l = context.l10n;
+    if (_running) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent)),
+      );
+    }
+    return PopupMenuButton<StackAction>(
+      tooltip: l.stackControls,
+      icon: Icon(Icons.more_horiz, color: p4.muted),
+      onSelected: _run,
       itemBuilder: (_) => [
-        for (final (icon, label) in [
-          (Icons.play_arrow_outlined, 'Start'),
-          (Icons.restart_alt, 'Restart'),
-          (Icons.stop_outlined, 'Stop'),
+        for (final (action, icon, label) in [
+          (StackAction.up, Icons.play_arrow_outlined, l.stackStart),
+          (StackAction.restart, Icons.restart_alt, l.stackRestart),
+          (StackAction.down, Icons.stop_outlined, l.stackStop),
         ])
           PopupMenuItem(
-            enabled: false,
+            value: action,
             child: Row(children: [Icon(icon, size: 18), const SizedBox(width: 12), Text(label)]),
           ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          enabled: false,
-          child: Text('Needs stack control endpoints in the API', style: p4.mono(size: 10, spacing: 0)),
-        ),
       ],
     );
   }
 }
 
-class _ServiceCard extends StatefulWidget {
-  const _ServiceCard(this.def, this.color, this.health, this.settings);
+class _ServiceCard extends StatelessWidget {
+  const _ServiceCard(this.def, this.color, this.health, this.settings, {required this.technical});
 
   final ServiceDef def;
   final Color color;
   final Health health;
   final AppSettings settings;
+  final bool technical;
 
-  @override
-  State<_ServiceCard> createState() => _ServiceCardState();
-}
-
-class _ServiceCardState extends State<_ServiceCard> {
-  P4Colors get p4 => context.p4;
-
-  bool _hover = false;
-
-  Future<void> _open() async {
-    final uri = widget.settings.url(widget.def.port, widget.def.path);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open $uri')));
+  Future<void> _open(BuildContext context) async {
+    final uri = settings.url(def.port, def.path);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.couldNotOpen('$uri'))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final def = widget.def;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        color: _hover ? p4.bg3 : p4.bg2,
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final p4 = context.p4;
+    final l = context.l10n;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: def.tcpOnly ? null : () => _open(context),
+        hoverColor: p4.bg3,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(def.icon, color: widget.color, size: 26),
-                      const Spacer(),
-                      if (!def.tcpOnly) StatusIndicator(widget.health),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Text(def.label(BrandScope.of(context).platform), style: p4.display()),
-                  const SizedBox(height: 6),
-                  SizedBox(
+                  Container(
+                    width: 40,
                     height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(Radii.control),
+                    ),
+                    child: Icon(def.icon, color: color, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      def.desc,
-                      maxLines: 2,
+                      def.label(BrandScope.of(context).platform),
                       overflow: TextOverflow.ellipsis,
-                      style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
+                      style: p4.display(size: 16),
                     ),
                   ),
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${widget.settings.host}:${def.port}${def.path}',
-                          overflow: TextOverflow.ellipsis,
-                          style: p4.mono(spacing: 0.05),
-                        ),
-                      ),
-                      if (def.tcpOnly)
-                        const TagBadge('TCP only')
-                      else
-                        FilledButton(
-                          onPressed: _open,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 30),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          child: const Text('OPEN'),
-                        ),
-                    ],
-                  ),
+                  if (!def.tcpOnly) StatusIndicator(health),
                 ],
               ),
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 250),
-                scale: _hover ? 1 : 0,
-                alignment: Alignment.centerLeft,
-                child: Container(height: 2, color: widget.color),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 40,
+                child: Text(
+                  l.serviceDesc(def),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: p4.body(size: 14, color: p4.muted),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: technical
+                        ? Text(
+                            '${settings.host}:${def.port}${def.path}',
+                            overflow: TextOverflow.ellipsis,
+                            style: p4.mono(size: 12, spacing: 0),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  if (def.tcpOnly)
+                    TagBadge(l.tcpOnly)
+                  else
+                    FilledButton.tonalIcon(
+                      onPressed: () => _open(context),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 34),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        backgroundColor: p4.accent.withValues(alpha: 0.14),
+                        foregroundColor: p4.accent,
+                      ),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: Text(l.open),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

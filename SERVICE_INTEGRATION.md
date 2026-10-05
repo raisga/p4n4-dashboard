@@ -2,6 +2,13 @@
 
 _Written 2026-09-29, against Flutter 3.47.2 and the repos as they are on `main` today._
 
+> **Status (2026-10-04): the assistant and the views moved behind p4n4-api.** What changed against the plan below:
+> - **No Ollama or Letta proxy.** The Agent tab (now *Assistant*) called Ollama and Letta directly or through nginx's `/ollama/` and `/letta/` routes, with no sign-in: anyone who could load the page could chat with any model, or pull and delete models through Ollama's own API. It now goes only through p4n4-api's `/api/v1/agents/*`, which requires sign-in and keeps the Letta password on the server. The `/ollama/` and `/letta/` routes, `OLLAMA_UPSTREAM`/`LETTA_UPSTREAM`, the `ollamaBase`/`lettaBase` keys in `config.json` and the dev server, and the app's Ollama URL, Letta URL and Letta password settings are gone; a stored Letta password is deleted from devices at upgrade. `/api/` gets `proxy_buffering off` and a 600 s read timeout for streamed replies.
+> - **The assistant is chosen per deployment.** `GET/PUT /api/v1/agents/config` (operators and admins choose; everyone reads). Normies get `403 assistant_restricted` for any other model or agent, or for generation `options`. A brand's `agentBackend`/`ollamaModel`/`lettaAgentId` defaults are offered to a deployment that never chose, at the first admin or power sign-in, if installed.
+> - **Views are kept by the API.** Each view's tabs and the tab order (`GET/PUT /api/v1/dashboard/views`, admins change them) used to be in each browser's `localStorage`, so an admin's choice only applied on their own device. Choices a device kept are handed to the API at the next admin sign-in there.
+> - **The normie view is read-only** (shown as *Viewer*): no model picker, demo-data switch, camera editing or system settings; the API enforces what matters (above, plus admin-only stack actions, which the dashboard now calls with a confirmation).
+> - CORS on Ollama (`OLLAMA_ORIGINS`) is no longer needed for the dev server: only p4n4-api's `P4N4_API_CORS_ORIGINS`, when not using the dev proxy.
+>
 > **Status (2026-10-02): Phases 1–7 are done.** Phase 7 added:
 > - **Basic auth** (`DASHBOARD_BASIC_AUTH`, `19-basic-auth.envsh`, `make htpasswd`). It conflicted with the app's own bearer tokens (one `Authorization` header per request), so behind the proxy the app sends them in `X-Upstream-Authorization`, which nginx moves back. `<link rel="manifest">` is sent with credentials.
 > - **HTTPS** via an optional Caddy overlay (`docker-compose.tls.yml`, `make up-tls`), plus an optional same-origin Grafana route (`GRAFANA_UPSTREAM`, `/grafana/`, app setting `grafanaBase`, `GRAFANA_SUB_PATH` in the IoT stack and the template) so nothing is mixed content.
@@ -60,7 +67,7 @@ A web build **already compiles**: a trial `flutter build web --release` in a scr
 | 7 | Absolute paths | Clients call `base.resolve('/api/tags')` etc., which drops any path prefix. So they can't sit behind a reverse proxy at a subpath (`/ollama/`) | `lib/api/agent_client.dart:38,48,92,103`, `services.dart` |
 | 8 | Offline assets | By default Flutter web loads CanvasKit (and fallback fonts) from Google's CDN. p4n4 targets offline LANs and Raspberry Pis | build flags |
 | 9 | Brand tool | `tool/brand.dart` doesn't patch `web/index.html` / `manifest.json`, and generates icons with `web: generate: false` | `tool/brand.dart:314` |
-| 10 | API reachability | p4n4-api v0.1 runs **on the host** and binds `127.0.0.1` by default, so a container can't reach it | `clients/api/p4n4_api/config.py` |
+| 10 | API reachability | p4n4-api v0.1 runs **on the host** and binds `127.0.0.1` by default, so a container can't reach it | `api/p4n4_api/config.py` |
 | 11 | Packaging | No Dockerfile, compose file, image or CLI/lib integration exists for the dashboard | — |
 
 ## Target architecture
@@ -73,14 +80,19 @@ A web build **already compiles**: a trial `flutter build web --release` in a scr
  │  /              → Flutter web build (static, SPA fallback)                  │
  │  /config.json   → runtime config rendered from env vars at container start  │
  │  /healthz       → 200 ok                                                    │
- │  /api/, /health → p4n4-api        (same origin: no CORS needed)             │
- │  /ollama/       → p4n4-ollama:11434  (streaming, buffering off)             │
- │  /letta/        → p4n4-letta:8283                                           │
+ │  /api/, /health → p4n4-api        (same origin: no CORS needed; the         │
+ │                   assistant too, streaming, buffering off)                  │
+ │  /grafana/      → Grafana         (optional, GRAFANA_UPSTREAM)              │
  └──────────────────────────────────────────────┬─────────────────────────────┘
                                                 │ p4n4-net (external bridge)
        Grafana :3000 ← <iframe> (same-site, needs allow_embedding)
        Camera        ← <img>    (browsers render MJPEG natively, no CORS needed)
+
+ p4n4-api → Ollama :11434, Letta :8283 (P4N4_API_OLLAMA_URL, P4N4_API_LETTA_URL):
+ sign-in, the Letta password and who may use which model stay on the server.
 ```
+
+_Updated 2026-10-04: the plan proxied `/ollama/` and `/letta/` too (below); they were removed._
 
 Design rules:
 
@@ -93,7 +105,7 @@ Design rules:
 
 ## Step-by-step
 
-The phases are in dependency order. Phases 1–3 live in the dashboard repo and can ship on their own: at that point `docker compose up` in `clients/dashboard` works. Phases 4–6 wire it into the rest of p4n4.
+The phases are in dependency order. Phases 1–3 live in the dashboard repo and can ship on their own: at that point `docker compose up` in `dashboard` works. Phases 4–6 wire it into the rest of p4n4.
 
 ### Phase 1 — Make the app web-ready (dashboard repo)
 
@@ -156,6 +168,8 @@ Example `config.json` served by the container:
 }
 ```
 
+> **Superseded (2026-10-04):** `config.json` now has `host`, `apiBase` and `grafanaBase` only; the assistant goes through `apiBase`.
+
 Rules:
 
 - If `host` is empty, use `Uri.base.host`, the machine that served the page. This fixes gap #3.
@@ -163,6 +177,8 @@ Rules:
 - Let `AppSettings.load` accept the merged map (it already takes `defaults:`). Values the user saved still win, so add a **Reset connection to defaults** action in Settings for when the operator changes the environment.
 
 **1.6 Make service base URLs configurable and path-safe**
+
+> **Superseded (2026-10-04):** `ollamaBase` and `lettaBase` were added, then removed with the direct Ollama/Letta clients. The path-safe `resolve` rule still applies to `apiBase` and `grafanaBase`.
 
 - Add `ollamaBase` and `lettaBase` to `profileKeys`, following the `apiBase` pattern. When they're empty, fall back to `settings.url(11434)` / `url(8283)`, as today.
 - Normalize every base to end with `/` and resolve **relative** paths: `base.resolve('api/tags')`, `apiBase.resolve('api/v1/stacks')`. This fixes gap #7 and is harmless on native.
@@ -297,6 +313,8 @@ server {
 }
 ```
 
+> **Superseded (2026-10-04):** the `/ollama/` and `/letta/` locations and their `config.json` keys are gone (see the status note at the top); `/api/` streams with buffering off and a 600 s read timeout.
+
 `proxy_common.conf` is a small include that sets `Host`, `X-Forwarded-*`, `proxy_http_version 1.1` and `proxy_read_timeout 30s`. Values in `config.json` are inserted without escaping, so document that they must be plain URLs or paths.
 
 **2.3 Local smoke test**
@@ -348,6 +366,7 @@ networks:
     name: p4n4-net
 ```
 
+- **Superseded (2026-10-04):** `OLLAMA_UPSTREAM` and `LETTA_UPSTREAM` are gone from the image, compose file and `.env.example`.
 - **Port 8088** is free across the platform: 1880, 1883, 3000, 5678, 8000, 8080, 8086, 8283, 9001 and 11434 are taken. Record it in every port table (Phase 6).
 - **Pin `DASHBOARD_VERSION`** rather than defaulting to `latest`. The CLI writes the version it was released with.
 - `docker-compose.build.yml` adds `build: { context: ., args: { BRAND: "${BRAND:-p4n4}" } }` for local image builds. Keep it out of the scaffolded copy.
@@ -409,6 +428,8 @@ Windows developers without `make` run the `flutter` commands directly. The READM
 - Ollama: `OLLAMA_ORIGINS=http://localhost:8088`
 - p4n4-api: the planned `P4N4_API_CORS_ORIGINS`
 
+> **Superseded (2026-10-04):** the assistant goes through p4n4-api, so Ollama needs no CORS; `web_dev_config.yaml` proxies `/api/` and `/health` only.
+
 Alternatively, if the pinned Flutter version supports a proxy section in `web_dev_config.yaml`, mirror the nginx routes there so dev and prod use the same paths. Check the Flutter docs for your version before relying on it.
 
 ### Phase 4 — CI/CD (dashboard repo)
@@ -435,7 +456,7 @@ Only the `p4n4` brand goes to the public `ghcr.io/raisga/p4n4-dashboard`. Build 
 
 ### Phase 5 — Platform integration (other repos)
 
-**5.1 p4n4-lib: register a `dashboard` layer** (`core/lib/p4n4_lib/layers.py`, `sources.yaml`)
+**5.1 p4n4-lib: register a `dashboard` layer** (`lib/p4n4_lib/layers.py`, `sources.yaml`)
 
 ```python
 "dashboard": Layer(
@@ -452,14 +473,14 @@ Only the `p4n4` brand goes to the public `ghcr.io/raisga/p4n4-dashboard`. Build 
 - The scaffold does a shallow `git clone` of the whole Flutter repo just to copy one file. That's acceptable for now. Later, consider publishing the compose file as a release asset.
 - Add tests for the layer registry, layout ordering and validation. Release as p4n4-lib 0.2.0.
 
-**5.2 p4n4-cli** (`clients/cli`)
+**5.2 p4n4-cli** (`cli`)
 
 - `init --layer`: accept `dashboard`. Decide whether `all` includes it: `init.py:84` hard-codes `["iot", "ai", "edge"]`. Recommendation: build that list from `LAYERS` so `all` includes the dashboard, since it's lightweight and is the UI.
 - `p4n4 up dashboard`, `down`, `status` and `logs --stack dashboard` then work unchanged through `require_compose_dirs`.
 - After `up`, print the dashboard URL (`http://<host>:${DASHBOARD_PORT}`), like the stacks' `make up` does.
 - Add tests, a CHANGELOG entry, and bump the `p4n4-lib` minimum version.
 
-**5.3 p4n4-api** (`clients/api`)
+**5.3 p4n4-api** (`api`)
 
 - `GET /api/v1/stacks` picks up the new layer automatically. The dashboard's catalog doesn't list itself, and `statusFor` ignores unknown services, so nothing breaks.
 - Implement the documented `P4N4_API_CORS_ORIGINS` (FastAPI `CORSMiddleware`, explicit allowlist, no `*` with credentials). The proxied container doesn't need it, but these do: native clients don't (no browser), and the dev web server (3.4) and the **Clients tab on web**, which calls *other* deployments' APIs cross-origin, do.
@@ -468,7 +489,7 @@ Only the `p4n4` brand goes to the public `ghcr.io/raisga/p4n4-dashboard`. Build 
 **5.4 Stacks**
 
 - `stacks/iot/docker-compose.yml`: pass through `GF_SECURITY_ALLOW_EMBEDDING: ${GRAFANA_ALLOW_EMBEDDING:-true}` and add it to `.env.example`. Recommend `true` when the dashboard layer is enabled. For kiosk viewing without a login, point to the existing anonymous-viewer example in `docker-compose.override.yml.example`.
-- `stacks/ai`: nothing is required for the container. Document `OLLAMA_ORIGINS` for the dev server only.
+- `stacks/ai`: nothing is required for the container. Document `OLLAMA_ORIGINS` for the dev server only. *(Superseded 2026-10-04: not needed; p4n4-api reaches Ollama and Letta, configured with `P4N4_API_OLLAMA_URL` / `P4N4_API_LETTA_URL`.)*
 
 **5.5 tools/emu**
 
@@ -482,8 +503,8 @@ To show the dashboard itself on the Services tab and Home, add a `ServiceDef('Da
 
 | File | Change |
 |------|--------|
-| `clients/dashboard/README.md` | Lead with **Run as a service (web)** (`docker compose up -d` / `p4n4 up dashboard`), then **Develop** (`make run`, `PLATFORM=`), then native builds. Add web to *Platform notes* (iframe, `<img>` video, proxy paths, runtime `config.json`) |
-| `clients/dashboard/TODO.md` | Add web to *Current status* and *What was checked*. Remove items this work resolves |
+| `dashboard/README.md` | Lead with **Run as a service (web)** (`docker compose up -d` / `p4n4 up dashboard`), then **Develop** (`make run`, `PLATFORM=`), then native builds. Add web to *Platform notes* (iframe, `<img>` video, proxy paths, runtime `config.json`) |
+| `dashboard/TODO.md` | Add web to *Current status* and *What was checked*. Remove items this work resolves |
 | Root `README.md` | Add `8088` to *Service URLs*. Update the Repository Map (`clients/`, not `client/`) |
 | `docs/stacks/` | New `dashboard.md`: purpose, ports, env vars, proxy routes, security notes |
 | `docs/reference/architecture.md`, `cli-reference.md` | Add the dashboard layer and `--layer dashboard` |
@@ -496,7 +517,7 @@ To show the dashboard itself on the Services tab and Home, add a `ServiceDef('Da
   - Offer optional nginx basic auth (`DASHBOARD_BASIC_AUTH` → htpasswd file mounted read-only).
   - Document binding to a LAN interface only: `"${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT}:8080"`.
 - **TLS and mixed content.** If the dashboard is served over HTTPS (Caddy, Traefik, or nginx with certs), browsers block the `http://` Grafana iframe and camera `<img>`. Either proxy those through the same HTTPS origin too (Grafana under `/grafana/` needs `GF_SERVER_ROOT_URL` + `GF_SERVER_SERVE_FROM_SUB_PATH=true`), or serve everything over HTTPS. Document both.
-- **Browser storage.** `shared_preferences` uses `localStorage` on web, scoped per origin, so the Letta token is readable by any script on that origin. The strict CSP (2.2) mitigates this. The `flutter_secure_storage` TODO doesn't give real protection on web either, so the durable fix is short-lived tokens from p4n4-api.
+- **Browser storage.** `shared_preferences` uses `localStorage` on web, scoped per origin, so the Letta token is readable by any script on that origin. *(Superseded 2026-10-04: the Letta password is no longer stored in the app at all; p4n4-api keeps it. The browser holds the p4n4-api refresh token.)* The strict CSP (2.2) mitigates this. The `flutter_secure_storage` TODO doesn't give real protection on web either, so the durable fix is short-lived tokens from p4n4-api.
 - **Proxy scope.** The proxy only forwards to fixed upstreams from env vars. Never add a "proxy any URL" route, such as for arbitrary cameras. That would turn the dashboard into an open SSRF relay.
 - **Hardening.** Keep the non-root image, read-only filesystem, `cap_drop: ALL` and `no-new-privileges` (3.1). Keep images pinned by digest and scanned in CI (4.2).
 
@@ -518,9 +539,9 @@ Order matters: the lib and CLI need a published image to point at.
 ## Definition of done
 
 - [ ] `p4n4 init demo --layer all && cd demo && p4n4 up` starts `p4n4-dashboard`, and `http://<pi>:8088` loads it from another device on the LAN with no configuration.
-- [ ] Every tab works in the browser against a running stack: Services (via the API, and via probes with the API stopped), Home, Edge (demo mode), Agent (Ollama streaming), Grafana (embedded) and Video (MJPEG and snapshot).
+- [ ] Every tab works in the browser against a running stack: Services (via the API, and via probes with the API stopped), Home, Edge (demo mode), Agent (Ollama streaming; now the Assistant, through p4n4-api), Grafana (embedded) and Video (MJPEG and snapshot).
 - [ ] The page makes no requests to external hosts, verified offline.
-- [ ] The container stays healthy with the AI stack stopped: the UI loads and Agent shows a clear error.
+- [ ] The container stays healthy with the AI stack stopped: the UI loads and the Assistant shows a clear error.
 - [ ] The same image runs on amd64 and arm64 (Raspberry Pi 5).
 - [ ] `make run` launches the web dev server, and `make run PLATFORM=linux` (etc.) and `make build PLATFORM=apk` still work. The CI matrix builds web plus all five native targets.
 - [ ] Applying the `acme` brand changes the web title, manifest and favicon, and `make image BRAND=acme` produces an image with only acme assets.

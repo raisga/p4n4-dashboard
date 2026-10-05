@@ -2,15 +2,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'api/agent_client.dart' show viaPageProxy;
 import 'api/auth.dart';
 import 'api/project.dart';
 import 'api/status_monitor.dart';
+import 'api/views.dart';
 import 'core/brand.dart';
 import 'core/runtime_config.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
 import 'core/theme.dart';
+import 'l10n/l10n.dart';
 import 'pages/login_page.dart';
 import 'platform/http_client.dart';
 import 'pages/settings_page.dart';
@@ -35,7 +36,9 @@ Future<void> main() async {
     final runtime = kIsWeb ? await loadRuntimeDefaults(Uri.base) : const <String, Object>{};
     final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime});
     final session = credentials.session = await Session.load(settings);
-    ProjectWatcher(settings); // lives as long as the app
+    // Both live as long as the app.
+    ProjectWatcher(settings);
+    ViewsWatcher(settings);
     runApp(
       BrandScope(
         brand: brand,
@@ -81,29 +84,74 @@ class _DashboardAppState extends State<DashboardApp> {
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final role = SessionScope.of(context).role;
+    final settings = SettingsScope.of(context);
+    // Settings → Accessibility adds to the device's own settings, never takes away from them.
+    final device = MediaQuery.of(context);
+    final reduceMotion = settings.reduceMotion || device.disableAnimations;
+    final highContrast = settings.highContrast || device.highContrast;
+    ThemeData theme(P4Colors c) => buildTheme(highContrast ? c.contrasted : c, reduceMotion: reduceMotion);
     final app = MaterialApp(
       title: brand.appName,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(brand.light),
-      darkTheme: buildTheme(brand.dark),
-      themeMode: SettingsScope.of(context).themeMode,
+      theme: theme(brand.light),
+      darkTheme: theme(brand.dark),
+      themeMode: settings.themeMode,
+      themeAnimationDuration: reduceMotion ? Duration.zero : kThemeAnimationDuration,
+      // The language picked in Settings, else the device's if supported, else English.
+      locale: settings.locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       // Keyed by role so switching views starts from a fresh shell.
       home: role == null ? const LoginPage() : HomeShell(key: ValueKey(role)),
     );
-    return StatusScope(monitor: _status, child: app);
+    // MaterialApp takes these from the MediaQuery above it (see MediaQuery.fromView's platformData).
+    return StatusScope(
+      monitor: _status,
+      child: MediaQuery(
+        data: device.copyWith(
+          textScaler: _scaled(device.textScaler, settings.textScale),
+          disableAnimations: reduceMotion,
+          highContrast: highContrast,
+        ),
+        child: app,
+      ),
+    );
   }
+}
+
+/// The device's text scaler, [factor] times bigger (Settings → Accessibility → Text size).
+TextScaler _scaled(TextScaler device, double factor) => factor == 1 ? device : _ScaledTextScaler(device, factor);
+
+class _ScaledTextScaler extends TextScaler {
+  const _ScaledTextScaler(this.device, this.factor);
+
+  final TextScaler device;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => device.scale(fontSize) * factor;
+
+  @override
+  // ignore: deprecated_member_use
+  double get textScaleFactor => device.textScaleFactor * factor;
+
+  @override
+  bool operator ==(Object other) => other is _ScaledTextScaler && other.device == device && other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(device, factor);
 }
 
 class _Dest {
   const _Dest(this.label, this.icon, this.selectedIcon);
 
-  final String label;
+  final String Function(AppLocalizations) label;
   final IconData icon;
   final IconData selectedIcon;
 }
 
-/// A navigation destination: one of the brand's tabs, or a screen that only
-/// some views have (Home for normies, Clients for admins).
+/// A navigation destination: one of the brand's tabs, Home (every view's
+/// first) or Clients (admins only, last).
 enum Screen {
   home,
   clients,
@@ -118,28 +166,25 @@ enum Screen {
   DashTab? get tab => DashTab.values.asNameMap()[name];
 }
 
-const _dests = {
-  Screen.home: _Dest('Home', Icons.home_outlined, Icons.home),
-  Screen.clients: _Dest('Clients', Icons.devices_other_outlined, Icons.devices_other),
-  Screen.services: _Dest('Services', Icons.apps_outlined, Icons.apps),
-  Screen.edge: _Dest('Edge', Icons.memory_outlined, Icons.memory),
-  Screen.agent: _Dest('Agent', Icons.forum_outlined, Icons.forum),
-  Screen.grafana: _Dest('Grafana', Icons.show_chart_outlined, Icons.show_chart),
-  Screen.video: _Dest('Video', Icons.videocam_outlined, Icons.videocam),
+final _dests = {
+  Screen.home: _Dest((l) => l.navHome, Icons.home_outlined, Icons.home),
+  Screen.clients: _Dest((l) => l.navClients, Icons.devices_other_outlined, Icons.devices_other),
+  Screen.services: _Dest((l) => l.navServices, Icons.apps_outlined, Icons.apps),
+  Screen.edge: _Dest((l) => l.navEdge, Icons.memory_outlined, Icons.memory),
+  Screen.agent: _Dest((l) => l.navAgent, Icons.forum_outlined, Icons.forum),
+  Screen.grafana: _Dest((l) => l.navGrafana, Icons.show_chart_outlined, Icons.show_chart),
+  Screen.video: _Dest((l) => l.navVideo, Icons.videocam_outlined, Icons.videocam),
 };
 
-/// Screens for [role]: admins get every brand tab plus Clients; power users
-/// the brand tabs an admin has enabled for them (Home if none); normies Home
-/// plus theirs. Tabs the connected project doesn't serve (its `.p4n4.json`
-/// `dashboard.tabs`) are always left out.
-List<Screen> screensFor(Role role, Brand brand, AppSettings settings) {
-  final tabs = brand.tabs.where(settings.projectAllows).where(settings.tabsFor(role).contains).map(Screen.of);
-  return switch (role) {
-    Role.admin => [...tabs, Screen.clients],
-    Role.power => tabs.isEmpty ? [Screen.home] : tabs.toList(),
-    Role.normie => [Screen.home, ...tabs],
-  };
-}
+/// Screens for [role]: Home, then the brand tabs in the admin's
+/// [AppSettings.tabOrder] (every tab for admins, the ones an admin has enabled
+/// for power users and normies), then Clients for admins. Tabs the connected
+/// project doesn't serve (its `.p4n4.json` `dashboard.tabs`) are always left out.
+List<Screen> screensFor(Role role, Brand brand, AppSettings settings) => [
+  Screen.home,
+  ...settings.tabsFor(role).where(brand.tabs.contains).where(settings.projectAllows).map(Screen.of),
+  if (role == Role.admin) Screen.clients,
+];
 
 /// Each view's badge colour.
 Color roleColor(P4Colors p4, Role role) => switch (role) {
@@ -158,7 +203,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   P4Colors get p4 => context.p4;
 
-  int _index = 0;
+  /// The open screen, kept by identity so reordering tabs doesn't switch it.
+  Screen? _selected;
 
   /// [all] and [open] are for Home's shortcut cards.
   Widget _page(Screen screen, bool active, List<Screen> all, ValueChanged<Screen> open) => switch (screen) {
@@ -179,22 +225,24 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final session = SessionScope.of(context);
+    final l = context.l10n;
     final role = session.role!;
     final all = screensFor(role, brand, SettingsScope.of(context));
     final wide = MediaQuery.sizeOf(context).width >= 800;
     // A phone bottom bar fits five destinations; the rest open from the app bar.
     final screens = wide ? all : all.take(5).toList();
     final extra = all.skip(screens.length);
-    final index = _index.clamp(0, screens.length - 1);
+    final index = screens.indexOf(_selected ?? Screen.home).clamp(0, screens.length - 1);
+    void select(int i) => setState(() => _selected = screens[i]);
     void open(Screen s) {
       if (screens.contains(s)) {
-        setState(() => _index = screens.indexOf(s));
+        setState(() => _selected = s);
         return;
       }
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => Scaffold(
-            appBar: AppBar(title: Text(_dests[s]!.label.toLowerCase())),
+            appBar: AppBar(title: Text(_dests[s]!.label(l))),
             body: _page(s, true, all, open),
           ),
         ),
@@ -216,25 +264,25 @@ class _HomeShellState extends State<HomeShell> {
         title: const Wordmark(),
         actions: [
           if (wide) ...[
-            if (role.technical) Center(child: Text('// ${_connection(SettingsScope.of(context))}', style: p4.mono())),
+            if (role.technical) _ConnectionLabel(_connection(SettingsScope.of(context))),
             const SizedBox(width: 12),
-            Center(child: TagBadge(role.name, color: roleColor(p4, role))),
+            Center(child: TagBadge(l.roleName(role), color: roleColor(p4, role))),
             const SizedBox(width: 8),
           ],
           for (final s in extra)
             IconButton(
-              tooltip: _dests[s]!.label,
+              tooltip: _dests[s]!.label(l),
               icon: Icon(_dests[s]!.icon, color: p4.muted),
               onPressed: () => open(s),
             ),
           _ThemeToggle(SettingsScope.of(context)),
           IconButton(
-            tooltip: 'Settings',
+            tooltip: l.settingsTooltip,
             icon: Icon(Icons.tune, color: p4.muted),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage())),
           ),
           IconButton(
-            tooltip: 'Sign out',
+            tooltip: l.signOutTooltip,
             icon: Icon(Icons.logout, color: p4.muted),
             onPressed: session.signOut,
           ),
@@ -248,14 +296,14 @@ class _HomeShellState extends State<HomeShell> {
                 children: [
                   NavigationRail(
                     selectedIndex: index,
-                    onDestinationSelected: (i) => setState(() => _index = i),
+                    onDestinationSelected: select,
                     labelType: NavigationRailLabelType.all,
                     destinations: [
                       for (final d in screens.map((s) => _dests[s]!))
                         NavigationRailDestination(
                           icon: Icon(d.icon),
                           selectedIcon: Icon(d.selectedIcon),
-                          label: Text(d.label.toUpperCase()),
+                          label: Text(d.label(l)),
                         ),
                     ],
                   ),
@@ -269,15 +317,11 @@ class _HomeShellState extends State<HomeShell> {
           ? null
           : NavigationBar(
               selectedIndex: index,
-              onDestinationSelected: (i) => setState(() => _index = i),
+              onDestinationSelected: select,
               height: 64,
               destinations: [
                 for (final d in screens.map((s) => _dests[s]!))
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: d.label.toUpperCase(),
-                  ),
+                  NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label(l)),
               ],
             ),
     );
@@ -304,18 +348,19 @@ class _PreviewBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
+    final l = context.l10n;
     return Material(
       color: roleColor(p4, view).withValues(alpha: 0.15),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         child: Row(
           children: [
-            Icon(Icons.visibility_outlined, size: 16, color: roleColor(p4, view)),
-            const SizedBox(width: 8),
+            Icon(Icons.visibility_outlined, size: 18, color: roleColor(p4, view)),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text('Previewing the ${view.name} view', style: p4.mono(color: p4.text)),
+              child: Text(l.previewingView(l.roleName(view)), style: p4.body(size: 14, weight: FontWeight.w500)),
             ),
-            TextButton(onPressed: onExit, child: const Text('BACK TO ADMIN')),
+            TextButton(onPressed: onExit, child: Text(l.backToAdmin)),
           ],
         ),
       ),
@@ -326,6 +371,28 @@ class _PreviewBanner extends StatelessWidget {
 /// The connected deployment, named once there's more than one to tell apart.
 String _connection(AppSettings s) => s.deployments.length > 1 ? '${s.deployment.name} · ${s.host}' : s.host;
 
+/// Where the dashboard is connected, for admins and power users.
+class _ConnectionLabel extends StatelessWidget {
+  const _ConnectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.dns_outlined, size: 15, color: p4.muted),
+          const SizedBox(width: 6),
+          Text(text, style: p4.mono(size: 12, spacing: 0)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Cycles system → light → dark.
 class _ThemeToggle extends StatelessWidget {
   const _ThemeToggle(this.settings);
@@ -334,13 +401,14 @@ class _ThemeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final (icon, label, next) = switch (settings.themeMode) {
-      ThemeMode.system => (Icons.brightness_auto_outlined, 'system', ThemeMode.light),
-      ThemeMode.light => (Icons.light_mode_outlined, 'light', ThemeMode.dark),
-      ThemeMode.dark => (Icons.dark_mode_outlined, 'dark', ThemeMode.system),
+      ThemeMode.system => (Icons.brightness_auto_outlined, l.themeSystem, ThemeMode.light),
+      ThemeMode.light => (Icons.light_mode_outlined, l.themeLight, ThemeMode.dark),
+      ThemeMode.dark => (Icons.dark_mode_outlined, l.themeDark, ThemeMode.system),
     };
     return IconButton(
-      tooltip: 'Theme: $label',
+      tooltip: l.themeTooltip(label),
       icon: Icon(icon, color: context.p4.muted),
       onPressed: () => settings.themeMode = next,
     );

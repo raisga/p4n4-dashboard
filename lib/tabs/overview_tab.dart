@@ -6,15 +6,19 @@ import '../api/edge_metrics.dart';
 import '../api/services.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
+import '../core/format.dart';
+import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 
 const _interval = Duration(seconds: 30);
 
-/// Normie home: one big "is everything OK" card, the device's readings in
-/// plain language and large shortcuts to the other tabs. Deliberately free of
-/// service and stack names, hosts, ports and URLs.
+/// Home, every view's first tab: one big "is everything OK" card, the
+/// device's readings in plain language and large shortcuts to the other tabs.
+/// For viewers it's free of service and stack names, hosts, ports and URLs:
+/// what's broken is said as what people use (the assistant, charts).
 class OverviewTab extends StatefulWidget {
   const OverviewTab({super.key, required this.active, required this.shortcuts, required this.onOpen});
 
@@ -30,6 +34,7 @@ class OverviewTab extends StatefulWidget {
 
 class _OverviewTabState extends State<OverviewTab> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   final _demo = DemoMetrics();
   EdgeMetrics? _metrics;
@@ -42,8 +47,8 @@ class _OverviewTabState extends State<OverviewTab> {
   late StatusMonitor _monitor;
   late StatusTarget _target;
 
-  ServiceReport? get _report => _monitor.statusOf(_target).report;
-  bool get _loading => _metricsLoading || _monitor.statusOf(_target).checking;
+  TargetStatus get _status => _monitor.statusOf(_target);
+  bool get _loading => _metricsLoading || _status.checking;
 
   @override
   void didChangeDependencies() {
@@ -118,73 +123,39 @@ class _OverviewTabState extends State<OverviewTab> {
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
-    return RefreshIndicator(
-      color: p4.accent,
+    final checkedAt = _status.checkedAt;
+    return PageBody(
+      maxWidth: 1000,
       onRefresh: _refresh,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    tag: 'home',
-                    title: Text(brand.appName, style: p4.display(size: 28, weight: FontWeight.w800, spacing: -1)),
-                    trailing: IconButton(
-                      tooltip: 'Refresh status',
-                      onPressed: _loading ? null : _refresh,
-                      icon: _loading
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent),
-                            )
-                          : Icon(Icons.refresh, color: p4.muted),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _summary(),
-                  if (_showsDevice) ...[const SizedBox(height: 16), _device()],
-                  if (widget.shortcuts.isNotEmpty) ...[
-                    const SizedBox(height: 36),
-                    const SectionHeader(tag: 'go to', title: SizedBox.shrink()),
-                    const SizedBox(height: 12),
-                    _grid([for (final t in widget.shortcuts) _shortcut(t)], minWidth: 280),
-                  ],
-                ],
-              ),
-            ),
-          ),
+      children: [
+        PageHeader(
+          title: brand.appName,
+          subtitle: checkedAt == null ? null : l.summaryUpdated(context.formats.clock(checkedAt)),
+          trailing: RefreshButton(busy: _loading, onPressed: _refresh),
+        ),
+        const SizedBox(height: 24),
+        _summary(),
+        if (_showsDevice) ...[const SizedBox(height: 16), _device()],
+        if (widget.shortcuts.isNotEmpty) ...[
+          const SizedBox(height: 36),
+          Text(l.goToTag, style: p4.display(size: 17)),
+          const SizedBox(height: 12),
+          TileGrid(minWidth: 280, children: [for (final t in widget.shortcuts) _shortcut(t)]),
         ],
-      ),
+      ],
     );
   }
 
   Widget _summary() {
-    final r = _report;
+    final r = _status.report;
     final (health, title, sub) = switch (r) {
-      null => (Health.pending, 'Checking your system…', 'This takes a few seconds.'),
+      null => (Health.pending, l.summaryChecking, l.summaryCheckingSub),
       // The API answered but reported none of the catalog's services.
-      _ when r.known == 0 => (
-        Health.unknown,
-        'Service status unavailable',
-        'Your system is responding but didn\'t report service status. Contact your administrator if this persists.',
-      ),
+      _ when r.known == 0 => (Health.unknown, l.summaryUnavailable, l.summaryUnavailableSub),
       // Probing is the fallback when the API is down, so nothing answering means the host is unreachable.
-      _ when !r.viaApi && r.online == 0 => (
-        Health.down,
-        'We can\'t reach your system',
-        'Check that the device is on and connected.',
-      ),
-      _ when r.online == r.known => (Health.up, 'Everything is working', 'Your system is running normally.'),
-      _ => (
-        Health.down,
-        'Something needs attention',
-        'Part of your system isn\'t working right now. Contact your administrator if this persists.',
-      ),
+      _ when !r.viaApi && r.online == 0 => (Health.down, l.summaryUnreachable, l.summaryUnreachableSub),
+      _ when r.online == r.known => (Health.up, l.summaryOk, l.summaryOkSub),
+      _ => (Health.down, l.summaryAttention, l.summaryAttentionSub),
     };
     final (color, icon) = switch (health) {
       Health.up => (p4.ok, Icons.check_circle_outline),
@@ -192,23 +163,34 @@ class _OverviewTabState extends State<OverviewTab> {
       Health.pending => (p4.warn, Icons.hourglass_empty),
       _ => (p4.warn, Icons.help_outline),
     };
+    final affected = health == Health.down && r != null && r.online > 0 ? _affected(r) : const <String>[];
     return Panel(
       accent: color,
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 56, color: color),
-          const SizedBox(width: 20),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: Icon(icon, size: 32, color: color),
+          ),
+          const SizedBox(width: 18),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: p4.display(size: 26, weight: FontWeight.w800, spacing: -0.8)),
+                Text(title, style: p4.display(size: 24, weight: FontWeight.w800, spacing: -0.6)),
                 const SizedBox(height: 6),
-                Text(
-                  sub,
-                  style: p4.display(size: 15, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-                ),
+                Text(sub, style: p4.body(size: 15, color: p4.muted)),
+                if (affected.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    l.summaryAffected(affected.join(', ')),
+                    style: p4.body(size: 14, color: p4.text, weight: FontWeight.w600),
+                  ),
+                ],
               ],
             ),
           ),
@@ -217,27 +199,65 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
+  /// What's down: service names for those who know them, and for viewers the
+  /// thing they use that each one provides.
+  List<String> _affected(ServiceReport r) {
+    final technical = SessionScope.of(context).isTechnical;
+    final platform = BrandScope.of(context).platform;
+    final down = [
+      for (final MapEntry(key: def, value: up) in r.up.entries)
+        if (up == false) def,
+    ];
+    if (technical) return [for (final d in down) d.label(platform)];
+    return {
+      for (final d in down)
+        switch (d.name) {
+          'Ollama' || 'Letta' => l.featureAssistant,
+          'Grafana' => l.featureCharts,
+          'InfluxDB' => l.featureHistory,
+          'MQTT' => l.featureSensors,
+          'Node-RED' || 'n8n' => l.featureAutomations,
+          'EI Runner' => l.featureDeviceAi,
+          _ => l.featureConnection,
+        },
+    }.toList();
+  }
+
   Widget _device() {
     final m = _metrics;
+    final f = context.formats;
+    final details = widget.shortcuts.contains(DashTab.edge);
     return Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Your device', style: p4.display()),
+          Row(
+            children: [
+              Expanded(child: Text(l.yourDevice, style: p4.display(size: 17))),
+              if (details)
+                TextButton.icon(
+                  onPressed: () => widget.onOpen(DashTab.edge),
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: Text(l.deviceDetails),
+                ),
+            ],
+          ),
           const SizedBox(height: 14),
           if (m == null)
-            Text(
-              _metricsFailed ? 'Device readings are unavailable right now.' : 'Loading readings…',
-              style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-            )
+            Text(_metricsFailed ? l.deviceUnavailable : l.deviceLoading, style: p4.body(color: p4.muted))
           else
-            Wrap(
-              spacing: 32,
-              runSpacing: 12,
+            TileGrid(
+              minWidth: 180,
               children: [
-                _reading('Processor', '${m.cpu.round()}%'),
-                _reading('Memory', '${m.mem.round()}%'),
-                if (m.tempC != null) _reading('Temperature', '${m.tempC!.round()}°C'),
+                _reading(l.readingProcessor, f.percent(m.cpu), usageLevel(m.cpu)),
+                _reading(l.readingMemory, f.percent(m.mem), usageLevel(m.mem)),
+                if (m.tempC != null)
+                  _reading(
+                    l.readingTemperature,
+                    f.temperature(m.tempC!),
+                    temperatureLevel(m.tempC!),
+                    temperature: true,
+                  ),
               ],
             ),
         ],
@@ -245,65 +265,71 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
-  Widget _reading(String label, String value) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label.toUpperCase(), style: p4.mono(size: 10)),
-      const SizedBox(height: 4),
-      Text(value, style: p4.display(size: 24, weight: FontWeight.w800, spacing: -0.8)),
-    ],
-  );
+  Widget _reading(String label, String value, Level level, {bool temperature = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: p4.body(size: 13, color: p4.muted, weight: FontWeight.w500),
+        ),
+        const SizedBox(height: 4),
+        // Wraps the badge under the value with large text (Settings → Accessibility).
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(value, style: p4.display(size: 26, weight: FontWeight.w800, spacing: -0.8)),
+            TagBadge(l.levelName(level, temperature: temperature), color: levelColor(p4, level)),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _shortcut(DashTab tab) {
-    final (icon, title, desc) = switch (tab) {
-      DashTab.services => (Icons.apps_outlined, 'Services', 'Open the apps running on your system.'),
-      DashTab.edge => (Icons.memory_outlined, 'Device', 'Live readings from your edge device.'),
-      DashTab.agent => (Icons.forum_outlined, 'Assistant', 'Ask questions about your system.'),
-      DashTab.grafana => (Icons.show_chart, 'Dashboards', 'Charts and history for your sensors.'),
-      DashTab.video => (Icons.videocam_outlined, 'Camera', 'Watch the live camera feed.'),
+    final (icon, desc) = switch (tab) {
+      DashTab.services => (Icons.apps_outlined, l.shortcutServicesDesc),
+      DashTab.edge => (Icons.memory_outlined, l.shortcutDeviceDesc),
+      DashTab.agent => (Icons.forum_outlined, l.shortcutAssistantDesc),
+      DashTab.grafana => (Icons.show_chart, l.shortcutDashboardsDesc),
+      DashTab.video => (Icons.videocam_outlined, l.shortcutCameraDesc),
     };
-    return Material(
-      color: p4.bg2,
-      shape: Border.all(color: p4.border),
+    return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => widget.onOpen(tab),
         hoverColor: p4.bg3,
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              Icon(icon, color: p4.accent, size: 36),
-              const SizedBox(width: 18),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: p4.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(Radii.control + 2),
+                ),
+                child: Icon(icon, color: p4.accent, size: 26),
+              ),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: p4.display(size: 18)),
+                    Text(l.tabName(tab), style: p4.display(size: 17)),
                     const SizedBox(height: 4),
-                    Text(
-                      desc,
-                      style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-                    ),
+                    Text(desc, style: p4.body(size: 14, color: p4.muted)),
                   ],
                 ),
               ),
+              Icon(Icons.chevron_right, color: p4.muted),
             ],
           ),
         ),
       ),
     );
   }
-
-  /// Equal-width columns, at least [minWidth] wide.
-  Widget _grid(List<Widget> children, {double minWidth = 260}) => LayoutBuilder(
-    builder: (context, c) {
-      final cols = (c.maxWidth / minWidth).floor().clamp(1, 4);
-      final w = (c.maxWidth - (cols - 1) * 12) / cols - 0.01;
-      return Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [for (final child in children) SizedBox(width: w, child: child)],
-      );
-    },
-  );
 }

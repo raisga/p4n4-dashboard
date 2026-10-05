@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api/edge_metrics.dart';
+import '../core/format.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/sparkline.dart';
 
@@ -106,17 +108,23 @@ class _EdgeTabState extends State<EdgeTab> {
   @override
   Widget build(BuildContext context) {
     final settings = SettingsScope.of(context);
-    final technical = SessionScope.of(context).isTechnical;
+    final session = SessionScope.of(context);
+    final technical = session.isTechnical;
+    final l = context.l10n;
+    final f = context.formats;
     final m = _latest;
 
-    final header = SectionHeader(
-      tag: 'edge system',
-      title: const StackName('edge', size: 24),
-      trailing: technical
+    final header = PageHeader(
+      title: l.navEdge,
+      subtitle: l.edgeSubtitle,
+      // Demo data is a setting: admins only.
+      trailing: session.isAdmin
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('DEMO', style: p4.mono()),
+                Flexible(
+                  child: Text(l.edgeDemoSwitch, style: p4.body(size: 13, color: p4.muted)),
+                ),
                 const SizedBox(width: 8),
                 Switch(value: settings.edgeDemo, onChanged: (v) => settings.edgeDemo = v),
               ],
@@ -126,23 +134,20 @@ class _EdgeTabState extends State<EdgeTab> {
 
     if (m == null && _error != null) {
       return Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
         child: Column(
           children: [
             header,
             Expanded(
               child: EmptyState(
                 icon: Icons.sensors_off_outlined,
-                title: 'No metrics from edge device',
-                message: technical
-                    ? 'GET ${settings.edgeMetricsUri} failed:\n$_error\n\n'
-                          'Point the metrics URL at an endpoint returning the JSON described in the README, '
-                          'or turn on demo data to preview the dashboard.'
-                    : 'Device readings are unavailable right now. Try again shortly.',
+                color: p4.err,
+                title: l.edgeNoMetrics,
+                message: technical ? l.edgeFetchFailed('${settings.edgeMetricsUri}', '$_error') : l.edgeUnavailable,
                 actions: [
-                  if (technical)
-                    FilledButton(onPressed: () => settings.edgeDemo = true, child: const Text('USE DEMO DATA')),
-                  OutlinedButton(onPressed: _tick, child: const Text('RETRY')),
+                  if (session.isAdmin)
+                    FilledButton(onPressed: () => settings.edgeDemo = true, child: Text(l.useDemoData)),
+                  OutlinedButton(onPressed: _tick, child: Text(l.retry)),
                 ],
               ),
             ),
@@ -151,117 +156,102 @@ class _EdgeTabState extends State<EdgeTab> {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+    return PageBody(
       children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                header,
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    StatusIndicator(
-                      _error != null
-                          ? Health.down
-                          : (m == null ? Health.pending : (settings.edgeDemo ? Health.unknown : Health.up)),
-                      label: _error != null ? 'stale' : (settings.edgeDemo ? 'demo data' : null),
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        settings.edgeDemo
-                            ? 'synthetic random walk'
-                            : (technical ? settings.edgeMetricsUri.toString() : 'live readings'),
-                        overflow: TextOverflow.ellipsis,
-                        style: p4.mono(),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                if (m == null)
-                  Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Center(child: CircularProgressIndicator(color: p4.accent)),
-                  )
-                else ...[
-                  _grid([
-                    _MetricTile(
-                      'CPU',
-                      '${m.cpu.toStringAsFixed(1)}%',
-                      _cpu,
-                      (v) => '${v.toStringAsFixed(1)}%',
-                      maxY: 100,
-                    ),
-                    _MetricTile(
-                      'Memory',
-                      '${m.mem.toStringAsFixed(1)}%',
-                      _mem,
-                      (v) => '${v.toStringAsFixed(1)}%',
-                      maxY: 100,
-                      sub: m.memUsedMb != null && m.memTotalMb != null
-                          ? '${_gb(m.memUsedMb!)} / ${_gb(m.memTotalMb!)} GB'
-                          : null,
-                    ),
-                    if (m.tempC != null)
-                      _MetricTile(
-                        'SoC temp',
-                        '${m.tempC!.toStringAsFixed(1)}°C',
-                        _temp,
-                        (v) => '${v.toStringAsFixed(1)}°C',
-                        maxY: 100,
-                        color: p4.amber,
-                      ),
-                    if (m.inferenceMs != null)
-                      _MetricTile(
-                        'Inference',
-                        '${m.inferenceMs!.toStringAsFixed(1)} ms',
-                        _inf,
-                        (v) => '${v.toStringAsFixed(1)} ms',
-                        color: p4.blue,
-                      ),
-                  ]),
-                  const SizedBox(height: 16),
-                  _grid([
-                    if (m.disk != null) _Fact('Disk', '${m.disk!.toStringAsFixed(1)}%', progress: m.disk! / 100),
-                    if (m.load != null) _Fact('Load avg', m.load!.map((e) => e.toStringAsFixed(2)).join('  ')),
-                    if (m.uptime != null) _Fact('Uptime', _uptime(m.uptime!)),
-                  ], minWidth: 220),
-                ],
-              ],
+        header,
+        const SizedBox(height: 12),
+        // Wraps onto two lines with large text (Settings → Accessibility).
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            StatusIndicator(
+              _error != null
+                  ? Health.down
+                  : (m == null ? Health.pending : (settings.edgeDemo ? Health.unknown : Health.up)),
+              label: _error != null
+                  ? l.edgeStale
+                  : (settings.edgeDemo ? l.edgeDemoLabel : (m == null ? null : l.edgeLive)),
             ),
-          ),
+            if (technical || settings.edgeDemo)
+              Text(
+                settings.edgeDemo ? l.edgeSynthetic : settings.edgeMetricsUri.toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: settings.edgeDemo ? p4.body(size: 13, color: p4.muted) : p4.mono(size: 12, spacing: 0),
+              ),
+          ],
         ),
+        const SizedBox(height: 20),
+        if (m == null)
+          LoadingState(l.deviceLoading)
+        else ...[
+          TileGrid(
+            minWidth: 280,
+            children: [
+              _MetricTile(
+                l.readingProcessor,
+                f.percent(m.cpu, technical ? 1 : 0),
+                _cpu,
+                (v) => f.percent(v, 1),
+                maxY: 100,
+                level: (usageLevel(m.cpu), l.levelName(usageLevel(m.cpu))),
+              ),
+              _MetricTile(
+                l.readingMemory,
+                f.percent(m.mem, technical ? 1 : 0),
+                _mem,
+                (v) => f.percent(v, 1),
+                maxY: 100,
+                level: (usageLevel(m.mem), l.levelName(usageLevel(m.mem))),
+                sub: m.memUsedMb != null && m.memTotalMb != null
+                    ? '${f.decimal(m.memUsedMb! / 1024)} / ${f.decimal(m.memTotalMb! / 1024)} GB'
+                    : null,
+              ),
+              if (m.tempC != null)
+                _MetricTile(
+                  l.readingTemperature,
+                  f.temperature(m.tempC!, technical ? 1 : 0),
+                  _temp,
+                  (v) => f.temperature(v, 1),
+                  maxY: 100,
+                  color: p4.amber,
+                  level: (temperatureLevel(m.tempC!), l.levelName(temperatureLevel(m.tempC!), temperature: true)),
+                ),
+              if (m.inferenceMs != null)
+                _MetricTile(
+                  l.metricInference,
+                  '${f.decimal(m.inferenceMs!, technical ? 1 : 0)} ms',
+                  _inf,
+                  (v) => '${f.decimal(v)} ms',
+                  color: p4.blue,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TileGrid(
+            minWidth: 220,
+            children: [
+              if (m.disk != null) _Fact(l.factDisk, f.percent(m.disk!), progress: m.disk! / 100),
+              // Load average means little without knowing the core count: technical users only.
+              if (m.load != null && technical) _Fact(l.factLoad, m.load!.map((e) => f.decimal(e, 2)).join('  ')),
+              if (m.uptime != null) _Fact(l.factUptime, _uptime(m.uptime!)),
+            ],
+          ),
+        ],
       ],
     );
   }
-
-  static String _gb(double mb) => (mb / 1024).toStringAsFixed(1);
 
   static String _uptime(Duration d) {
     final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
     return days > 0 ? '${days}d ${h}h ${m}m' : '${h}h ${m}m';
   }
-
-  Widget _grid(List<Widget> children, {double minWidth = 280}) => LayoutBuilder(
-    builder: (context, c) {
-      final cols = (c.maxWidth / minWidth).floor().clamp(1, 4);
-      final w = (c.maxWidth - (cols - 1) * 12) / cols - 0.01;
-      return Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [for (final child in children) SizedBox(width: w, child: child)],
-      );
-    },
-  );
 }
 
 class _MetricTile extends StatelessWidget {
-  const _MetricTile(this.label, this.value, this.history, this.format, {this.maxY, this.sub, this.color});
+  const _MetricTile(this.label, this.value, this.history, this.format, {this.maxY, this.sub, this.color, this.level});
 
   final String label;
   final String value;
@@ -271,6 +261,9 @@ class _MetricTile extends StatelessWidget {
   final String? sub;
   final Color? color;
 
+  /// How the reading compares with normal, and that in words.
+  final (Level, String)? level;
+
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
@@ -278,8 +271,18 @@ class _MetricTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: p4.mono(spacing: 0.12)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: p4.body(size: 14, color: p4.muted, weight: FontWeight.w500),
+                ),
+              ),
+              if (level case (final lvl, final name)) TagBadge(name, color: levelColor(p4, lvl)),
+            ],
+          ),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
@@ -288,7 +291,11 @@ class _MetricTile extends StatelessWidget {
               if (sub != null) ...[
                 const SizedBox(width: 10),
                 Flexible(
-                  child: Text(sub!, overflow: TextOverflow.ellipsis, style: p4.mono()),
+                  child: Text(
+                    sub!,
+                    overflow: TextOverflow.ellipsis,
+                    style: p4.body(size: 13, color: p4.muted),
+                  ),
                 ),
               ],
             ],
@@ -298,9 +305,9 @@ class _MetricTile extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Text('−2 min', style: p4.mono(size: 9)),
+              Text(context.l10n.sparkStart, style: p4.body(size: 11, color: p4.muted)),
               const Spacer(),
-              Text('now', style: p4.mono(size: 9)),
+              Text(context.l10n.sparkNow, style: p4.body(size: 11, color: p4.muted)),
             ],
           ),
         ],
@@ -324,19 +331,22 @@ class _Fact extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: p4.mono(spacing: 0.12)),
-          const SizedBox(height: 6),
           Text(
-            value,
-            style: p4.mono(size: 16, color: p4.text, weight: FontWeight.w600, spacing: 0),
+            label,
+            style: p4.body(size: 13, color: p4.muted, weight: FontWeight.w500),
           ),
+          const SizedBox(height: 4),
+          Text(value, style: p4.display(size: 18, weight: FontWeight.w700, spacing: -0.3)),
           if (progress != null) ...[
             const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: progress!.clamp(0, 1),
-              minHeight: 4,
-              color: p4.accent,
-              backgroundColor: p4.bg3,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress!.clamp(0, 1),
+                minHeight: 6,
+                color: levelColor(p4, usageLevel(progress! * 100)),
+                backgroundColor: p4.bg3,
+              ),
             ),
           ],
         ],

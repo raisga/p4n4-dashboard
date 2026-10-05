@@ -29,6 +29,7 @@ WORKDIR /src
 COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 # Only what the web build reads, so editing docker/ or docs doesn't rebuild it.
+COPY l10n.yaml ./
 COPY lib/ lib/
 COPY assets/ assets/
 COPY brands/ brands/
@@ -44,21 +45,17 @@ RUN dart run tool/brand.dart apply "$BRAND" --web-only \
 FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="p4n4-dashboard" \
-      org.opencontainers.image.description="p4n4 dashboard (Flutter web) with a same-origin proxy to p4n4-api, Ollama and Letta" \
+      org.opencontainers.image.description="p4n4 dashboard (Flutter web) with a same-origin proxy to p4n4-api" \
       org.opencontainers.image.source="https://github.com/raisga/p4n4-dashboard" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="$VERSION"
 # Defaults for the nginx template (the image's entrypoint runs envsubst over
 # /etc/nginx/templates/*.template, replacing only variables that are set).
 ENV P4N4_API_UPSTREAM=http://host.docker.internal:8000 \
-    OLLAMA_UPSTREAM=http://p4n4-ollama:11434 \
-    LETTA_UPSTREAM=http://p4n4-letta:8283 \
     GRAFANA_UPSTREAM="" \
     DASHBOARD_BASIC_AUTH="" \
     DASHBOARD_HOST="" \
     DASHBOARD_API_BASE=/ \
-    DASHBOARD_OLLAMA_BASE=/ollama/ \
-    DASHBOARD_LETTA_BASE=/letta/ \
     DASHBOARD_GRAFANA_BASE=
 COPY --from=build /src/build/web /usr/share/nginx/html
 COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template

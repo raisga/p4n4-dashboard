@@ -4,54 +4,48 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/agent_client.dart' show AgentBackend, AssistantConfig;
 import '../api/camera.dart';
 import '../api/fleet.dart';
 import '../api/project.dart';
 import '../api/services.dart' show StackDef;
 import '../api/status_monitor.dart';
+import '../api/views.dart';
 import 'brand.dart';
 import 'role.dart';
 import 'secrets.dart';
 
-enum AgentBackend { ollama, letta }
-
 /// Settings that belong to a deployment, so switching deployments switches
-/// them all. Everything else (theme, each view's tabs) is app-wide.
+/// them all. Everything else (theme, language) is app-wide; each view's tabs
+/// belong to the deployment too, but its p4n4-api keeps them ([views]).
 const profileKeys = {
   'host',
   'apiBase',
-  'ollamaBase',
-  'lettaBase',
   'edgeMetricsUrl',
   'edgeDemo',
-  'agentBackend',
-  'ollamaModel',
-  'lettaAgentId',
-  'lettaToken',
   'grafanaBase',
   'grafanaPath',
   'grafanaKiosk',
   'videoUrl',
   'cameras',
+  'videoDemo',
   'session',
 };
 
 /// Profile keys that say where the services are, cleared by
 /// [AppSettings.resetConnection].
-const connectionKeys = {
-  'host',
-  'apiBase',
-  'ollamaBase',
-  'lettaBase',
-  'edgeMetricsUrl',
-  'grafanaBase',
-  'grafanaPath',
-  'grafanaKiosk',
-};
+const connectionKeys = {'host', 'apiBase', 'edgeMetricsUrl', 'grafanaBase', 'grafanaPath', 'grafanaKiosk'};
 
 /// Profile keys whose values are credentials: kept in the platform's secure
 /// storage ([SecretStore]) instead of shared_preferences.
-const secretKeys = {'lettaToken', 'apiRefreshToken'};
+const secretKeys = {'apiRefreshToken'};
+
+/// Deployment settings from before the assistant went through p4n4-api:
+/// where Ollama and Letta were, the Letta password, and the model or agent
+/// (now chosen on the server, for everyone). Removed at load. As brand (or
+/// project) defaults, the last three still say which assistant to offer a
+/// deployment that never chose one ([AppSettings.assistantDefault]).
+const retiredKeys = {'ollamaBase', 'lettaBase', 'lettaToken', 'agentBackend', 'ollamaModel', 'lettaAgentId'};
 
 /// User-editable settings, persisted with shared_preferences.
 ///
@@ -92,6 +86,7 @@ class AppSettings extends ChangeNotifier {
     }
     final settings = AppSettings._(await SharedPreferences.getInstance(), defaults, store, saved);
     await settings._moveSecretsToStore();
+    await settings._dropRetired();
     return settings;
   }
 
@@ -149,6 +144,8 @@ class AppSettings extends ChangeNotifier {
           await _prefs.setString(key, v);
         case bool v:
           await _prefs.setBool(key, v);
+        case double v:
+          await _prefs.setDouble(key, v);
       }
     }
     notifyListeners();
@@ -194,8 +191,83 @@ class AppSettings extends ChangeNotifier {
     if (moved) await _saveDeployments();
   }
 
+  /// Forgets [retiredKeys], the Letta password included, wherever they're kept.
+  Future<void> _dropRetired() async {
+    var changed = false;
+    for (final d in _deployments) {
+      for (final key in retiredKeys) {
+        changed = d.values.remove(key) != null || changed;
+      }
+    }
+    if (changed) await _saveDeployments();
+    final stale = _secrets.keys.where((id) => retiredKeys.any((k) => id.endsWith('.$k'))).toList();
+    for (final id in stale) {
+      _secrets.remove(id);
+      if (!_secretsOk) continue;
+      try {
+        await _store.delete(id);
+      } catch (_) {
+        _secretsOk = false;
+      }
+    }
+  }
+
+  /// The brand's assistant (`agentBackend`, `ollamaModel`, `lettaAgentId` in
+  /// its defaults, or the project's), or null when it names none. The Assistant
+  /// tab offers it to a deployment's p4n4-api once, while nobody there has
+  /// chosen one; after that the deployment's choice stands.
+  AssistantConfig? get assistantDefault {
+    String? value(String key) => switch (_default<String>(key)) {
+      final v? when v.trim().isNotEmpty => v.trim(),
+      _ => null,
+    };
+    final backend = AgentBackend.values.asNameMap()[value('agentBackend')];
+    final model = value('ollamaModel'), agent = value('lettaAgentId');
+    if (backend == null && model == null && agent == null) return null;
+    return AssistantConfig(backend: backend ?? AgentBackend.ollama, model: model, agentId: agent);
+  }
+
   ThemeMode get themeMode => ThemeMode.values.asNameMap()[_str('themeMode', 'system')] ?? ThemeMode.system;
   set themeMode(ThemeMode v) => _set('themeMode', v.name);
+
+  /// The language picked in Settings (a code such as `es`), or null to follow
+  /// the device. A brand can set the default with `"locale"` in its defaults.
+  Locale? get locale => switch (_str('locale', '')) {
+    '' => null,
+    final code => Locale(code),
+  };
+  set locale(Locale? v) => _set('locale', v?.languageCode ?? '');
+
+  // Accessibility and region: app-wide, like the theme. A brand can set any
+  // of them as a default (e.g. `"textScale": 1.15` for wall-mounted screens).
+
+  /// How much bigger (or smaller) than the device's text size to draw text,
+  /// within [textScaleRange].
+  double get textScale =>
+      switch (_raw('textScale', null) ?? _project?.defaults['textScale'] ?? _defaults['textScale']) {
+        num v => v.toDouble().clamp(textScaleRange.$1, textScaleRange.$2),
+        _ => 1.0,
+      };
+
+  /// Rounded to whole percents, so a slider's steps don't save as 1.1500000001.
+  set textScale(double v) => _set('textScale', (v.clamp(textScaleRange.$1, textScaleRange.$2) * 100).round() / 100);
+
+  static const textScaleRange = (0.85, 1.5);
+
+  /// Stronger text and borders, on top of the device's own high-contrast setting.
+  bool get highContrast => _bool('highContrast', false);
+  set highContrast(bool v) => _set('highContrast', v);
+
+  /// No transitions or animations, on top of the device's own setting.
+  bool get reduceMotion => _bool('reduceMotion', false);
+  set reduceMotion(bool v) => _set('reduceMotion', v);
+
+  TemperatureUnit get temperatureUnit =>
+      TemperatureUnit.values.asNameMap()[_str('temperatureUnit', 'auto')] ?? TemperatureUnit.auto;
+  set temperatureUnit(TemperatureUnit v) => _set('temperatureUnit', v.name);
+
+  TimeFormat get timeFormat => TimeFormat.values.asNameMap()[_str('timeFormat', 'auto')] ?? TimeFormat.auto;
+  set timeFormat(TimeFormat v) => _set('timeFormat', v.name);
 
   /// Host running the p4n4 stacks. Use 10.0.2.2 from the Android emulator.
   String get host => hostOf(deployment);
@@ -227,30 +299,6 @@ class AppSettings extends ChangeNotifier {
   bool get edgeDemo => _bool('edgeDemo', false);
   set edgeDemo(bool v) => _set('edgeDemo', v);
 
-  // Agent chat
-  AgentBackend get agentBackend =>
-      AgentBackend.values.asNameMap()[_str('agentBackend', 'ollama')] ?? AgentBackend.ollama;
-  set agentBackend(AgentBackend v) => _set('agentBackend', v.name);
-
-  /// Ollama and Letta base URLs; empty means `http://<host>:11434/` and
-  /// `http://<host>:8283/`. Set them to reach the services through a proxy.
-  String get ollamaBase => _str('ollamaBase', '');
-  set ollamaBase(String v) => _set('ollamaBase', v.trim());
-  Uri get ollamaUri => ollamaBase.isNotEmpty ? baseUri(ollamaBase) : url(11434, '/');
-
-  String get lettaBase => _str('lettaBase', '');
-  set lettaBase(String v) => _set('lettaBase', v.trim());
-  Uri get lettaUri => lettaBase.isNotEmpty ? baseUri(lettaBase) : url(8283, '/');
-
-  String get ollamaModel => _str('ollamaModel', '');
-  set ollamaModel(String v) => _set('ollamaModel', v.trim());
-
-  String get lettaAgentId => _str('lettaAgentId', '');
-  set lettaAgentId(String v) => _set('lettaAgentId', v.trim());
-
-  String get lettaToken => _str('lettaToken', '');
-  set lettaToken(String v) => _set('lettaToken', v.trim());
-
   // Grafana
 
   /// Grafana's base URL; empty means `http://<host>:3000/`. Behind the
@@ -276,17 +324,30 @@ class AppSettings extends ChangeNotifier {
 
   /// The deployment's cameras, in display order.
   ///
-  /// Until cameras are first saved, a single `videoUrl` (stored, or a brand
-  /// default) appears as one camera named "Camera".
-  List<Camera> get cameras => switch (deployment.values['cameras']) {
-    List list => [for (final c in list) Camera.fromJson((c as Map).cast())],
-    _ => [if (_str('videoUrl', '') case final url when url.isNotEmpty) Camera(id: 'camera', name: 'Camera', url: url)],
+  /// Once cameras are saved, that list. Before then, a `videoUrl` the user
+  /// stored (in versions before camera lists) appears as one camera named
+  /// "Camera"; without one, the connected project's cameras
+  /// (`dashboard.cameras` in its `.p4n4.json`, on this deployment's host)
+  /// apply, and without those a default `videoUrl` (the project's or the
+  /// brand's). A project's cameras never hide one the user set up: saving the
+  /// list would then drop it for good.
+  List<Camera> get cameras => switch ((deployment.values['cameras'], _raw('videoUrl', null))) {
+    (List list, _) => [for (final c in list) Camera.fromJson((c as Map).cast())],
+    (_, String url) when url.isNotEmpty => [_singleCamera(url)],
+    _ when _project?.cameras.isNotEmpty ?? false => [for (final c in _project!.cameras) c.on(host)],
+    _ => [if (_default<String>('videoUrl') case final url? when url.isNotEmpty) _singleCamera(url)],
   };
+
+  static Camera _singleCamera(String url) => Camera(id: 'camera', name: 'Camera', url: url);
 
   set cameras(List<Camera> v) {
     deployment.values.remove('videoUrl'); // superseded by the list
     _set('cameras', [for (final c in v) c.toJson()]);
   }
+
+  /// Show [demoCameras] in place of [cameras] (which stay as they are).
+  bool get videoDemo => _bool('videoDemo', false);
+  set videoDemo(bool v) => _set('videoDemo', v);
 
   /// A camera id not used by any of [cameras].
   String newCameraId() => _newId(cameras.map((c) => c.id));
@@ -322,26 +383,100 @@ class AppSettings extends ChangeNotifier {
     return null;
   }
 
-  /// Brand tabs an admin lets power users and normies see (normies get Home
-  /// first). Admins always see every tab.
+  // Views: each view's tabs and their order, kept by the deployment's p4n4-api
+
+  /// The connected deployment's views (see [ViewsWatcher]); null until
+  /// p4n4-api has answered, or without the API. Its fields win over anything
+  /// kept on this device and over the brand's defaults.
+  DashboardViews? get views => _views;
+  DashboardViews? _views;
+  set views(DashboardViews? v) {
+    if (v == null && _views == null) return;
+    _views = v;
+    notifyListeners();
+  }
+
+  static const _localViewKeys = ['tabOrder', 'powerTabs', 'normieTabs'];
+
+  /// Views an admin set on this device before they moved to p4n4-api, if any;
+  /// [loadViews] hands them to the API once.
+  DashboardViews? get localViews {
+    List<String>? names(String key) => _prefs.getString(key)?.split(',').where((n) => n.isNotEmpty).toList();
+    if (!_localViewKeys.any(_prefs.containsKey)) return null;
+    return DashboardViews(tabOrder: names('tabOrder'), powerTabs: names('powerTabs'), normieTabs: names('normieTabs'));
+  }
+
+  Future<void> forgetLocalViews() async {
+    for (final key in _localViewKeys) {
+      await _prefs.remove(key);
+    }
+  }
+
+  /// Tab names for one view field: the API's, else this device's (from before
+  /// the API kept them), else the brand's default, else [fallback].
+  List<String> _viewNames(List<String>? fromApi, String key, String fallback) =>
+      fromApi ?? _str(key, fallback).split(',');
+
+  /// The order of the brand tabs, after Home, in every view. Set by an admin
+  /// (or a brand's `tabOrder` default); tabs it leaves out follow in their
+  /// default order.
+  List<DashTab> get tabOrder {
+    final byName = DashTab.values.asNameMap();
+    final saved = {for (final n in _viewNames(_views?.tabOrder, 'tabOrder', '')) ?byName[n]};
+    return [...saved, ...DashTab.values.where((t) => !saved.contains(t))];
+  }
+
+  /// Saves the order for every device (admins only; the API checks).
+  Future<void> setTabOrder(List<DashTab> tabs) =>
+      _saveViews((v) => DashboardViews(tabOrder: _names(tabs), powerTabs: v.powerTabs, normieTabs: v.normieTabs));
+
+  /// Back to the brand's order, or the default one, on every device.
+  Future<void> resetTabOrder() => _saveViews((v) => DashboardViews(powerTabs: v.powerTabs, normieTabs: v.normieTabs));
+
+  /// Brand tabs an admin lets power users and normies see, in [tabOrder].
+  /// Admins always see every tab.
   List<DashTab> tabsFor(Role view) {
     final names = switch (view) {
       Role.admin => [for (final t in DashTab.values) t.name],
-      Role.power => _str('powerTabs', DashTab.values.map((t) => t.name).join(',')).split(','),
-      // `clientTabs` is the setting (and brand default) from before there were three views.
-      Role.normie => _str('normieTabs', _str('clientTabs', 'agent,grafana,video')).split(','),
+      Role.power => _viewNames(_views?.powerTabs, 'powerTabs', DashTab.values.map((t) => t.name).join(',')),
+      // `clientTabs` is the brand default from before there were three views.
+      Role.normie => _views?.normieTabs ?? _str('normieTabs', _str('clientTabs', 'agent,grafana,video')).split(','),
     };
     return [
-      for (final t in DashTab.values)
+      for (final t in tabOrder)
         if (names.contains(t.name)) t,
     ];
   }
 
+  /// Saves [view]'s tabs for every device (admins only; the API checks).
   Future<void> setTabsFor(Role view, List<DashTab> tabs) => switch (view) {
     Role.admin => throw ArgumentError('Admins always see every tab'),
-    Role.power => _set('powerTabs', tabs.map((t) => t.name).join(',')),
-    Role.normie => _set('normieTabs', tabs.map((t) => t.name).join(',')),
+    Role.power => _saveViews(
+      (v) => DashboardViews(tabOrder: v.tabOrder, powerTabs: _names(tabs), normieTabs: v.normieTabs),
+    ),
+    Role.normie => _saveViews(
+      (v) => DashboardViews(tabOrder: v.tabOrder, powerTabs: v.powerTabs, normieTabs: _names(tabs)),
+    ),
   };
+
+  static List<String> _names(List<DashTab> tabs) => [for (final t in tabs) t.name];
+
+  /// Shows [change] at once and saves it to the connected deployment's
+  /// p4n4-api; if that fails, puts the views back and rethrows. Unsaved local
+  /// views are kept as the starting point, so none of them are lost.
+  Future<void> _saveViews(DashboardViews Function(DashboardViews current) change) async {
+    final before = _views;
+    final next = change(before ?? localViews ?? const DashboardViews());
+    views = next;
+    try {
+      await saveViews(apiUri, next);
+    } catch (_) {
+      _views = before;
+      notifyListeners();
+      rethrow;
+    }
+    await forgetLocalViews();
+  }
 
   // Deployments
 
@@ -465,6 +600,14 @@ class AppSettings extends ChangeNotifier {
     }
   }
 }
+
+/// How temperatures are shown. [auto] follows the device's region: °F in the
+/// few countries that use it, °C everywhere else.
+enum TemperatureUnit { auto, celsius, fahrenheit }
+
+/// How times of day are shown. [auto] follows the device's 24-hour setting
+/// where it has one, else the language's custom (2:05 PM in English, 14:05 in Spanish).
+enum TimeFormat { auto, h12, h24 }
 
 /// Exposes [AppSettings] to the widget tree and rebuilds dependents on change.
 class SettingsScope extends InheritedNotifier<AppSettings> {

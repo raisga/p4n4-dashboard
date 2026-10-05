@@ -8,6 +8,7 @@ import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 
 /// Sign-in for the connected deployment.
@@ -29,6 +30,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   Uri? _api;
   Future<auth.AuthMode>? _mode;
@@ -76,6 +78,7 @@ class _LoginPageState extends State<LoginPage> {
     if (_busy || _user.text.trim().isEmpty || _password.text.isEmpty) return;
     final session = SessionScope.of(context);
     final platform = BrandScope.of(context).platform;
+    final l = this.l;
     setState(() {
       _busy = true;
       _error = null;
@@ -83,9 +86,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await session.signInWithPassword(_user.text, _password.text);
     } on auth.AuthException catch (e) {
-      _error = e.message;
+      _error = switch (e.statusCode) {
+        401 => l.signInWrongCredentials,
+        429 => l.signInRateLimited,
+        _ => e.message,
+      };
     } catch (_) {
-      _error = 'Can\'t reach $platform-api. Check the server and try again.';
+      _error = l.signInApiFailed(platform);
     }
     if (mounted) {
       setState(() => _busy = false);
@@ -110,15 +117,14 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: DefaultTextStyle(
-                      style: p4.mono(size: 30, color: p4.accent, weight: FontWeight.w700, spacing: -0.05),
-                      child: const Wordmark(size: 30),
-                    ),
-                  ),
+                  const Center(child: Wordmark(size: 30)),
                   if (brand.tagline.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(brand.tagline, textAlign: TextAlign.center, style: p4.mono()),
+                    Text(
+                      brand.tagline,
+                      textAlign: TextAlign.center,
+                      style: p4.body(color: p4.muted),
+                    ),
                   ],
                   const SizedBox(height: 40),
                   FutureBuilder<auth.AuthMode>(
@@ -126,10 +132,7 @@ class _LoginPageState extends State<LoginPage> {
                     builder: (context, snap) => switch (snap.data) {
                       _ when snap.connectionState != ConnectionState.done => _checking(),
                       auth.AuthMode.required => _form(),
-                      auth.AuthMode.off => _picker(
-                        'Choose how to continue',
-                        '${brand.platform}-api runs without sign-in (P4N4_API_AUTH=off), so anyone can pick a role.',
-                      ),
+                      auth.AuthMode.off => _picker(l.signInChooseTitle, l.signInAuthOffNote(brand.platform)),
                       _ => _unreachable(),
                     },
                   ),
@@ -149,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
       const SizedBox(height: 24),
       CircularProgressIndicator(color: p4.accent),
       const SizedBox(height: 16),
-      Text('Connecting…', style: p4.mono()),
+      Text(l.signInConnecting, style: p4.body(color: p4.muted)),
     ],
   );
 
@@ -157,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(tag: 'sign in', title: const Text('Welcome back')),
+        SectionHeader(tag: l.signInTag, title: Text(l.signInWelcome)),
         const SizedBox(height: 16),
         TextField(
           controller: _user,
@@ -165,7 +168,7 @@ class _LoginPageState extends State<LoginPage> {
           autofocus: true,
           autofillHints: const [AutofillHints.username],
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(labelText: 'Username'),
+          decoration: InputDecoration(labelText: l.fieldUsername),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -176,13 +179,13 @@ class _LoginPageState extends State<LoginPage> {
           autofillHints: const [AutofillHints.password],
           textInputAction: TextInputAction.go,
           onSubmitted: (_) => _signIn(),
-          decoration: const InputDecoration(labelText: 'Password'),
+          decoration: InputDecoration(labelText: l.fieldPassword),
         ),
         if (_error != null) ...[
           const SizedBox(height: 12),
           Text(
             _error!,
-            style: p4.display(size: 13, color: p4.err, weight: FontWeight.w500, spacing: 0),
+            style: p4.body(size: 14, color: p4.err, weight: FontWeight.w500),
           ),
         ],
         const SizedBox(height: 20),
@@ -190,7 +193,7 @@ class _LoginPageState extends State<LoginPage> {
           onPressed: _busy ? null : _signIn,
           child: _busy
               ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.onAccent))
-              : const Text('SIGN IN'),
+              : Text(l.signInButton),
         ),
         if (widget.offerDevUsers) ...[const SizedBox(height: 24), _devUsers()],
       ],
@@ -200,25 +203,18 @@ class _LoginPageState extends State<LoginPage> {
   Widget _unreachable() {
     final brand = BrandScope.of(context);
     if (_offline) {
-      return _picker(
-        'Continue without signing in',
-        'Without ${brand.platform}-api, service status comes from port checks and the role is your choice.',
-      );
+      return _picker(l.signInOfflineTitle, l.signInOfflineNote(brand.platform));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(tag: 'sign in', title: Text('Can\'t reach ${brand.platform}-api')),
+        SectionHeader(tag: l.signInTag, title: Text(l.signInUnreachableTitle(brand.platform))),
         const SizedBox(height: 12),
-        Text(
-          'Signing in needs ${brand.platform}-api at ${_api ?? ''}. Check that it\'s running and reachable '
-          'from this device, or change the server below.',
-          style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-        ),
+        Text(l.signInUnreachableBody(brand.platform, '${_api ?? ''}'), style: p4.body(color: p4.muted)),
         const SizedBox(height: 20),
-        FilledButton(onPressed: () => setState(() => _check(_api!)), child: const Text('RETRY')),
+        FilledButton(onPressed: () => setState(() => _check(_api!)), child: Text(l.retry)),
         const SizedBox(height: 8),
-        TextButton(onPressed: () => setState(() => _offline = true), child: const Text('CONTINUE WITHOUT SIGNING IN')),
+        TextButton(onPressed: () => setState(() => _offline = true), child: Text(l.signInOfflineButton)),
       ],
     );
   }
@@ -228,7 +224,11 @@ class _LoginPageState extends State<LoginPage> {
   Widget _devUsers() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Text('DEV ACCOUNTS', textAlign: TextAlign.center, style: p4.mono(size: 10)),
+      Text(
+        l.signInDevAccounts,
+        textAlign: TextAlign.center,
+        style: p4.body(size: 12, color: p4.muted),
+      ),
       const SizedBox(height: 8),
       Row(
         children: [
@@ -237,7 +237,7 @@ class _LoginPageState extends State<LoginPage> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _busy ? null : () => _signInAs(user, devPassword),
-                child: Text(view.name.toUpperCase()),
+                child: Text(l.roleName(view), overflow: TextOverflow.ellipsis),
               ),
             ),
           ],
@@ -245,9 +245,9 @@ class _LoginPageState extends State<LoginPage> {
       ),
       const SizedBox(height: 6),
       Text(
-        'Needs ${BrandScope.of(context).platform}-api with P4N4_API_DEV_USERS=true',
+        l.signInDevAccountsNote(BrandScope.of(context).platform),
         textAlign: TextAlign.center,
-        style: p4.mono(size: 10, spacing: 0),
+        style: p4.body(size: 12, color: p4.muted),
       ),
     ],
   );
@@ -257,30 +257,34 @@ class _LoginPageState extends State<LoginPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(tag: 'sign in', title: Text(title)),
+        SectionHeader(tag: l.signInTag, title: Text(title)),
         const SizedBox(height: 16),
         _RoleCard(
           icon: Icons.admin_panel_settings_outlined,
-          title: 'Administrator',
-          desc: 'Every service, client deployments, stack controls, users and diagnostics.',
+          title: l.roleAdminTitle,
+          desc: l.roleAdminDesc,
           onTap: () => session.signInLocal(Role.admin),
         ),
         const SizedBox(height: 12),
         _RoleCard(
           icon: Icons.engineering_outlined,
-          title: 'Power user',
-          desc: 'Every service and connection setting, without managing deployments or users.',
+          title: l.rolePowerTitle,
+          desc: l.rolePowerDesc,
           onTap: () => session.signInLocal(Role.power),
         ),
         const SizedBox(height: 12),
         _RoleCard(
           icon: Icons.person_outline,
-          title: 'Normie',
-          desc: 'System health at a glance, dashboards, camera and assistant.',
+          title: l.roleNormieTitle,
+          desc: l.roleNormieDesc,
           onTap: () => session.signInLocal(Role.normie),
         ),
         const SizedBox(height: 16),
-        Text(note, textAlign: TextAlign.center, style: p4.mono(size: 10, spacing: 0)),
+        Text(
+          note,
+          textAlign: TextAlign.center,
+          style: p4.body(size: 12, color: p4.muted),
+        ),
       ],
     );
   }
@@ -294,9 +298,10 @@ class _LoginPageState extends State<LoginPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Flexible(
-            child: Text('server · ${s.apiUri}', overflow: TextOverflow.ellipsis, style: p4.mono(size: 10)),
+            child: Text(l.signInServer('${s.apiUri}'), overflow: TextOverflow.ellipsis, style: p4.mono(size: 11)),
           ),
-          if (!kIsWeb) TextButton(onPressed: () => setState(() => _editServer = true), child: const Text('CHANGE')),
+          if (!kIsWeb)
+            TextButton(onPressed: () => setState(() => _editServer = true), child: Text(l.signInChangeServer)),
         ],
       );
     }
@@ -334,25 +339,21 @@ class _ServerFormState extends State<_ServerForm> {
 
   @override
   Widget build(BuildContext context) {
-    final p4 = context.p4;
+    final l = context.l10n;
     final platform = BrandScope.of(context).platform;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
           controller: _host,
-          decoration: InputDecoration(
-            labelText: 'Host',
-            helperText: 'Machine running the $platform stacks. From the Android emulator use 10.0.2.2.',
-            helperStyle: p4.mono(size: 10, spacing: 0),
-          ),
+          decoration: InputDecoration(labelText: l.fieldHost, helperText: l.hostHelp(platform)),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _api,
           onSubmitted: (_) => _save(),
           decoration: InputDecoration(
-            labelText: '$platform-api base URL (optional)',
+            labelText: l.apiBaseUrlOptional(platform),
             hintText: widget.settings.url(8000, '/').toString(),
           ),
         ),
@@ -360,9 +361,9 @@ class _ServerFormState extends State<_ServerForm> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(onPressed: widget.onDone, child: const Text('CANCEL')),
+            TextButton(onPressed: widget.onDone, child: Text(l.cancel)),
             const SizedBox(width: 8),
-            FilledButton(onPressed: _save, child: const Text('SAVE')),
+            FilledButton(onPressed: _save, child: Text(l.save)),
           ],
         ),
       ],
@@ -381,9 +382,8 @@ class _RoleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
-    return Material(
-      color: p4.bg2,
-      shape: Border.all(color: p4.border),
+    return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         hoverColor: p4.bg3,
@@ -399,10 +399,7 @@ class _RoleCard extends StatelessWidget {
                   children: [
                     Text(title, style: p4.display()),
                     const SizedBox(height: 4),
-                    Text(
-                      desc,
-                      style: p4.display(size: 13, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-                    ),
+                    Text(desc, style: p4.body(size: 13, color: p4.muted)),
                   ],
                 ),
               ),

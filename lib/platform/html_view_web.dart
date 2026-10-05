@@ -72,3 +72,67 @@ class _HtmlImageState extends State<HtmlImage> {
     },
   );
 }
+
+/// [uri] in a muted, looping `<video>` scaled to fit (an MP4 or WebM file, or
+/// HLS where the browser plays it). Like an `<img>`, it needs no CORS headers.
+/// [playing] pauses and resumes it in place; give it a new key to reload.
+class HtmlVideo extends StatefulWidget {
+  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError});
+
+  final Uri uri;
+  final bool playing;
+
+  /// Each time playback starts or resumes.
+  final VoidCallback? onPlaying;
+  final VoidCallback? onError;
+
+  @override
+  State<HtmlVideo> createState() => _HtmlVideoState();
+}
+
+class _HtmlVideoState extends State<HtmlVideo> {
+  web.HTMLVideoElement? _video;
+
+  void _play(web.HTMLVideoElement video) {
+    // play() rejects when a pause() interrupts it; nothing to report.
+    widget.playing ? video.play().toDart.ignore() : video.pause();
+  }
+
+  @override
+  void didUpdateWidget(HtmlVideo old) {
+    super.didUpdateWidget(old);
+    final video = _video;
+    if (video == null) return;
+    if (old.uri != widget.uri) video.src = widget.uri.toString();
+    if (old.uri != widget.uri || old.playing != widget.playing) _play(video);
+  }
+
+  @override
+  void dispose() {
+    // Stop downloading: removing the element alone can leave it buffering.
+    _video
+      ?..pause()
+      ..removeAttribute('src')
+      ..load();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => HtmlElementView.fromTagName(
+    tagName: 'video',
+    onElementCreated: (element) {
+      final video = _video = element as web.HTMLVideoElement;
+      video
+        ..muted = true
+        ..loop = true
+        ..playsInline = true
+        ..autoplay = widget.playing
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.objectFit = 'contain'
+        ..onplaying = ((web.Event _) => widget.onPlaying?.call()).toJS
+        ..onerror = ((web.Event _) => widget.onError?.call()).toJS
+        ..src = widget.uri.toString();
+    },
+  );
+}

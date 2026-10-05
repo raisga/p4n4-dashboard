@@ -1,13 +1,15 @@
 # Rendered at container start: ${VARS} below are the image's env vars
-# (P4N4_API_UPSTREAM, OLLAMA_UPSTREAM, LETTA_UPSTREAM, GRAFANA_UPSTREAM,
-# DASHBOARD_*). nginx's own $variables are left alone because no env var has
+# (P4N4_API_UPSTREAM, GRAFANA_UPSTREAM, DASHBOARD_*).
+#
+# Ollama and Letta aren't proxied: the assistant goes through p4n4-api, which
+# requires sign-in and decides who may use which model. nginx's own $variables are left alone because no env var has
 # their names.
 
 # What upstreams get as Authorization. Basic auth credentials
 # (19-basic-auth.envsh) are for this proxy only and are dropped. With basic
 # auth on, the browser's credentials occupy Authorization, so the app sends a
-# service's own token (Letta, p4n4-api) in X-Upstream-Authorization instead,
-# and it's moved back here (lib/api/agent_client.dart).
+# service's own token (p4n4-api) in X-Upstream-Authorization instead, and it's
+# moved back here (lib/api/auth.dart).
 map $http_authorization $authorization_without_basic {
     ~*^basic\s  "";
     default     $http_authorization;
@@ -51,7 +53,7 @@ server {
         default_type application/json;
         add_header Cache-Control "no-store" always;
         include /etc/nginx/security_headers.conf;
-        return 200 '{"defaults":{"host":"${DASHBOARD_HOST}","apiBase":"${DASHBOARD_API_BASE}","ollamaBase":"${DASHBOARD_OLLAMA_BASE}","lettaBase":"${DASHBOARD_LETTA_BASE}","grafanaBase":"${DASHBOARD_GRAFANA_BASE}"}}';
+        return 200 '{"defaults":{"host":"${DASHBOARD_HOST}","apiBase":"${DASHBOARD_API_BASE}","grafanaBase":"${DASHBOARD_GRAFANA_BASE}"}}';
     }
 
     # p4n4-api keeps its own /api/v1 and /health paths.
@@ -59,30 +61,14 @@ server {
         set $api ${P4N4_API_UPSTREAM};
         proxy_pass $api;
         include /etc/nginx/proxy_common.conf;
-        proxy_read_timeout 30s;
+        # Assistant replies stream as they're generated, and can take minutes on a Pi.
+        proxy_buffering off;
+        proxy_read_timeout 600s;
     }
     location = /health {
         set $api ${P4N4_API_UPSTREAM};
         proxy_pass $api;
         include /etc/nginx/proxy_common.conf;
-    }
-
-    location /ollama/ {
-        set $ollama ${OLLAMA_UPSTREAM};
-        rewrite ^/ollama/(.*)$ /$1 break;
-        proxy_pass $ollama;
-        include /etc/nginx/proxy_common.conf;
-        proxy_buffering off;          # NDJSON chat streaming
-        proxy_read_timeout 600s;      # long generations on a Pi
-    }
-
-    location /letta/ {
-        set $letta ${LETTA_UPSTREAM};
-        rewrite ^/letta/(.*)$ /$1 break;
-        proxy_pass $letta;
-        include /etc/nginx/proxy_common.conf;
-        proxy_buffering off;
-        proxy_read_timeout 300s;
     }
 
     # Optional: Grafana on this origin (GRAFANA_UPSTREAM set), so the Grafana

@@ -6,8 +6,9 @@ import 'package:flutter/widgets.dart';
 
 import 'theme.dart';
 
-/// Tabs a brand can enable, in display order.
-enum DashTab { services, edge, agent, grafana, video }
+/// Tabs a brand can enable, in their default display order (after Home).
+/// Admins reorder them in Settings; see [AppSettings.tabOrder].
+enum DashTab { agent, grafana, video, edge, services }
 
 class BrandLink {
   const BrandLink(this.label, this.url);

@@ -30,11 +30,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   flutter_secure_storage: ^11.2.0
   http: ^1.6.0
+  intl: any
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
+  video_player: ^2.14.1
   web: ^1.1.1
   webview_flutter: ^4.14.1
 
@@ -60,6 +64,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Generates AppLocalizations from lib/l10n/*.arb (see l10n.yaml).
+  generate: true
 
   # The active white-label brand. Populated by `dart run tool/brand.dart <id>`
   # from brands/<id>/; only this one brand ships in a build.

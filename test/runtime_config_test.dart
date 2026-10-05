@@ -12,13 +12,8 @@ final _page = Uri.parse('http://pi.lan:8088/');
 void main() {
   group('runtimeDefaults', () {
     test('an empty host becomes the page host; paths resolve against the page', () {
-      final d = runtimeDefaults({'host': '', 'apiBase': '/', 'ollamaBase': '/ollama/', 'lettaBase': 'letta/'}, _page);
-      expect(d, {
-        'host': 'pi.lan',
-        'apiBase': 'http://pi.lan:8088/',
-        'ollamaBase': 'http://pi.lan:8088/ollama/',
-        'lettaBase': 'http://pi.lan:8088/letta/',
-      });
+      final d = runtimeDefaults({'host': '', 'apiBase': '/', 'grafanaBase': 'grafana/'}, _page);
+      expect(d, {'host': 'pi.lan', 'apiBase': 'http://pi.lan:8088/', 'grafanaBase': 'http://pi.lan:8088/grafana/'});
     });
 
     test('explicit values and absolute URLs are kept; other types are dropped', () {
@@ -32,8 +27,8 @@ void main() {
     });
 
     test('a page under a subpath resolves paths under it', () {
-      final d = runtimeDefaults({'ollamaBase': 'ollama/'}, Uri.parse('https://edge.lan/dashboard/'));
-      expect(d['ollamaBase'], 'https://edge.lan/dashboard/ollama/');
+      final d = runtimeDefaults({'grafanaBase': 'grafana/'}, Uri.parse('https://edge.lan/dashboard/'));
+      expect(d['grafanaBase'], 'https://edge.lan/dashboard/grafana/');
     });
   });
 
@@ -67,27 +62,26 @@ void main() {
 
     test('brand < runtime config < saved values', () async {
       final brand = {'host': 'localhost', 'edgeDemo': true};
-      final runtime = runtimeDefaults({'host': '', 'ollamaBase': '/ollama/'}, _page);
+      final runtime = runtimeDefaults({'host': '', 'grafanaBase': '/grafana/'}, _page);
       final s = await load({...brand, ...runtime});
       expect(s.host, 'pi.lan');
       expect(s.edgeDemo, isTrue);
-      expect(s.ollamaUri, Uri.parse('http://pi.lan:8088/ollama/'));
+      expect(s.grafanaUri, Uri.parse('http://pi.lan:8088/grafana/?kiosk=1'));
 
       s.host = '10.0.0.9';
       expect(s.host, '10.0.0.9');
     });
 
     test('base URLs end in a slash, so relative paths keep a proxy prefix', () async {
-      expect(AppSettings.baseUri('http://pi.lan/ollama'), Uri.parse('http://pi.lan/ollama/'));
+      expect(AppSettings.baseUri('http://pi.lan/p4n4'), Uri.parse('http://pi.lan/p4n4/'));
       expect(AppSettings.baseUri('http://pi.lan:8000'), Uri.parse('http://pi.lan:8000/'));
       expect(
-        AppSettings.baseUri('http://pi.lan/ollama/').resolve('api/tags'),
-        Uri.parse('http://pi.lan/ollama/api/tags'),
+        AppSettings.baseUri('http://pi.lan/p4n4/').resolve('api/v1/agents/models'),
+        Uri.parse('http://pi.lan/p4n4/api/v1/agents/models'),
       );
 
       final s = await load({'host': 'pi.lan'});
-      expect(s.ollamaUri, Uri.parse('http://pi.lan:11434/'));
-      expect(s.lettaUri, Uri.parse('http://pi.lan:8283/'));
+      expect(s.apiUri, Uri.parse('http://pi.lan:8000/'));
       s.apiBase = 'http://pi.lan/p4n4';
       expect(s.edgeMetricsUri, Uri.parse('http://pi.lan/p4n4/api/v1/edge/metrics'));
     });
@@ -105,12 +99,12 @@ void main() {
     test('resetting the connection brings the defaults back, and keeps cameras', () async {
       final s = await load({'host': 'pi.lan'});
       s.host = '10.0.0.9';
-      s.ollamaBase = 'http://other/';
+      s.apiBase = 'http://other/';
       s.grafanaPath = '/d/x';
       s.edgeDemo = true;
       await s.resetConnection();
       expect(s.host, 'pi.lan');
-      expect(s.ollamaBase, '');
+      expect(s.apiBase, '');
       expect(s.grafanaPath, '/');
       expect(s.edgeDemo, isTrue, reason: 'not a connection setting');
     });

@@ -97,13 +97,13 @@ void main() {
     expect(brand.logo, isNull);
   });
 
-  test('tabs keep canonical order', () {
+  test('tabs keep the default order', () {
     final brand = Brand.fromJson(
       _minimal({
         'tabs': ['video', 'services'],
       }),
     );
-    expect(brand.tabs, [DashTab.services, DashTab.video]);
+    expect(brand.tabs, [DashTab.video, DashTab.services]);
   });
 
   test('invalid brand config is rejected', () {

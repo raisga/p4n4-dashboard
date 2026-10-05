@@ -21,3 +21,16 @@ class HtmlImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => throw UnsupportedError('HtmlImage is web-only');
 }
+
+/// Web only; see `html_view_web.dart`.
+class HtmlVideo extends StatelessWidget {
+  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError});
+
+  final Uri uri;
+  final bool playing;
+  final VoidCallback? onPlaying;
+  final VoidCallback? onError;
+
+  @override
+  Widget build(BuildContext context) => throw UnsupportedError('HtmlVideo is web-only');
+}

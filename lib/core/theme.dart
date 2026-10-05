@@ -142,6 +142,15 @@ class P4Colors extends ThemeExtension<P4Colors> {
 
   bool get isDark => brightness == Brightness.dark;
 
+  /// This palette with secondary text close to body text and borders that
+  /// stand out, for Settings → Accessibility → High contrast (or the device's
+  /// own setting). Only ever raises contrast, so a valid brand stays valid.
+  P4Colors get contrasted => withBrand({
+    'muted': Color.lerp(muted, text, 0.6)!,
+    'border': Color.lerp(border2, text, 0.3)!,
+    'border2': Color.lerp(border2, text, 0.5)!,
+  });
+
   TextStyle mono({double size = 11, Color? color, FontWeight weight = FontWeight.w400, double spacing = 0.08}) =>
       TextStyle(
         fontFamily: monoFamily,
@@ -160,6 +169,10 @@ class P4Colors extends ThemeExtension<P4Colors> {
         letterSpacing: spacing,
       );
 
+  /// Running text: sentences people read, in the display face at a regular weight.
+  TextStyle body({double size = 14, Color? color, FontWeight weight = FontWeight.w400}) =>
+      TextStyle(fontFamily: displayFamily, fontSize: size, color: color ?? text, fontWeight: weight, height: 1.45);
+
   @override
   P4Colors copyWith() => this;
 
@@ -173,7 +186,21 @@ extension P4Context on BuildContext {
   P4Colors get p4 => Theme.of(this).extension<P4Colors>()!;
 }
 
-ThemeData buildTheme(P4Colors c) {
+/// Corner radii shared by every surface, so cards, fields and buttons line up.
+abstract final class Radii {
+  /// Cards, panels, dialogs.
+  static const card = 12.0;
+
+  /// Buttons, fields, chips, menus.
+  static const control = 8.0;
+
+  static final cardShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(card));
+  static final controlShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(control));
+}
+
+/// [reduceMotion] drops page transitions and ink ripples (Settings →
+/// Accessibility → Reduce motion, or the device's own setting).
+ThemeData buildTheme(P4Colors c, {bool reduceMotion = false}) {
   final base = ThemeData(
     useMaterial3: true,
     brightness: c.brightness,
@@ -192,12 +219,19 @@ ThemeData buildTheme(P4Colors c) {
     ),
     scaffoldBackgroundColor: c.bg,
     dividerColor: c.border,
+    pageTransitionsTheme: reduceMotion
+        ? PageTransitionsTheme(builders: {for (final p in TargetPlatform.values) p: const _NoTransition()})
+        : null,
+    splashFactory: reduceMotion ? NoSplash.splashFactory : null,
   );
-  const square = RoundedRectangleBorder(borderRadius: BorderRadius.zero);
+  final control = Radii.controlShape;
   final inputBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.zero,
+    borderRadius: BorderRadius.circular(Radii.control),
     borderSide: BorderSide(color: c.border2),
   );
+  // Labels people read are in the display face, sentence case; the mono face
+  // is kept for values such as URLs, hosts and numbers.
+  final label = c.display(size: 14, color: null, weight: FontWeight.w600, spacing: 0);
   return base.copyWith(
     extensions: [c],
     textTheme: base.textTheme.apply(fontFamily: P4Colors.displayFamily, bodyColor: c.text, displayColor: c.heading),
@@ -208,65 +242,142 @@ ThemeData buildTheme(P4Colors c) {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Border(bottom: BorderSide(color: c.border)),
-      titleTextStyle: c.mono(size: 18, color: c.accent, weight: FontWeight.w700, spacing: -0.05),
+      titleTextStyle: c.display(size: 18, weight: FontWeight.w700),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: c.bg2,
       indicatorColor: c.accent.withValues(alpha: 0.15),
-      indicatorShape: square,
-      labelTextStyle: WidgetStatePropertyAll(c.mono(size: 10)),
+      indicatorShape: control,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => c.display(
+          size: 12,
+          color: s.contains(WidgetState.selected) ? c.heading : c.muted,
+          weight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+          spacing: 0,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.accent : c.muted),
+      ),
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: c.bg2,
       indicatorColor: c.accent.withValues(alpha: 0.15),
-      indicatorShape: square,
-      selectedLabelTextStyle: c.mono(size: 10, color: c.accent),
-      unselectedLabelTextStyle: c.mono(size: 10),
+      indicatorShape: control,
+      selectedLabelTextStyle: c.display(size: 12, color: c.heading, weight: FontWeight.w700, spacing: 0),
+      unselectedLabelTextStyle: c.display(size: 12, color: c.muted, weight: FontWeight.w500, spacing: 0),
       selectedIconTheme: IconThemeData(color: c.accent),
       unselectedIconTheme: IconThemeData(color: c.muted),
+    ),
+    cardTheme: CardThemeData(
+      color: c.bg2,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: Radii.cardShape.copyWith(side: BorderSide(color: c.border)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: c.bg2,
+      surfaceTintColor: Colors.transparent,
+      shape: Radii.cardShape.copyWith(side: BorderSide(color: c.border2)),
+      titleTextStyle: c.display(size: 18),
+      contentTextStyle: c.display(size: 14, color: c.text, weight: FontWeight.w400, spacing: 0),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: c.accent,
         foregroundColor: c.onAccent,
-        shape: square,
-        textStyle: c.mono(size: 11, weight: FontWeight.w600),
+        shape: control,
+        minimumSize: const Size(64, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        textStyle: label,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: c.text,
         side: BorderSide(color: c.border2),
-        shape: square,
-        textStyle: c.mono(size: 11),
+        shape: control,
+        minimumSize: const Size(64, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        textStyle: label,
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: c.accent, shape: control, textStyle: label),
+    ),
+    iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(shape: control)),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        shape: control,
+        foregroundColor: c.text,
+        selectedBackgroundColor: c.accent,
+        selectedForegroundColor: c.onAccent,
+        textStyle: c.display(size: 13, color: null, weight: FontWeight.w600, spacing: 0),
+        side: BorderSide(color: c.border2),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      shape: control,
+      side: BorderSide(color: c.border2),
+      backgroundColor: c.bg2,
+      selectedColor: c.accent.withValues(alpha: 0.15),
+      labelStyle: c.display(size: 13, color: c.text, weight: FontWeight.w500, spacing: 0),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: c.bg2,
+      surfaceTintColor: Colors.transparent,
+      shape: control.copyWith(side: BorderSide(color: c.border2)),
+      textStyle: c.display(size: 14, color: c.text, weight: FontWeight.w400, spacing: 0),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: c.bg2,
       isDense: true,
-      labelStyle: c.mono(size: 12),
-      hintStyle: c.mono(size: 12, color: c.muted.withValues(alpha: 0.6)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      labelStyle: c.display(size: 14, color: c.muted, weight: FontWeight.w400, spacing: 0),
+      hintStyle: c.mono(size: 12, color: c.muted.withValues(alpha: 0.7), spacing: 0),
+      helperStyle: c.display(size: 12, color: c.muted, weight: FontWeight.w400, spacing: 0),
+      helperMaxLines: 3,
       border: inputBorder,
       enabledBorder: inputBorder,
-      focusedBorder: inputBorder.copyWith(borderSide: BorderSide(color: c.accent)),
+      focusedBorder: inputBorder.copyWith(borderSide: BorderSide(color: c.accent, width: 1.5)),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.onAccent : c.muted),
       trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.accent : c.bg3),
       trackOutlineColor: WidgetStatePropertyAll(c.border2),
     ),
+    listTileTheme: ListTileThemeData(
+      titleTextStyle: c.display(size: 14, color: c.text, weight: FontWeight.w500, spacing: 0),
+      subtitleTextStyle: c.display(size: 13, color: c.muted, weight: FontWeight.w400, spacing: 0),
+    ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: c.bg3,
-      contentTextStyle: c.mono(size: 12, color: c.text),
-      shape: square,
+      contentTextStyle: c.display(size: 14, color: c.text, weight: FontWeight.w400, spacing: 0),
+      shape: control.copyWith(side: BorderSide(color: c.border2)),
+      behavior: SnackBarBehavior.floating,
     ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
         color: c.bg3,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: c.border2),
       ),
-      textStyle: c.mono(size: 11, color: c.text),
+      textStyle: c.display(size: 12, color: c.text, weight: FontWeight.w500, spacing: 0),
     ),
   );
+}
+
+/// Pages that appear at once, for reduced motion.
+class _NoTransition extends PageTransitionsBuilder {
+  const _NoTransition();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
 }

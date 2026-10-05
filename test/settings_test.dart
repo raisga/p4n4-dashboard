@@ -104,89 +104,146 @@ void main() {
       expect(Camera.parseUrl('rtsp://cam/stream'), isNull);
       expect(Camera.parseUrl('cam.lan'), isNull);
     });
-  });
 
-  group('Letta token', () {
-    test('is kept in secure storage, per deployment, and survives a restart', () async {
-      final store = MemorySecretStore();
-      final s = await _load({}, secrets: store);
-      s.lettaToken = 'pw-default';
-      await pumpEventQueue();
-      final site = Deployment(id: 'site', name: 'Site', values: {'host': 'site'});
-      await s.saveDeployment(site);
-      await s.connect(site.id);
-      expect(s.lettaToken, isEmpty);
-      s.lettaToken = 'pw-site';
-      await pumpEventQueue();
-
-      expect(store.values, {'deployment.default.lettaToken': 'pw-default', 'deployment.site.lettaToken': 'pw-site'});
-      expect(await _savedPrefs(), isNot(contains('pw-')));
-
-      final again = await AppSettings.load(secrets: store);
-      expect(again.lettaToken, 'pw-site');
-      await again.connect('default');
-      expect(again.lettaToken, 'pw-default');
+    test('video files and playlists play as video; streams and snapshots don\'t', () {
+      for (final url in [
+        'https://cdn/clip.mp4',
+        'http://nvr/rec/Gate.MOV',
+        'http://cam/a.webm',
+        'http://hls/live.m3u8',
+      ]) {
+        expect(
+          Camera(id: 'c', name: 'C', url: url).isVideo,
+          isTrue,
+          reason: url,
+        );
+      }
+      for (final url in ['http://cam/?action=stream', 'http://cam/snapshot.jpg', 'http://cam/mp4', 'not a url.mp4']) {
+        expect(
+          Camera(id: 'c', name: 'C', url: url).isVideo,
+          isFalse,
+          reason: url,
+        );
+      }
+      expect(demoCameras.every((c) => c.isVideo && c.id.startsWith('demo-')), isTrue);
     });
 
-    test('clearing it deletes it; removing a deployment deletes its token', () async {
-      final store = MemorySecretStore({'deployment.default.lettaToken': 'a', 'deployment.x.lettaToken': 'b'});
+    test('demo cameras are a deployment setting that leaves the saved cameras alone', () async {
+      final s = await _load({});
+      s.cameras = [const Camera(id: 'c', name: 'Gate', url: 'http://cam/stream')];
+      s.videoDemo = true;
+      expect(s.deployment.values['videoDemo'], isTrue);
+      expect(s.cameras.single.name, 'Gate');
+    });
+  });
+
+  group('credentials', () {
+    Deployment d(AppSettings s, String id) => s.deployments.firstWhere((d) => d.id == id);
+
+    test('are kept in secure storage, per deployment, and survive a restart', () async {
+      final store = MemorySecretStore();
+      final s = await _load({}, secrets: store);
+      await s.setApiRefreshToken(s.deployment, 'rt-default');
+      final site = Deployment(id: 'site', name: 'Site', values: {'host': 'site'});
+      await s.saveDeployment(site);
+      expect(s.apiRefreshTokenOf(site), isEmpty);
+      await s.setApiRefreshToken(site, 'rt-site');
+
+      expect(store.values, {
+        'deployment.default.apiRefreshToken': 'rt-default',
+        'deployment.site.apiRefreshToken': 'rt-site',
+      });
+      expect(await _savedPrefs(), isNot(contains('rt-')));
+
+      final again = await AppSettings.load(secrets: store);
+      expect(again.apiRefreshTokenOf(d(again, 'site')), 'rt-site');
+      expect(again.apiRefreshTokenOf(d(again, 'default')), 'rt-default');
+    });
+
+    test('clearing one deletes it; removing a deployment deletes its own', () async {
+      final store = MemorySecretStore({'deployment.default.apiRefreshToken': 'a', 'deployment.x.apiRefreshToken': 'b'});
       final s = await _load({
         'deployments': jsonEncode([
           {'id': 'default', 'name': 'Default', 'values': {}},
           {'id': 'x', 'name': 'X', 'values': {}},
         ]),
       }, secrets: store);
-      s.lettaToken = '';
-      await pumpEventQueue();
+      await s.setApiRefreshToken(s.deployment, '');
       await s.removeDeployment('x');
       expect(store.values, isEmpty);
     });
 
-    test('a plain-text token from an older version moves into secure storage', () async {
+    test('a plain-text one from an older version moves into secure storage', () async {
       final store = MemorySecretStore();
       final s = await _load({
         'deployments': jsonEncode([
           {
             'id': 'd0',
             'name': 'Site',
-            'values': {'host': 'site', 'lettaToken': 'old-pw'},
+            'values': {'host': 'site', 'apiRefreshToken': 'old-rt'},
           },
         ]),
       }, secrets: store);
-      expect(s.lettaToken, 'old-pw');
-      expect(store.values, {'deployment.d0.lettaToken': 'old-pw'});
-      expect(await _savedPrefs(), isNot(contains('old-pw')));
+      expect(s.apiRefreshTokenOf(s.deployment), 'old-rt');
+      expect(store.values, {'deployment.d0.apiRefreshToken': 'old-rt'});
+      expect(await _savedPrefs(), isNot(contains('old-rt')));
     });
 
-    test('without secure storage, old tokens still work and new ones stay in memory', () async {
+    test('without secure storage, old ones still work and new ones stay in memory', () async {
       final store = MemorySecretStore({}, true);
       final s = await _load({
         'deployments': jsonEncode([
           {
             'id': 'd0',
             'name': 'Site',
-            'values': {'host': 'site', 'lettaToken': 'old-pw'},
+            'values': {'host': 'site', 'apiRefreshToken': 'old-rt'},
           },
         ]),
       }, secrets: store);
       expect(s.secureStorageAvailable, isFalse);
-      expect(s.lettaToken, 'old-pw');
+      expect(s.apiRefreshTokenOf(s.deployment), 'old-rt');
 
-      s.lettaToken = 'new-pw';
-      await pumpEventQueue();
-      expect(s.lettaToken, 'new-pw');
+      await s.setApiRefreshToken(s.deployment, 'new-rt');
+      expect(s.apiRefreshTokenOf(s.deployment), 'new-rt');
       expect(store.values, isEmpty);
-      expect(await _savedPrefs(), isNot(contains('-pw')));
+      expect(await _savedPrefs(), isNot(contains('new-rt')));
     });
 
-    test('a failed write is reported and the token is kept in memory', () async {
+    test('a failed write is reported and the value is kept in memory', () async {
       final store = MemorySecretStore();
       final s = await _load({}, secrets: store);
       store.fail = true;
-      s.lettaToken = 'pw';
-      await pumpEventQueue();
+      await s.setApiRefreshToken(s.deployment, 'rt');
       expect(s.secureStorageAvailable, isFalse);
-      expect(s.lettaToken, 'pw');
+      expect(s.apiRefreshTokenOf(s.deployment), 'rt');
+    });
+
+    test('the old Letta password and Ollama/Letta settings are forgotten everywhere', () async {
+      // The assistant goes through p4n4-api now, which keeps Letta's password itself.
+      final store = MemorySecretStore({'deployment.d0.lettaToken': 'letta-pw', 'deployment.d0.apiRefreshToken': 'rt'});
+      final s = await _load({
+        'deployments': jsonEncode([
+          {
+            'id': 'd0',
+            'name': 'Site',
+            'values': {
+              'host': 'site',
+              'ollamaBase': '/ollama/',
+              'lettaBase': '/letta/',
+              'agentBackend': 'letta',
+              'ollamaModel': 'llama3.2',
+              'lettaAgentId': 'agent-1',
+              'lettaToken': 'plain-pw',
+            },
+          },
+        ]),
+      }, secrets: store);
+      expect(store.values, {'deployment.d0.apiRefreshToken': 'rt'});
+      expect(s.deployment.values, {'host': 'site'});
+      final saved = await _savedPrefs();
+      for (final gone in ['ollama', 'letta', 'agent', '-pw']) {
+        expect(saved, isNot(contains(gone)), reason: gone);
+      }
     });
   });
 

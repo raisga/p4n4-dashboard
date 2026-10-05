@@ -5,14 +5,16 @@ import 'package:http/http.dart' as http;
 
 import '../core/brand.dart';
 import '../core/settings.dart';
+import 'camera.dart';
 import 'status_monitor.dart';
 
 /// What a deployment's `.p4n4.json` says about itself, from p4n4-api
 /// `GET /api/v1/project`.
 ///
 /// The manifest's optional `dashboard` block tunes the dashboard per project:
-/// `grafana_path` is the Grafana page to open, and `tabs` lists the tabs the
-/// project can serve (the others are hidden while connected).
+/// `grafana_path` is the Grafana page to open, `tabs` lists the tabs the
+/// project can serve (the others are hidden while connected), and `cameras`
+/// lists the streams the Video tab shows (see [ProjectCamera]).
 class ProjectInfo {
   const ProjectInfo({
     required this.name,
@@ -21,6 +23,7 @@ class ProjectInfo {
     this.templateVersion,
     this.grafanaPath,
     this.tabs,
+    this.cameras = const [],
   });
 
   final String name;
@@ -33,6 +36,9 @@ class ProjectInfo {
 
   /// Null when the manifest doesn't restrict tabs.
   final Set<DashTab>? tabs;
+
+  /// The project's cameras, in display order; empty when it lists none.
+  final List<ProjectCamera> cameras;
 
   /// Whether the project runs the catalog stack with [suffix]. p4n4-api
   /// (`api`) isn't a layer, so it always counts, and a manifest without
@@ -57,7 +63,39 @@ class ProjectInfo {
       templateVersion: template['version'] as String?,
       grafanaPath: path is String && path.startsWith('/') ? path : null,
       tabs: tabs == null || tabs.isEmpty ? null : tabs,
+      cameras: [
+        if (dashboard['cameras'] case final List list)
+          for (final c in list.whereType<Map>()) ?ProjectCamera.fromJson(c.cast<String, dynamic>()),
+      ],
     );
+  }
+}
+
+/// A camera from the manifest's `dashboard.cameras`: an absolute `url`, or a
+/// `port` and `path` on whichever host the dashboard is connected to (the
+/// manifest can't know it), e.g. go2rtc's `{"port": 1984, "path":
+/// "/api/stream.mjpeg?src=floor"}`.
+class ProjectCamera {
+  const ProjectCamera({required this.id, required this.name, this.url, this.port, this.path = '/'});
+
+  final String id;
+  final String name;
+  final String? url;
+  final int? port;
+  final String path;
+
+  /// The [Camera] on [host]; [url] when set, else http://host:port/path.
+  Camera on(String host) => Camera(id: id, name: name, url: url ?? 'http://$host:$port$path');
+
+  /// Null (skipped) unless it has an id, a name, and either an http(s) url or a port.
+  static ProjectCamera? fromJson(Map<String, dynamic> j) {
+    final (id, name, url, port, path) = (j['id'], j['name'], j['url'], j['port'], j['path'] ?? '/');
+    if (id is! String || id.isEmpty || name is! String || name.isEmpty || path is! String || !path.startsWith('/')) {
+      return null;
+    }
+    if (url is String && Camera.parseUrl(url) != null) return ProjectCamera(id: id, name: name, url: url);
+    if (port is int && port > 0 && port < 65536) return ProjectCamera(id: id, name: name, port: port, path: path);
+    return null;
   }
 }
 
@@ -68,18 +106,20 @@ Future<ProjectInfo> fetchProject(Uri apiBase) async {
   return ProjectInfo.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
 }
 
-/// Keeps [AppSettings.project] in step with the connected deployment: reads
-/// its project through p4n4-api whenever the API URL or host changes, and
-/// retries every [retry] while the API can't be reached. A failed read is
-/// also retried on the next settings change, which includes signing in.
-class ProjectWatcher {
-  ProjectWatcher(this.settings, {this.fetch = fetchProject, this.retry = const Duration(seconds: 30)}) {
+/// Keeps something the connected deployment's p4n4-api says in step with it:
+/// reads it whenever the API URL or host changes, hands it to [apply] (null
+/// while switching), and retries every [retry] while the API can't be
+/// reached. A failed read is also retried on the next settings change, which
+/// includes signing in.
+class ApiWatcher<T> {
+  ApiWatcher(this.settings, {required this.fetch, required this.apply, this.retry = const Duration(seconds: 30)}) {
     settings.addListener(_check);
     _check();
   }
 
   final AppSettings settings;
-  final Future<ProjectInfo> Function(Uri api) fetch;
+  final Future<T> Function(Uri api) fetch;
+  final void Function(T? value) apply;
   final Duration retry;
 
   StatusTarget? _target;
@@ -97,14 +137,14 @@ class ProjectWatcher {
     }
     _target = target;
     _timer?.cancel();
-    settings.project = null;
+    apply(null);
     _load(target);
   }
 
   Future<void> _load(StatusTarget target) async {
     try {
-      final project = await fetch(target.api);
-      if (_target == target) settings.project = project;
+      final value = await fetch(target.api);
+      if (_target == target) apply(value);
     } catch (_) {
       if (_target == target) _timer = Timer(retry, () => _load(target));
     }
@@ -114,4 +154,9 @@ class ProjectWatcher {
     _timer?.cancel();
     settings.removeListener(_check);
   }
+}
+
+/// Keeps [AppSettings.project] in step with the connected deployment.
+class ProjectWatcher extends ApiWatcher<ProjectInfo> {
+  ProjectWatcher(super.settings, {super.fetch = fetchProject, super.retry}) : super(apply: (p) => settings.project = p);
 }

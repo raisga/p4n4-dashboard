@@ -8,9 +8,3 @@ server:
       target: http://localhost:8000/
     - prefix: /health
       target: http://localhost:8000/
-    - prefix: /ollama/
-      target: http://localhost:11434/
-      replace: /
-    - prefix: /letta/
-      target: http://localhost:8283/
-      replace: /

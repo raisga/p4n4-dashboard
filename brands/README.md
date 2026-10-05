@@ -71,7 +71,8 @@ What `apply` doesn't change:
   "links": [{ "label": "Support", "url": "https://…" }],
   "defaults": {                         // first-run settings; the user can change them
     "host": "192.168.1.50", "themeMode": "light", "grafanaPath": "/d/edge/overview",
-    "videoUrl": "", "edgeDemo": false
+    "videoUrl": "", "edgeDemo": false,
+    "tabOrder": "edge,grafana,services,agent"   // optional; first tabs after Home, the rest follow in the default order
   },
   "native": {
     "displayName": "Acme Edge",         // home-screen / launcher name
@@ -86,8 +87,10 @@ What `apply` doesn't change:
 Only `id`, `appName`, `wordmark.text` and `native` are required. A theme's `id` is lowercase letters, digits and dashes, and can't be `p4n4`. Every other field falls back to the p4n4 defaults.
 
 - **Colors.** Color tokens are the fields of `P4Colors` in `lib/core/theme.dart`: `bg`, `bg2`, `bg3`, `accent`, `accent2`, `onAccent`, `amber`, `blue`, `heading`, `text`, `muted`, `border`, `border2`, `ok`, `warn`, `err`. `check` and `apply` warn when a text color falls below WCAG AA contrast (4.5:1) against any surface in that mode. Light and dark are validated separately, so a teal that works on black may need a darker step on white.
-- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `agentBackend` (`ollama` | `letta`), `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`).
-- **Disabled tabs** also hide their section on the settings page.
+- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`), `locale` (`en` | `es`; leave it out to follow the device's language), `textScale` (0.85–1.5, e.g. `1.25` for a wall-mounted screen), `highContrast`, `reduceMotion` (`true` | `false`), `temperatureUnit` (`auto` | `celsius` | `fahrenheit`), `timeFormat` (`auto` | `h12` | `h24`).
+- **Assistant.** `agentBackend` (`ollama` | `letta`) with `ollamaModel` or `lettaAgentId` names the brand's assistant. The assistant is a deployment-wide choice kept by p4n4-api (`/api/v1/agents/config`), so these are offered to it rather than applied: the first time an admin or power user signs in to a deployment where nobody has chosen one (with the Assistant tab in their view), the brand's is saved there, provided that model or agent is installed. After that the deployment's own choice stands, and changing these defaults doesn't touch it.
+- **Disabled tabs** also hide their section in Settings → Endpoints (and the category, if none is left).
+- **Tab order.** `tabs` only picks tabs; they show in the default order (agent, grafana, video, edge, services) unless `defaults.tabOrder` sets another. Admins can still reorder them in Settings → Views; that's saved on each deployment's p4n4-api (`/api/v1/dashboard/views`) and wins over `defaults.tabOrder`, `powerTabs` and `normieTabs`, which apply until an admin changes them.
 
 ## Files
 

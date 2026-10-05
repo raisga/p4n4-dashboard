@@ -4,11 +4,14 @@ import '../api/camera.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/mjpeg_view.dart';
+import '../widgets/video_view.dart';
 
-/// Live camera feeds from the edge device (MJPEG streams or JPEG snapshots):
-/// one camera at a time, or all of them in a grid.
+/// Live camera feeds from the edge device (MJPEG streams, JPEG snapshots or
+/// video files): one camera at a time, or all of them in a grid. Admins can
+/// swap in [demoCameras] to show it off without cameras.
 class VideoTab extends StatefulWidget {
   const VideoTab({super.key, required this.active});
 
@@ -20,22 +23,26 @@ class VideoTab extends StatefulWidget {
 
 class _VideoTabState extends State<VideoTab> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   /// One key per camera id, so a camera's viewer (and its connection) moves
   /// between the single view and the grid instead of reconnecting.
-  final _views = <String, GlobalKey<MjpegViewState>>{};
+  final _views = <String, GlobalKey>{};
   String? _selectedId;
   bool _grid = false;
   bool _paused = false;
 
-  GlobalKey<MjpegViewState> _key(Camera c) => _views.putIfAbsent(c.id, GlobalKey.new);
+  GlobalKey _key(Camera c) => _views.putIfAbsent(c.id, GlobalKey.new);
 
   Future<void> _edit(AppSettings s, [Camera? camera]) async {
     final cameras = s.cameras;
     final result = await showDialog<_CameraEdit>(
       context: context,
-      builder: (_) =>
-          _CameraDialog(initial: camera, defaultName: 'Camera ${cameras.length + 1}', defaultUrl: 'http://${s.host}:'),
+      builder: (_) => _CameraDialog(
+        initial: camera,
+        defaultName: l.cameraDefaultName(cameras.length + 1),
+        defaultUrl: 'http://${s.host}:',
+      ),
     );
     if (result == null) return;
     if (camera == null) {
@@ -55,16 +62,25 @@ class _VideoTabState extends State<VideoTab> {
 
   void _reconnect(Iterable<Camera> cameras) {
     for (final c in cameras) {
-      _views[c.id]?.currentState?.reconnect();
+      switch (_views[c.id]?.currentState) {
+        case final MjpegViewState v:
+          v.reconnect();
+        case final VideoViewState v:
+          v.reconnect();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final s = SettingsScope.of(context);
-    final cameras = s.cameras;
-    // Only admins and power users see URLs or change cameras.
-    final technical = SessionScope.of(context).isTechnical;
+    final session = SessionScope.of(context);
+    final demo = s.videoDemo;
+    final cameras = demo ? demoCameras : s.cameras;
+    // Only admins and power users see URLs or change cameras; demo cameras
+    // aren't the deployment's to change.
+    final technical = session.isTechnical;
+    final editable = technical && !demo;
     final selected = cameras.where((c) => c.id == _selectedId).firstOrNull ?? cameras.firstOrNull;
     final grid = _grid && cameras.length > 1;
     final shown = grid ? cameras : [?selected];
@@ -72,39 +88,48 @@ class _VideoTabState extends State<VideoTab> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
           color: p4.bg2,
           child: Row(
             children: [
-              Icon(Icons.videocam_outlined, color: p4.accent, size: 18),
+              Icon(Icons.videocam_outlined, color: p4.accent, size: 20),
               const SizedBox(width: 10),
               Expanded(child: _title(cameras, selected, grid, technical)),
               if (shown.isNotEmpty) ...[
                 IconButton(
-                  tooltip: _paused ? 'Resume' : 'Pause',
+                  tooltip: _paused ? l.resumeTooltip : l.pauseTooltip,
                   onPressed: () => setState(() => _paused = !_paused),
-                  icon: Icon(_paused ? Icons.play_arrow : Icons.pause, size: 18),
+                  icon: Icon(_paused ? Icons.play_arrow : Icons.pause, size: 20),
                 ),
                 IconButton(
-                  tooltip: 'Reconnect',
+                  tooltip: l.reconnectTooltip,
                   onPressed: () => _reconnect(shown),
-                  icon: const Icon(Icons.refresh, size: 18),
+                  icon: const Icon(Icons.refresh, size: 20),
                 ),
               ],
               if (cameras.length > 1)
                 IconButton(
-                  tooltip: grid ? 'Single camera' : 'All cameras',
+                  tooltip: grid ? l.singleCamera : l.allCameras,
                   onPressed: () => setState(() => _grid = !grid),
-                  icon: Icon(grid ? Icons.crop_square : Icons.grid_view, size: 18),
+                  icon: Icon(grid ? Icons.crop_square : Icons.grid_view, size: 20),
                 ),
-              if (technical) ...[
+              // Demo cameras are a setting: admins only.
+              if (session.isAdmin)
+                IconButton(
+                  tooltip: l.videoDemoSwitch,
+                  isSelected: demo,
+                  onPressed: () => s.videoDemo = !demo,
+                  icon: const Icon(Icons.movie_outlined, size: 20),
+                  selectedIcon: Icon(Icons.movie, size: 20, color: p4.accent),
+                ),
+              if (editable) ...[
                 if (!grid && selected != null)
                   IconButton(
-                    tooltip: 'Edit camera',
+                    tooltip: l.editCamera,
                     onPressed: () => _edit(s, selected),
-                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    icon: const Icon(Icons.edit_outlined, size: 20),
                   ),
-                IconButton(tooltip: 'Add camera', onPressed: () => _edit(s), icon: const Icon(Icons.add, size: 18)),
+                IconButton(tooltip: l.addCamera, onPressed: () => _edit(s), icon: const Icon(Icons.add, size: 20)),
               ],
             ],
           ),
@@ -114,27 +139,44 @@ class _VideoTabState extends State<VideoTab> {
           child: switch (selected) {
             null => EmptyState(
               icon: Icons.videocam_off_outlined,
-              title: 'No cameras',
-              message: technical
-                  ? 'Add the URL of an MJPEG stream or JPEG snapshot from your edge camera.'
-                  : 'No camera has been set up yet. Ask your administrator to add one.',
-              actions: [if (technical) FilledButton(onPressed: () => _edit(s), child: const Text('ADD CAMERA'))],
+              title: l.noCameras,
+              message: technical ? l.noCamerasTechnical : l.noCamerasNormie,
+              actions: [
+                if (technical) FilledButton(onPressed: () => _edit(s), child: Text(l.addCameraButton)),
+                if (session.isAdmin) OutlinedButton(onPressed: () => s.videoDemo = true, child: Text(l.useDemoCameras)),
+              ],
             ),
             _ when grid => _gridView(cameras),
             final c => _view(c),
           },
         ),
+        if (demo)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: p4.bg2,
+            child: Text(l.videoDemoCredits, style: p4.body(size: 11, color: p4.muted)),
+          ),
       ],
     );
   }
 
   Widget _title(List<Camera> cameras, Camera? selected, bool grid, bool technical) {
-    final style = p4.mono();
-    if (selected == null) return Text('no cameras configured', style: style);
-    if (grid) return Text('${cameras.length} cameras', style: style);
-    final url = technical ? Text(selected.url, overflow: TextOverflow.ellipsis, style: style) : null;
+    final style = p4.display(size: 15, weight: FontWeight.w600, spacing: 0);
+    if (selected == null) return Text(l.noCamerasConfigured, style: p4.body(color: p4.muted));
+    if (grid) return Text(l.cameraCount(cameras.length), style: style);
+    final url = technical
+        ? Text(selected.url, overflow: TextOverflow.ellipsis, style: p4.mono(size: 12, spacing: 0))
+        : null;
     if (cameras.length == 1) {
-      return technical ? url! : Text(selected.name, overflow: TextOverflow.ellipsis, style: style);
+      return Row(
+        children: [
+          Flexible(
+            child: Text(selected.name, overflow: TextOverflow.ellipsis, style: style),
+          ),
+          if (url != null) ...[const SizedBox(width: 12), Expanded(child: url)],
+        ],
+      );
     }
     return Row(
       children: [
@@ -143,7 +185,7 @@ class _VideoTabState extends State<VideoTab> {
           isDense: true,
           underline: const SizedBox.shrink(),
           dropdownColor: p4.bg2,
-          style: p4.mono(size: 12, color: p4.text, spacing: 0),
+          style: style.copyWith(color: p4.text),
           onChanged: (id) => setState(() => _selectedId = id),
           items: [for (final c in cameras) DropdownMenuItem(value: c.id, child: Text(c.name))],
         ),
@@ -153,9 +195,10 @@ class _VideoTabState extends State<VideoTab> {
   }
 
   Widget _view(Camera c) => switch (c.uri) {
+    final uri? when c.isVideo => VideoView(key: _key(c), uri: uri, active: widget.active && !_paused),
     final uri? => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
     null => Center(
-      child: Text('"${c.name}" has an invalid URL', style: p4.mono(color: p4.err)),
+      child: Text(l.cameraInvalidUrl(c.name), style: p4.body(color: p4.err)),
     ),
   };
 
@@ -193,7 +236,7 @@ class _VideoTabState extends State<VideoTab> {
                               child: Text(
                                 c.name,
                                 overflow: TextOverflow.ellipsis,
-                                style: p4.mono(size: 11, color: P4Colors.dark.text),
+                                style: p4.body(size: 13, color: P4Colors.dark.text, weight: FontWeight.w600),
                               ),
                             ),
                             Icon(Icons.open_in_full, size: 14, color: P4Colors.dark.text),
@@ -254,10 +297,11 @@ class _CameraDialogState extends State<_CameraDialog> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.initial != null;
+    final l = context.l10n;
+    // The examples line up under the localized "e.g.".
+    final pad = ' ' * (l.cameraExamples.length + 1);
     return AlertDialog(
-      backgroundColor: p4.bg2,
-      shape: RoundedRectangleBorder(side: BorderSide(color: p4.border2)),
-      title: Text(editing ? 'Edit camera' : 'Add camera', style: p4.display()),
+      title: Text(editing ? l.editCamera : l.addCamera),
       content: SizedBox(
         width: 420,
         child: Column(
@@ -267,7 +311,7 @@ class _CameraDialogState extends State<_CameraDialog> {
             TextField(
               controller: _name,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(labelText: l.fieldName),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -275,18 +319,19 @@ class _CameraDialogState extends State<_CameraDialog> {
               autofocus: true,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
               decoration: InputDecoration(
-                labelText: 'MJPEG or snapshot URL',
-                errorText: _url.text.isEmpty || _valid ? null : 'Enter an http:// or https:// URL',
+                labelText: l.cameraUrl,
+                errorText: _url.text.isEmpty || _valid ? null : l.cameraUrlError,
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: 12),
             Text(
-              'e.g. mjpg-streamer  http://host:8080/?action=stream\n'
-              '     motion         http://host:8081/\n'
-              '     go2rtc         http://host:1984/api/stream.mjpeg?src=cam\n'
-              '     snapshot       http://host/snapshot.jpg',
+              '${l.cameraExamples} mjpg-streamer  http://host:8080/?action=stream\n'
+              '${pad}motion         http://host:8081/\n'
+              '${pad}go2rtc         http://host:1984/api/stream.mjpeg?src=cam\n'
+              '${pad}snapshot       http://host/snapshot.jpg\n'
+              '${pad}video file     http://host/clip.mp4',
               style: p4.mono(size: 10, spacing: 0),
             ),
           ],
@@ -297,10 +342,10 @@ class _CameraDialogState extends State<_CameraDialog> {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: p4.err),
             onPressed: () => Navigator.pop<_CameraEdit>(context, (name: '', url: '', delete: true)),
-            child: const Text('DELETE'),
+            child: Text(l.delete),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-        FilledButton(onPressed: _valid ? _save : null, child: const Text('SAVE')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(onPressed: _valid ? _save : null, child: Text(l.save)),
       ],
     );
   }

@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Settings keys holding URLs, which `config.json` may give as paths
-/// (`/ollama/`) to resolve against the page.
-const _urlKeys = {'apiBase', 'ollamaBase', 'lettaBase', 'grafanaBase', 'edgeMetricsUrl'};
+/// (`/grafana/`) to resolve against the page.
+const _urlKeys = {'apiBase', 'grafanaBase', 'edgeMetricsUrl'};
 
 /// Set by `make run` (`--dart-define=P4N4_DEV_PROXY=true`): the dev server
 /// proxies the services like the container does (web_dev_config.yaml), so
@@ -12,13 +12,13 @@ const _urlKeys = {'apiBase', 'ollamaBase', 'lettaBase', 'grafanaBase', 'edgeMetr
 const devProxy = bool.fromEnvironment('P4N4_DEV_PROXY');
 
 /// The container's `config.json` routes, for [devProxy].
-const devProxyDefaults = <String, dynamic>{'apiBase': '/', 'ollamaBase': '/ollama/', 'lettaBase': '/letta/'};
+const devProxyDefaults = <String, dynamic>{'apiBase': '/'};
 
 /// Web only: settings defaults for this deployment, from a `config.json`
 /// served next to the app (the container renders it from env vars):
 ///
 /// ```json
-/// {"defaults": {"host": "", "apiBase": "/", "ollamaBase": "/ollama/"}}
+/// {"defaults": {"host": "", "apiBase": "/", "grafanaBase": "/grafana/"}}
 /// ```
 ///
 /// They sit between the brand's defaults and what the user saved. A missing

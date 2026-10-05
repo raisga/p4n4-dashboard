@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../platform/html_view.dart';
 
 /// Video viewer for MJPEG streams and JPEG snapshots.
@@ -189,7 +190,7 @@ class MjpegViewState extends State<MjpegView> {
         buf.add(data);
       },
       onError: (Object e) => _fail(e),
-      onDone: () => _fail('Stream ended'),
+      onDone: () => _fail(const _StreamEnded()),
       cancelOnError: true,
     );
   }
@@ -272,12 +273,15 @@ class MjpegViewState extends State<MjpegView> {
                   Icon(Icons.videocam_off_outlined, color: p4.err),
                   const SizedBox(height: 8),
                   Text(
-                    '$_error${_retry != null || _connecting ? '\nreconnecting…' : ''}',
+                    [
+                      if (_error is _StreamEnded) context.l10n.cameraStreamEnded else '$_error',
+                      if (_retry != null || _connecting) context.l10n.cameraReconnecting,
+                    ].join('\n'),
                     style: p4.mono(size: 11, color: p4.text),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton(onPressed: _connecting ? null : reconnect, child: const Text('RETRY')),
+                  OutlinedButton(onPressed: _connecting ? null : reconnect, child: Text(context.l10n.retry)),
                 ],
               ),
             ),
@@ -299,7 +303,7 @@ class MjpegViewState extends State<MjpegView> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'LIVE · ${_mode.toUpperCase()}${_fps > 0 ? ' · ${_fps.toStringAsFixed(1)} FPS' : ''}',
+                    '${context.l10n.cameraLive} · ${_mode.toUpperCase()}${_fps > 0 ? ' · ${_fps.toStringAsFixed(1)} FPS' : ''}',
                     style: p4.mono(size: 10, color: P4Colors.dark.text),
                   ),
                 ],
@@ -309,6 +313,11 @@ class MjpegViewState extends State<MjpegView> {
       ],
     );
   }
+}
+
+/// The server closed the stream (shown as a localized message).
+class _StreamEnded {
+  const _StreamEnded();
 }
 
 /// Web: [MjpegView] as an `<img>`. Errors retry with the same 2 s → 30 s
@@ -396,7 +405,7 @@ class _BrowserStreamState extends State<_BrowserStream> {
                   Icon(Icons.videocam_off_outlined, color: p4.err),
                   const SizedBox(height: 8),
                   Text(
-                    'Camera unavailable\nreconnecting…',
+                    '${context.l10n.cameraUnavailable}\n${context.l10n.cameraReconnecting}',
                     style: p4.mono(size: 11, color: p4.text),
                     textAlign: TextAlign.center,
                   ),
@@ -412,7 +421,7 @@ class _BrowserStreamState extends State<_BrowserStream> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               color: Colors.black54,
               child: Text(
-                'LIVE · ${_snapshot ? 'SNAPSHOT' : 'MJPEG'}',
+                '${context.l10n.cameraLive} · ${_snapshot ? 'SNAPSHOT' : 'MJPEG'}',
                 style: p4.mono(size: 10, color: P4Colors.dark.text),
               ),
             ),

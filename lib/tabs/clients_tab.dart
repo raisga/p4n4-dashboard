@@ -4,6 +4,7 @@ import '../api/fleet.dart';
 import '../api/status_monitor.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 
 /// Admin list of client deployments with live status from each host.
@@ -18,6 +19,7 @@ class ClientsTab extends StatefulWidget {
 
 class _ClientsTabState extends State<ClientsTab> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   late StatusMonitor _monitor;
   late List<StatusTarget> _targets;
@@ -74,67 +76,24 @@ class _ClientsTabState extends State<ClientsTab> {
   Widget build(BuildContext context) {
     final s = SettingsScope.of(context);
     final list = s.deployments;
-    return RefreshIndicator(
-      color: p4.accent,
+    return PageBody(
       onRefresh: _refresh,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    tag: 'admin',
-                    title: Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(text: 'Client '),
-                          TextSpan(
-                            text: 'Deployments',
-                            style: TextStyle(color: p4.accent),
-                          ),
-                        ],
-                      ),
-                      style: p4.display(size: 32, weight: FontWeight.w800, spacing: -1.5),
-                    ),
-                    trailing: FilledButton.icon(
-                      onPressed: () => _edit(s),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('ADD'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Status comes from each deployment\'s API (port 8000 unless set), or from probing service ports when '
-                    'it\'s down. Connect switches this dashboard, and every connection setting, to that deployment.',
-                    style: p4.display(size: 14, color: p4.muted, weight: FontWeight.w400, spacing: 0),
-                  ),
-                  const SizedBox(height: 24),
-                  if (list.isEmpty)
-                    const EmptyState(
-                      icon: Icons.devices_other_outlined,
-                      title: 'No deployments',
-                      message: 'Add a client deployment by name and host to monitor it here.',
-                    )
-                  else
-                    Container(
-                      color: p4.border,
-                      padding: const EdgeInsets.all(1),
-                      child: Column(
-                        children: [
-                          for (final (i, d) in list.indexed) ...[if (i > 0) const SizedBox(height: 1), _row(s, d)],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
+      children: [
+        PageHeader(
+          title: l.clientsTitle,
+          subtitle: l.clientsIntro,
+          trailing: FilledButton.icon(
+            onPressed: () => _edit(s),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(l.add),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 24),
+        if (list.isEmpty)
+          EmptyState(icon: Icons.devices_other_outlined, title: l.noDeployments, message: l.noDeploymentsMsg)
+        else
+          for (final d in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: _row(s, d)),
+      ],
     );
   }
 
@@ -151,8 +110,9 @@ class _ClientsTabState extends State<ClientsTab> {
     };
     final label = switch (r) {
       null => null,
-      _ when r.online == 0 => 'offline',
-      _ => '${r.online}/${r.known} up${r.viaApi ? '' : ' (probed)'}',
+      _ when r.online == 0 => l.healthOffline,
+      _ when r.viaApi => l.clientsUp(r.online, r.known),
+      _ => l.clientsUpProbed(r.online, r.known),
     };
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,13 +120,17 @@ class _ClientsTabState extends State<ClientsTab> {
         Row(
           children: [
             Flexible(
-              child: Text(d.name, overflow: TextOverflow.ellipsis, style: p4.display()),
+              child: Text(d.name, overflow: TextOverflow.ellipsis, style: p4.display(size: 16)),
             ),
-            if (current) ...[const SizedBox(width: 10), TagBadge('current', color: p4.accent)],
+            if (current) ...[const SizedBox(width: 10), TagBadge(l.currentBadge, color: p4.ok)],
           ],
         ),
         const SizedBox(height: 4),
-        Text(customApi ? '${s.hostOf(d)} · api $api' : s.hostOf(d), overflow: TextOverflow.ellipsis, style: p4.mono()),
+        Text(
+          customApi ? '${s.hostOf(d)} · api $api' : s.hostOf(d),
+          overflow: TextOverflow.ellipsis,
+          style: p4.mono(size: 12, spacing: 0),
+        ),
         const SizedBox(height: 8),
         StatusIndicator(health, label: label),
       ],
@@ -174,17 +138,20 @@ class _ClientsTabState extends State<ClientsTab> {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextButton(onPressed: current ? null : () => s.connect(d.id), child: const Text('CONNECT')),
-        IconButton(tooltip: 'Edit', onPressed: () => _edit(s, d), icon: const Icon(Icons.edit_outlined, size: 18)),
+        TextButton(onPressed: current ? null : () => s.connect(d.id), child: Text(l.connect)),
         IconButton(
-          tooltip: current ? 'Connect to another deployment to remove this one' : 'Remove',
+          tooltip: l.editTooltip,
+          onPressed: () => _edit(s, d),
+          icon: const Icon(Icons.edit_outlined, size: 18),
+        ),
+        IconButton(
+          tooltip: current ? l.removeCurrentTooltip : l.removeTooltip,
           onPressed: current ? null : () => s.removeDeployment(d.id),
           icon: const Icon(Icons.delete_outline, size: 18),
         ),
       ],
     );
-    return Container(
-      color: p4.bg2,
+    return Panel(
       padding: const EdgeInsets.fromLTRB(20, 14, 8, 14),
       // Actions sit beside the details when there's room, below them on phones.
       child: LayoutBuilder(
@@ -242,10 +209,9 @@ class _DeploymentDialogState extends State<_DeploymentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return AlertDialog(
-      backgroundColor: p4.bg2,
-      shape: RoundedRectangleBorder(side: BorderSide(color: p4.border2)),
-      title: Text(widget.initial == null ? 'Add deployment' : 'Edit deployment', style: p4.display()),
+      title: Text(widget.initial == null ? l.addDeployment : l.editDeployment),
       content: SizedBox(
         width: 420,
         child: Column(
@@ -255,23 +221,23 @@ class _DeploymentDialogState extends State<_DeploymentDialog> {
               controller: _name,
               autofocus: true,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
-              decoration: const InputDecoration(labelText: 'Client name'),
+              decoration: InputDecoration(labelText: l.clientName),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _host,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
-              decoration: const InputDecoration(labelText: 'Host', hintText: '192.168.1.50'),
+              decoration: InputDecoration(labelText: l.fieldHost, hintText: '192.168.1.50'),
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _api,
               style: p4.mono(size: 13, color: p4.text, spacing: 0),
-              decoration: const InputDecoration(
-                labelText: 'API URL (optional)',
+              decoration: InputDecoration(
+                labelText: l.apiUrlOptional,
                 hintText: 'http://<host>:8000',
-                helperText: 'Only if the API isn\'t on port 8000 of the host',
+                helperText: l.apiUrlHelp,
               ),
               onSubmitted: (_) => _save(),
             ),
@@ -279,8 +245,8 @@ class _DeploymentDialogState extends State<_DeploymentDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-        FilledButton(onPressed: _save, child: const Text('SAVE')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(onPressed: _save, child: Text(l.save)),
       ],
     );
   }

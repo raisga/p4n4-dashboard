@@ -1,16 +1,22 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/agent_client.dart';
+import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 
-/// Chat with a local Ollama model or a stateful Letta agent.
+/// Chat with the deployment's assistant, an Ollama model or a Letta agent,
+/// through p4n4-api.
+///
+/// Which one is a deployment-wide setting kept by the API. Admins and power
+/// users choose it here; viewers just chat, and the API holds them to the
+/// chosen one whatever this screen shows.
 class AgentTab extends StatefulWidget {
   const AgentTab({super.key});
 
@@ -20,36 +26,30 @@ class AgentTab extends StatefulWidget {
 
 class _AgentTabState extends State<AgentTab> {
   P4Colors get p4 => context.p4;
+  AppLocalizations get l => context.l10n;
 
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
   final _messages = <ChatMessage>[];
 
-  AgentClient? _client;
-  String? _clientKey;
+  AgentApi? _api;
+  AssistantConfig? _config;
   List<AgentOption>? _options;
-  Object? _optionsError;
+  Object? _loadError;
+  bool _saving = false;
   StreamSubscription<String>? _reply;
 
   bool get _busy => _reply != null;
+  bool get _technical => SessionScope.of(context).isTechnical;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final s = SettingsScope.of(context);
-    final key = '${s.agentBackend}|${s.ollamaUri}|${s.lettaUri}|${s.lettaToken}';
-    if (key != _clientKey) {
-      _clientKey = key;
-      _client = switch (s.agentBackend) {
-        AgentBackend.ollama => OllamaClient(s.ollamaUri),
-        AgentBackend.letta => LettaClient(
-          s.lettaUri,
-          token: s.lettaToken,
-          viaProxy: kIsWeb && viaPageProxy(s.lettaUri),
-        ),
-      };
-      _loadOptions();
+    final api = SettingsScope.of(context).apiUri;
+    if (api != _api?.api) {
+      _api = AgentApi(api);
+      _load();
     }
   }
 
@@ -62,39 +62,83 @@ class _AgentTabState extends State<AgentTab> {
     super.dispose();
   }
 
-  Future<void> _loadOptions() async {
-    final client = _client!;
+  /// The assistant's config, then what can be chosen for its backend.
+  Future<void> _load() async {
+    final api = _api!;
+    // Admins and power users hand the brand's assistant to a deployment that
+    // never chose one (the API lets only them choose).
+    final seed = _technical ? SettingsScope.of(context).assistantDefault : null;
     setState(() {
+      _config = null;
       _options = null;
-      _optionsError = null;
+      _loadError = null;
     });
     try {
-      final opts = await client.listOptions();
-      if (!mounted || client != _client) return;
-      setState(() => _options = opts);
-      final s = SettingsScope.of(context);
-      final current = _selected(s);
-      if (opts.isNotEmpty && !opts.any((o) => o.id == current)) _select(s, opts.first.id);
+      var config = await api.config();
+      if (seed != null && !config.everChosen) config = await _seed(api, seed) ?? config;
+      final options = await api.listOptions(config.backend);
+      if (!mounted || api != _api) return;
+      setState(() {
+        _config = config;
+        _options = options;
+      });
     } catch (e) {
-      if (mounted && client == _client) setState(() => _optionsError = e);
+      if (mounted && api == _api) setState(() => _loadError = e);
     }
   }
 
-  String _selected(AppSettings s) => s.agentBackend == AgentBackend.ollama ? s.ollamaModel : s.lettaAgentId;
-
-  void _select(AppSettings s, String id) {
-    if (s.agentBackend == AgentBackend.ollama) {
-      s.ollamaModel = id;
-    } else {
-      s.lettaAgentId = id;
+  /// Saves [seed] as the deployment's assistant if it's installed there; a
+  /// failure only means the API's own default stays.
+  static Future<AssistantConfig?> _seed(AgentApi api, AssistantConfig seed) async {
+    try {
+      if (!seedAvailable(seed, await api.listOptions(seed.backend))) return null;
+      return await api.setConfig(seed);
+    } on AgentException {
+      return null;
     }
   }
 
-  void _send() {
-    final text = _input.text.trim();
-    final s = SettingsScope.of(context);
-    final target = _selected(s);
-    if (text.isEmpty || _busy || target.isEmpty) return;
+  /// Who the conversation goes to: the chosen model or agent, else the first
+  /// one listed (as the API does).
+  String? get _target {
+    final options = _options;
+    if (options == null || options.isEmpty) return null;
+    final chosen = _config?.chosen;
+    return options.any((o) => o.id == chosen) ? chosen : options.first.id;
+  }
+
+  /// Saves a new choice for everyone, then reloads what can be chosen.
+  Future<void> _choose(AssistantConfig next) async {
+    final api = _api!;
+    final backendChanged = next.backend != _config?.backend;
+    setState(() {
+      _saving = true;
+      _config = next;
+      if (backendChanged) _options = null;
+    });
+    try {
+      final saved = await api.setConfig(next);
+      final options = backendChanged ? await api.listOptions(saved.backend) : _options;
+      if (!mounted || api != _api) return;
+      setState(() {
+        _config = saved;
+        _options = options;
+        _loadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.assistantSaveFailed('$e'))));
+      await _load();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _send([String? suggestion]) {
+    final text = (suggestion ?? _input.text).trim();
+    final target = _target;
+    final config = _config;
+    if (text.isEmpty || _busy || target == null || config == null) return;
 
     final reply = ChatMessage('assistant', '');
     setState(() {
@@ -105,14 +149,14 @@ class _AgentTabState extends State<AgentTab> {
     setState(() => _messages.add(reply));
     _scrollToEnd();
 
-    _reply = _client!
-        .send(target, history)
+    _reply = _api!
+        .send(config.backend, target, history)
         .listen(
           (chunk) {
             setState(() => reply.content += chunk);
             _scrollToEnd();
           },
-          onError: (Object e) => _finish(reply, error: e),
+          onError: (Object e) => _finish(reply, error: e is AgentException ? e : AgentException('$e')),
           onDone: () => _finish(reply),
           cancelOnError: true,
         );
@@ -123,24 +167,40 @@ class _AgentTabState extends State<AgentTab> {
     _finish(_messages.last);
   }
 
-  void _finish(ChatMessage reply, {Object? error}) {
+  void _finish(ChatMessage reply, {AgentException? error}) {
     if (!mounted) return;
     setState(() {
       _reply = null;
       if (error != null) {
         if (reply.content.isEmpty) _messages.remove(reply);
-        _messages.add(ChatMessage('error', '$error'));
+        _messages.add(ChatMessage('error', _describe(error), error: error));
       } else if (reply.content.isEmpty) {
-        reply.content = '(stopped)';
+        reply.content = l.agentStopped;
       }
     });
+    // Someone changed the assistant meanwhile: pick up the new one.
+    if (error?.code == 'assistant_restricted') _load();
     _scrollToEnd();
     _focus.requestFocus();
   }
 
+  /// What went wrong, in words that fit who's reading: the API's own message
+  /// for admins and power users, plain language for viewers.
+  String _describe(AgentException e) => switch (e) {
+    _ when _technical => e.message,
+    AgentException(statusCode: 401) => l.sessionExpired,
+    AgentException(code: 'assistant_restricted') => l.assistantErrorChanged,
+    _ when e.unavailable => l.assistantErrorUnavailable,
+    _ => l.assistantErrorGeneric,
+  };
+
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
+      if (!_scroll.hasClients || !mounted) return;
+      // Settings → Accessibility → Reduce motion, or the device's own setting.
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      } else {
         _scroll.animateTo(
           _scroll.position.maxScrollExtent,
           duration: const Duration(milliseconds: 150),
@@ -152,136 +212,160 @@ class _AgentTabState extends State<AgentTab> {
 
   @override
   Widget build(BuildContext context) {
-    final s = SettingsScope.of(context);
     return Column(
       children: [
-        _toolbar(s),
+        _toolbar(),
         const Divider(height: 1),
-        Expanded(child: _messages.isEmpty ? _empty(s) : _list()),
+        Expanded(child: _messages.isEmpty ? _empty() : _list()),
         const Divider(height: 1),
-        _composer(s),
+        _composer(),
       ],
     );
   }
 
-  Widget _toolbar(AppSettings s) {
-    final opts = _options;
-    final selected = _selected(s);
-    final technical = SessionScope.of(context).isTechnical;
-    return Padding(
+  Widget _toolbar() {
+    final config = _config;
+    final options = _options;
+    final ollama = (config?.backend ?? AgentBackend.ollama) == AgentBackend.ollama;
+    final health = switch ((_loadError, options)) {
+      (_?, _) => Health.down,
+      (_, null) => Health.pending,
+      (_, []) => Health.unknown,
+      _ => Health.up,
+    };
+    return Container(
+      width: double.infinity,
+      color: p4.bg2,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 10,
+        spacing: 16,
+        runSpacing: 12,
         crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
         children: [
-          // Choosing the backend is configuration; normies chat with whatever is set.
-          if (technical)
-            SegmentedButton<AgentBackend>(
-              showSelectedIcon: false,
-              style: SegmentedButton.styleFrom(
-                shape: const RoundedRectangleBorder(),
-                selectedBackgroundColor: p4.accent,
-                selectedForegroundColor: p4.onAccent,
-                textStyle: p4.mono(size: 11, weight: FontWeight.w600),
-                side: BorderSide(color: p4.border2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.forum_outlined, color: p4.accent, size: 22),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(l.navAgent, overflow: TextOverflow.ellipsis, style: p4.display(size: 17)),
               ),
-              segments: const [
-                ButtonSegment(
-                  value: AgentBackend.ollama,
-                  label: Text('OLLAMA'),
-                  icon: Icon(Icons.psychology_outlined, size: 16),
-                ),
-                ButtonSegment(
-                  value: AgentBackend.letta,
-                  label: Text('LETTA'),
-                  icon: Icon(Icons.smart_toy_outlined, size: 16),
-                ),
-              ],
-              selected: {s.agentBackend},
-              onSelectionChanged: _busy ? null : (v) => s.agentBackend = v.first,
-            ),
-          if (opts == null && _optionsError == null)
-            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
-          else if (_optionsError != null)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const StatusIndicator(Health.down),
-                IconButton(tooltip: 'Retry', onPressed: _loadOptions, icon: const Icon(Icons.refresh, size: 18)),
-              ],
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('$_clientKey|$selected'),
-                initialValue: opts!.any((o) => o.id == selected) ? selected : null,
-                isExpanded: true,
-                hint: Text(opts.isEmpty ? 'none available' : 'select', style: p4.mono(size: 12)),
-                decoration: InputDecoration(labelText: s.agentBackend == AgentBackend.ollama ? 'model' : 'agent'),
-                dropdownColor: p4.bg3,
-                style: p4.mono(size: 12, color: p4.text),
-                items: [
-                  for (final o in opts)
-                    DropdownMenuItem(
-                      value: o.id,
-                      child: Text(o.label, overflow: TextOverflow.ellipsis),
+              const SizedBox(width: 12),
+              Flexible(child: StatusIndicator(health)),
+            ],
+          ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Choosing the assistant is configuration: not for viewers, and
+              // the API refuses it from them too.
+              if (_technical && config != null) ...[
+                SegmentedButton<AgentBackend>(
+                  showSelectedIcon: false,
+                  // Product names: not translated.
+                  segments: const [
+                    ButtonSegment(
+                      value: AgentBackend.ollama,
+                      label: Text('Ollama'),
+                      icon: Icon(Icons.psychology_outlined, size: 16),
                     ),
-                ],
-                onChanged: _busy ? null : (v) => v == null ? null : _select(s, v),
-              ),
-            ),
-          if (_messages.isNotEmpty)
-            OutlinedButton.icon(
-              onPressed: _busy ? null : () => setState(_messages.clear),
-              icon: const Icon(Icons.delete_outline, size: 16),
-              label: const Text('CLEAR'),
-            ),
+                    ButtonSegment(
+                      value: AgentBackend.letta,
+                      label: Text('Letta'),
+                      icon: Icon(Icons.smart_toy_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {config.backend},
+                  onSelectionChanged: _busy || _saving ? null : (v) => _choose(config.copyWith(backend: v.first)),
+                ),
+                if (options != null && options.isNotEmpty)
+                  Tooltip(
+                    message: ollama ? l.assistantSharedModel : l.assistantSharedAgent,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('${config.backend}|$_target'),
+                        initialValue: _target,
+                        isExpanded: true,
+                        decoration: InputDecoration(labelText: ollama ? l.agentModel : l.agentAgent),
+                        dropdownColor: p4.bg2,
+                        style: p4.mono(size: 13, color: p4.text, spacing: 0),
+                        items: [
+                          for (final o in options)
+                            DropdownMenuItem(
+                              value: o.id,
+                              child: Text(o.label, overflow: TextOverflow.ellipsis),
+                            ),
+                        ],
+                        onChanged: _busy || _saving
+                            ? null
+                            : (v) => v == null || v == _target ? null : _choose(config.copyWith(id: v)),
+                      ),
+                    ),
+                  ),
+              ],
+              if (_messages.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => setState(_messages.clear),
+                  icon: const Icon(Icons.add_comment_outlined, size: 18),
+                  label: Text(l.clear),
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _empty(AppSettings s) {
-    final ollama = s.agentBackend == AgentBackend.ollama;
-    if (!SessionScope.of(context).isTechnical) {
-      final (icon, title, message) = switch ((_optionsError, _options)) {
-        (_?, _) => (Icons.cloud_off_outlined, 'Assistant unavailable', 'The assistant can\'t be reached right now.'),
-        (_, []) => (Icons.inbox_outlined, 'No assistant set up', 'Ask your administrator to set one up.'),
-        _ => (Icons.forum_outlined, 'Chat with your assistant', 'Ask about your devices, data or dashboards.'),
-      };
-      return EmptyState(
-        icon: icon,
-        title: title,
-        message: message,
-        actions: [if (_optionsError != null) OutlinedButton(onPressed: _loadOptions, child: const Text('RETRY'))],
-      );
+  Widget _empty() {
+    final config = _config;
+    final options = _options;
+    final ollama = (config?.backend ?? AgentBackend.ollama) == AgentBackend.ollama;
+    if (_loadError case final error?) {
+      return _technical
+          ? EmptyState(
+              icon: Icons.cloud_off_outlined,
+              color: p4.err,
+              title: l.agentUnreachable(ollama ? 'Ollama' : 'Letta'),
+              message: l.assistantUnavailableMsg,
+              details: '$error',
+              actions: [OutlinedButton(onPressed: _load, child: Text(l.retry))],
+            )
+          : EmptyState(
+              icon: Icons.cloud_off_outlined,
+              color: p4.err,
+              title: l.assistantUnavailable,
+              message: l.assistantUnavailableMsg,
+              actions: [OutlinedButton(onPressed: _load, child: Text(l.retry))],
+            );
     }
-    if (_optionsError != null) {
-      return EmptyState(
-        icon: Icons.cloud_off_outlined,
-        title: '${ollama ? 'Ollama' : 'Letta'} unreachable',
-        message: '${ollama ? s.ollamaUri : s.lettaUri}\n$_optionsError',
-        actions: [OutlinedButton(onPressed: _loadOptions, child: const Text('RETRY'))],
-      );
-    }
-    if (_options != null && _options!.isEmpty) {
-      return EmptyState(
-        icon: Icons.inbox_outlined,
-        title: ollama ? 'No models pulled' : 'No agents found',
-        message: ollama
-            ? 'Pull one first, e.g. `docker exec ollama ollama pull llama3.2`.'
-            : 'Create an agent in the Letta ADE, then retry.',
-        actions: [OutlinedButton(onPressed: _loadOptions, child: const Text('RETRY'))],
-      );
+    if (config == null || options == null) return LoadingState(l.signInConnecting);
+    if (options.isEmpty) {
+      return _technical
+          ? EmptyState(
+              icon: Icons.inbox_outlined,
+              title: ollama ? l.agentNoModels : l.agentNoAgents,
+              message: ollama ? l.agentNoModelsMsg : l.agentNoAgentsMsg,
+              actions: [OutlinedButton(onPressed: _load, child: Text(l.retry))],
+            )
+          : EmptyState(icon: Icons.inbox_outlined, title: l.assistantNotSetUp, message: l.assistantNotSetUpMsg);
     }
     return EmptyState(
       icon: Icons.forum_outlined,
-      title: 'Chat with your ${ollama ? 'local model' : 'agent'}',
-      message: ollama
-          ? 'Messages go straight to Ollama on ${s.host}. History stays in this session only.'
-          : 'Letta agents keep their own memory across sessions.',
+      title: l.assistantChat,
+      message: l.assistantChatMsg,
+      details: _technical ? (ollama ? l.agentOllamaMsg(BrandScope.of(context).platform) : l.agentLettaMsg) : null,
+      actions: [
+        for (final q in [l.assistantSuggestStatus, l.assistantSuggestDevice, l.assistantSuggestHelp])
+          ActionChip(
+            avatar: Icon(Icons.chat_bubble_outline, size: 16, color: p4.accent),
+            label: Text(q),
+            onPressed: () => _send(q),
+          ),
+      ],
     );
   }
 
@@ -292,8 +376,13 @@ class _AgentTabState extends State<AgentTab> {
     itemBuilder: (context, i) => _Bubble(_messages[i], streaming: _busy && i == _messages.length - 1),
   );
 
-  Widget _composer(AppSettings s) {
-    final ready = _selected(s).isNotEmpty && _optionsError == null;
+  Widget _composer() {
+    final ready = _target != null && _loadError == null && !_saving;
+    final hint = switch (ready) {
+      true => l.agentMessageHint,
+      false when _config == null && _loadError == null => l.signInConnecting,
+      false => _technical ? l.agentSelectFirst : l.assistantInputUnavailable,
+    };
     return SafeArea(
       top: false,
       child: Padding(
@@ -312,19 +401,30 @@ class _AgentTabState extends State<AgentTab> {
                   maxLines: 6,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
-                  style: p4.display(size: 14, color: p4.text, weight: FontWeight.w400, spacing: 0),
+                  style: p4.body(size: 15),
                   decoration: InputDecoration(
-                    hintText: ready ? 'Message… (Shift+Enter for newline)' : 'Select a model or agent first',
+                    hintText: hint,
+                    hintStyle: p4.body(size: 14, color: p4.muted),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             SizedBox(
-              height: 44,
+              height: 46,
+              width: 46,
               child: _busy
-                  ? OutlinedButton(onPressed: _stop, child: const Icon(Icons.stop, size: 18))
-                  : FilledButton(onPressed: ready ? _send : null, child: const Icon(Icons.arrow_upward, size: 18)),
+                  ? IconButton.outlined(
+                      tooltip: l.stopTooltip,
+                      onPressed: _stop,
+                      icon: const Icon(Icons.stop, size: 20),
+                    )
+                  : IconButton.filled(
+                      tooltip: l.sendTooltip,
+                      onPressed: ready ? _send : null,
+                      style: IconButton.styleFrom(backgroundColor: p4.accent, foregroundColor: p4.onAccent),
+                      icon: const Icon(Icons.arrow_upward, size: 20),
+                    ),
             ),
           ],
         ),
@@ -342,9 +442,16 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
+    final l = context.l10n;
     final user = msg.role == 'user';
     final error = msg.role == 'error';
-    final label = user ? 'you' : (error ? 'error' : 'agent');
+    final label = user ? l.bubbleYou : (error ? l.bubbleError : l.bubbleAgent);
+    final (fill, border) = switch ((user, error)) {
+      (true, _) => (p4.accent.withValues(alpha: 0.12), p4.accent.withValues(alpha: 0.35)),
+      (_, true) => (p4.err.withValues(alpha: 0.08), p4.err.withValues(alpha: 0.5)),
+      _ => (p4.bg2, p4.border),
+    };
+    const r = Radius.circular(14);
     return Align(
       alignment: user ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -353,34 +460,34 @@ class _Bubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
           decoration: BoxDecoration(
-            color: user ? p4.accent.withValues(alpha: 0.1) : p4.bg2,
-            border: Border(
-              left: BorderSide(color: error ? p4.err : (user ? p4.border : p4.accent), width: user ? 1 : 2),
-              top: BorderSide(color: p4.border),
-              right: BorderSide(color: user ? p4.accent.withValues(alpha: 0.5) : p4.border),
-              bottom: BorderSide(color: p4.border),
+            color: fill,
+            border: Border.all(color: border),
+            borderRadius: BorderRadius.only(
+              topLeft: r,
+              topRight: r,
+              bottomLeft: user ? r : const Radius.circular(4),
+              bottomRight: user ? const Radius.circular(4) : r,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '// ${label.toUpperCase()}',
-                style: p4.mono(size: 10, color: error ? p4.err : p4.muted, spacing: 0.12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (error) ...[Icon(Icons.error_outline, size: 14, color: p4.err), const SizedBox(width: 6)],
+                  Text(
+                    label,
+                    style: p4.display(size: 12, color: error ? p4.err : p4.muted, weight: FontWeight.w600, spacing: 0),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               if (msg.content.isEmpty && streaming)
                 SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
               else
-                SelectableText(
-                  msg.content,
-                  style: error
-                      ? p4.mono(size: 12, color: p4.text, spacing: 0)
-                      : p4
-                            .display(size: 14, color: p4.text, weight: FontWeight.w400, spacing: 0)
-                            .copyWith(height: 1.55),
-                ),
+                SelectableText(msg.content, style: p4.body(size: 15)),
             ],
           ),
         ),
