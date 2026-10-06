@@ -106,6 +106,21 @@ void main() {
     expect(brand.tabs, [DashTab.video, DashTab.services]);
   });
 
+  test('tour copy replaces steps per language, or in every language', () {
+    final brand = Brand.fromJson(
+      _minimal({
+        'tour': {
+          'welcome': {'en': 'Hi', 'es': 'Hola'},
+          'signOut': 'Bye',
+        },
+      }),
+    );
+    expect(brand.tourText(TourStep.welcome, 'es'), 'Hola');
+    expect(brand.tourText(TourStep.welcome, 'fr'), isNull);
+    expect(brand.tourText(TourStep.signOut, 'es'), 'Bye');
+    expect(brand.tourText(TourStep.theme, 'en'), isNull);
+  });
+
   test('invalid brand config is rejected', () {
     expect(() => Brand.fromJson(_minimal({'tabs': <String>[]})), throwsFormatException);
     expect(
@@ -140,6 +155,24 @@ void main() {
       () => Brand.fromJson(
         _minimal({
           'fonts': {'mono': ''},
+        }),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => Brand.fromJson(
+        _minimal({
+          'tour': {'tabs': 'Your tabs'},
+        }),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => Brand.fromJson(
+        _minimal({
+          'tour': {
+            'welcome': {'en': 1},
+          },
         }),
       ),
       throwsFormatException,

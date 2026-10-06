@@ -111,7 +111,7 @@ void main() {
       Size size = const Size(1280, 900),
       Role role = Role.admin,
     }) async {
-      SharedPreferences.setMockInitialValues({'edgeDemo': true, 'role': role.name, ...prefs});
+      SharedPreferences.setMockInitialValues({'edgeDemo': true, 'tourSeen': true, 'role': role.name, ...prefs});
       final brand = loadBrand('p4n4');
       final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
       final session = await Session.load(settings, probe: (_) async => AuthMode.off);

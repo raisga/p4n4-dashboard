@@ -58,7 +58,13 @@ void main() {
     Map<String, Object> prefs = const {},
     Map<String, Object> brandDefaults = const {},
   }) async {
-    SharedPreferences.setMockInitialValues({'edgeDemo': true, 'themeMode': mode.name, 'role': ?role?.name, ...prefs});
+    SharedPreferences.setMockInitialValues({
+      'edgeDemo': true,
+      'tourSeen': true,
+      'themeMode': mode.name,
+      'role': ?role?.name,
+      ...prefs,
+    });
     final brand = loadBrand(brandId);
     final settings = await AppSettings.load(
       defaults: {...brand.defaults, ...brandDefaults},

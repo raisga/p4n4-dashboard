@@ -10,6 +10,10 @@ import 'theme.dart';
 /// Admins reorder them in Settings; see [AppSettings.tabOrder].
 enum DashTab { agent, grafana, video, edge, services }
 
+/// Steps of the first-run tour of the shell that normies get, in order. Their
+/// names are the keys of brand.json `tour`, which replaces their text.
+enum TourStep { welcome, navigation, theme, settings, signOut }
+
 class BrandLink {
   const BrandLink(this.label, this.url);
 
@@ -37,6 +41,7 @@ class Brand {
     required this.tabs,
     required this.links,
     required this.defaults,
+    this.tour = const {},
     this.logo,
   });
 
@@ -64,6 +69,13 @@ class Brand {
 
   /// Initial values for [AppSettings] keys (host, themeMode, videoUrl, …).
   final Map<String, Object> defaults;
+
+  /// Tour text that replaces the built-in copy: step → language code (`*`
+  /// for every language) → text.
+  final Map<TourStep, Map<String, String>> tour;
+
+  /// [step]'s text from the brand in [language], if it has any.
+  String? tourText(TourStep step, String language) => tour[step]?[language] ?? tour[step]?['*'];
 
   /// Asset path of an app-bar logo that replaces the text wordmark.
   final String? logo;
@@ -118,6 +130,7 @@ class Brand {
           BrandLink((l as Map)['label'] as String, Uri.parse(l['url'] as String)),
       ],
       defaults: ((j['defaults'] as Map?) ?? const {}).cast<String, Object>(),
+      tour: _tour(j['tour']),
       logo: logo == null ? null : '$assetDir/$logo',
     );
   }
@@ -129,6 +142,19 @@ class Brand {
     String s when s.trim().isNotEmpty => s,
     _ => throw FormatException('Font "$name" must be a non-empty family name'),
   };
+
+  /// brand.json `tour`: each step's text, or its text per language.
+  static Map<TourStep, Map<String, String>> _tour(Object? raw) {
+    final steps = TourStep.values.asNameMap();
+    return {
+      for (final MapEntry(:key, :value) in ((raw as Map?) ?? const {}).entries)
+        steps[key] ?? (throw FormatException('Unknown tour step "$key" in brand.json')): switch (value) {
+          String text => {'*': text},
+          Map texts when texts.values.every((t) => t is String) => texts.cast<String, String>(),
+          _ => throw FormatException('brand.json tour.$key must be text or {language: text}'),
+        },
+    };
+  }
 
   static Map<String, Color> _colors(Object? raw) => {
     for (final e in ((raw as Map?) ?? const {}).entries) e.key as String: parseHex(e.value as String),

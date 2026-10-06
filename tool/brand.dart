@@ -27,6 +27,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 const _tabs = ['services', 'edge', 'agent', 'grafana', 'video'];
+const _tourSteps = ['welcome', 'navigation', 'theme', 'settings', 'signOut'];
 const _tokens = [
   'bg', 'bg2', 'bg3', 'accent', 'accent2', 'onAccent', 'amber', 'blue', //
   'heading', 'text', 'muted', 'border', 'border2', 'ok', 'warn', 'err',
@@ -212,6 +213,28 @@ Map<String, dynamic> _validate(Directory dir) {
     if (!_tabs.contains(t)) errors.add('unknown tab "$t" (valid: ${_tabs.join(', ')})');
   }
   if (tabs.isEmpty) errors.add('tabs must enable at least one tab');
+
+  final tour = j['tour'];
+  if (tour != null && tour is! Map) errors.add('tour must be an object');
+  // The dashboard's languages: one ARB file each in lib/l10n/.
+  final languages = [
+    for (final f in Directory('${_root.path}/lib/l10n').listSync())
+      if (RegExp(r'app_(\w+)\.arb$').firstMatch(f.path) case final m?) m[1]!,
+  ];
+  for (final MapEntry(:key, :value) in ((tour as Map?) ?? const {}).entries) {
+    if (!_tourSteps.contains(key)) {
+      errors.add('unknown tour step "$key" (valid: ${_tourSteps.join(', ')})');
+    } else if (value is Map) {
+      for (final MapEntry(key: lang, value: text) in value.entries) {
+        if (lang != '*' && !languages.contains(lang)) {
+          errors.add('tour.$key.$lang is not a dashboard language (valid: ${languages.join(', ')}, or *)');
+        }
+        if (text is! String || text.trim().isEmpty) errors.add('tour.$key.$lang must be a non-empty string');
+      }
+    } else if (value is! String || value.trim().isEmpty) {
+      errors.add('tour.$key must be text, or an object of language code → text');
+    }
+  }
 
   final native = j['native'];
   if (native is! Map) {

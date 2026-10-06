@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_intro/flutter_intro.dart' show Intro;
 import 'package:http/http.dart' as http;
 
 import 'api/auth.dart';
@@ -23,6 +26,7 @@ import 'tabs/overview_tab.dart';
 import 'tabs/services_tab.dart';
 import 'tabs/video_tab.dart';
 import 'widgets/common.dart';
+import 'widgets/tour.dart';
 
 Future<void> main() async {
   final credentials = _SessionCredentials();
@@ -113,7 +117,7 @@ class _DashboardAppState extends State<DashboardApp> {
           disableAnimations: reduceMotion,
           highContrast: highContrast,
         ),
-        child: app,
+        child: TourHost(child: app),
       ),
     );
   }
@@ -206,6 +210,43 @@ class _HomeShellState extends State<HomeShell> {
   /// The open screen, kept by identity so reordering tabs doesn't switch it.
   Screen? _selected;
 
+  late Intro _intro;
+
+  /// The tour group running (or about to start); null once the tour is seen.
+  String? _tourGroup;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _intro = Intro.of(context);
+  }
+
+  @override
+  void dispose() {
+    // e.g. the session expired mid-tour: don't leave the tour over the sign-in page.
+    if (_tourGroup != null && _intro.status.isOpen) _intro.dispose();
+    super.dispose();
+  }
+
+  /// Starts the tour of [group] once this frame has registered its steps. If
+  /// one is open in another group (navigation came or went), closes it first.
+  // Steps register in post-frame callbacks added after this shell's, so start after all of them.
+  void _startTour(String group) => WidgetsBinding.instance.addPostFrameCallback(
+    (_) => scheduleMicrotask(() {
+      if (!mounted || _tourGroup != group) return;
+      final intro = Intro.of(context);
+      if (!intro.status.isOpen) return intro.start(group: group, reset: true);
+      void restart() {
+        if (intro.status.isOpen) return;
+        intro.statusNotifier.removeListener(restart);
+        _startTour(group);
+      }
+
+      intro.statusNotifier.addListener(restart);
+      intro.dispose();
+    }),
+  );
+
   /// [all] and [open] are for Home's shortcut cards.
   Widget _page(Screen screen, bool active, List<Screen> all, ValueChanged<Screen> open) => switch (screen) {
     Screen.home => OverviewTab(
@@ -225,9 +266,10 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final session = SessionScope.of(context);
+    final settings = SettingsScope.of(context);
     final l = context.l10n;
     final role = session.role!;
-    final all = screensFor(role, brand, SettingsScope.of(context));
+    final all = screensFor(role, brand, settings);
     final wide = MediaQuery.sizeOf(context).width >= 800;
     // A phone bottom bar fits five destinations; the rest open from the app bar.
     final screens = wide ? all : all.take(5).toList();
@@ -251,6 +293,26 @@ class _HomeShellState extends State<HomeShell> {
 
     // Navigation needs at least two destinations; a single-screen view gets none.
     final nav = screens.length > 1;
+
+    // Normies get a tour of the shell the first time they sign in on a device
+    // (not admins previewing their view). Its steps depend on [nav], so each
+    // layout is a group of its own.
+    final tour = session.signedInRole == Role.normie;
+    final tourSteps = [
+      TourStep.welcome,
+      if (nav) TourStep.navigation,
+      TourStep.theme,
+      TourStep.settings,
+      TourStep.signOut,
+    ];
+    final tourGroup = 'shell-${identityHashCode(this)}${nav ? '' : '-solo'}';
+    if (settings.tourSeen) {
+      _tourGroup = null;
+    } else if (tour && _tourGroup != tourGroup) {
+      _startTour(_tourGroup = tourGroup);
+    }
+    Widget target(TourStep step, Widget child) =>
+        tour ? TourTarget(group: tourGroup, step: step, steps: tourSteps, child: child) : child;
     // IndexedStack keeps chat history and webviews alive; polling tabs pause via `active`.
     final body = IndexedStack(
       index: index,
@@ -261,10 +323,10 @@ class _HomeShellState extends State<HomeShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Wordmark(),
+        title: target(TourStep.welcome, const Wordmark()),
         actions: [
           if (wide) ...[
-            if (role.technical) _ConnectionLabel(_connection(SettingsScope.of(context))),
+            if (role.technical) _ConnectionLabel(_connection(settings)),
             const SizedBox(width: 12),
             Center(child: TagBadge(l.roleName(role), color: roleColor(p4, role))),
             const SizedBox(width: 8),
@@ -275,16 +337,22 @@ class _HomeShellState extends State<HomeShell> {
               icon: Icon(_dests[s]!.icon, color: p4.muted),
               onPressed: () => open(s),
             ),
-          _ThemeToggle(SettingsScope.of(context)),
-          IconButton(
-            tooltip: l.settingsTooltip,
-            icon: Icon(Icons.tune, color: p4.muted),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+          target(TourStep.theme, _ThemeToggle(settings)),
+          target(
+            TourStep.settings,
+            IconButton(
+              tooltip: l.settingsTooltip,
+              icon: Icon(Icons.tune, color: p4.muted),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+            ),
           ),
-          IconButton(
-            tooltip: l.signOutTooltip,
-            icon: Icon(Icons.logout, color: p4.muted),
-            onPressed: session.signOut,
+          target(
+            TourStep.signOut,
+            IconButton(
+              tooltip: l.signOutTooltip,
+              icon: Icon(Icons.logout, color: p4.muted),
+              onPressed: session.signOut,
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -294,18 +362,21 @@ class _HomeShellState extends State<HomeShell> {
         wide && nav
             ? Row(
                 children: [
-                  NavigationRail(
-                    selectedIndex: index,
-                    onDestinationSelected: select,
-                    labelType: NavigationRailLabelType.all,
-                    destinations: [
-                      for (final d in screens.map((s) => _dests[s]!))
-                        NavigationRailDestination(
-                          icon: Icon(d.icon),
-                          selectedIcon: Icon(d.selectedIcon),
-                          label: Text(d.label(l)),
-                        ),
-                    ],
+                  target(
+                    TourStep.navigation,
+                    NavigationRail(
+                      selectedIndex: index,
+                      onDestinationSelected: select,
+                      labelType: NavigationRailLabelType.all,
+                      destinations: [
+                        for (final d in screens.map((s) => _dests[s]!))
+                          NavigationRailDestination(
+                            icon: Icon(d.icon),
+                            selectedIcon: Icon(d.selectedIcon),
+                            label: Text(d.label(l)),
+                          ),
+                      ],
+                    ),
                   ),
                   const VerticalDivider(width: 1),
                   Expanded(child: body),
@@ -315,14 +386,17 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: wide || !nav
           ? null
-          : NavigationBar(
-              selectedIndex: index,
-              onDestinationSelected: select,
-              height: 64,
-              destinations: [
-                for (final d in screens.map((s) => _dests[s]!))
-                  NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label(l)),
-              ],
+          : target(
+              TourStep.navigation,
+              NavigationBar(
+                selectedIndex: index,
+                onDestinationSelected: select,
+                height: 64,
+                destinations: [
+                  for (final d in screens.map((s) => _dests[s]!))
+                    NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label(l)),
+                ],
+              ),
             ),
     );
   }

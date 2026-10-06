@@ -262,6 +262,11 @@ class AppSettings extends ChangeNotifier {
   bool get reduceMotion => _bool('reduceMotion', false);
   set reduceMotion(bool v) => _set('reduceMotion', v);
 
+  /// Whether this device has shown (or been told to skip) the normie view's
+  /// tour of the shell. Settings → Account → Take the tour clears it.
+  bool get tourSeen => _bool('tourSeen', false);
+  set tourSeen(bool v) => _set('tourSeen', v);
+
   TemperatureUnit get temperatureUnit =>
       TemperatureUnit.values.asNameMap()[_str('temperatureUnit', 'auto')] ?? TemperatureUnit.auto;
   set temperatureUnit(TemperatureUnit v) => _set('temperatureUnit', v.name);

@@ -334,5 +334,17 @@
   "unitAuto": "Auto",
   "timeFormat": "Hora",
   "time12h": "12 horas",
-  "time24h": "24 horas"
+  "time24h": "24 horas",
+  "tourWelcome": "¡Te damos la bienvenida a {appName}! Te mostramos lo básico.",
+  "tourNavigation": "Aquí están tus pantallas. Inicio muestra cómo va todo; toca otra pantalla para abrirla.",
+  "tourTheme": "Cambia entre un aspecto claro y uno oscuro, o usa el de tu dispositivo.",
+  "tourSettings": "El idioma, el tamaño del texto y más están en Ajustes. Desde ahí puedes repetir este recorrido.",
+  "tourSignOut": "Cierra sesión aquí cuando termines.",
+  "tourProgress": "{current} de {total}",
+  "tourNext": "Siguiente",
+  "tourBack": "Atrás",
+  "tourDone": "Entendido",
+  "tourSkip": "Saltar recorrido",
+  "takeTour": "Hacer el recorrido",
+  "takeTourSubtitle": "Un vistazo rápido al panel"
 }

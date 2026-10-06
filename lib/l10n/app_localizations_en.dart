@@ -1131,4 +1131,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get time24h => '24-hour';
+
+  @override
+  String tourWelcome(String appName) {
+    return 'Welcome to $appName! Here\'s a quick look around.';
+  }
+
+  @override
+  String get tourNavigation =>
+      'Your screens are here. Home shows how everything is doing; tap another screen to open it.';
+
+  @override
+  String get tourTheme => 'Switch between a light and a dark look, or match your device.';
+
+  @override
+  String get tourSettings => 'Language, text size and more are in Settings. You can take this tour again from there.';
+
+  @override
+  String get tourSignOut => 'Sign out here when you\'re done.';
+
+  @override
+  String tourProgress(Object current, Object total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get tourNext => 'Next';
+
+  @override
+  String get tourBack => 'Back';
+
+  @override
+  String get tourDone => 'Got it';
+
+  @override
+  String get tourSkip => 'Skip tour';
+
+  @override
+  String get takeTour => 'Take the tour';
+
+  @override
+  String get takeTourSubtitle => 'A quick look around the dashboard';
 }

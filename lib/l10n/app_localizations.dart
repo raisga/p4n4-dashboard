@@ -2101,6 +2101,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'24-hour'**
   String get time24h;
+
+  /// First step of the normie view's tour, pointing at the app name
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to {appName}! Here\'s a quick look around.'**
+  String tourWelcome(String appName);
+
+  /// No description provided for @tourNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your screens are here. Home shows how everything is doing; tap another screen to open it.'**
+  String get tourNavigation;
+
+  /// No description provided for @tourTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch between a light and a dark look, or match your device.'**
+  String get tourTheme;
+
+  /// No description provided for @tourSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Language, text size and more are in Settings. You can take this tour again from there.'**
+  String get tourSettings;
+
+  /// No description provided for @tourSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out here when you\'re done.'**
+  String get tourSignOut;
+
+  /// Tour step counter, e.g. 2 of 5
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String tourProgress(Object current, Object total);
+
+  /// No description provided for @tourNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get tourNext;
+
+  /// No description provided for @tourBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get tourBack;
+
+  /// No description provided for @tourDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get tourDone;
+
+  /// No description provided for @tourSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip tour'**
+  String get tourSkip;
+
+  /// No description provided for @takeTour.
+  ///
+  /// In en, this message translates to:
+  /// **'Take the tour'**
+  String get takeTour;
+
+  /// No description provided for @takeTourSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A quick look around the dashboard'**
+  String get takeTourSubtitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -1136,4 +1136,46 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get time24h => '24 horas';
+
+  @override
+  String tourWelcome(String appName) {
+    return '¡Te damos la bienvenida a $appName! Te mostramos lo básico.';
+  }
+
+  @override
+  String get tourNavigation =>
+      'Aquí están tus pantallas. Inicio muestra cómo va todo; toca otra pantalla para abrirla.';
+
+  @override
+  String get tourTheme => 'Cambia entre un aspecto claro y uno oscuro, o usa el de tu dispositivo.';
+
+  @override
+  String get tourSettings =>
+      'El idioma, el tamaño del texto y más están en Ajustes. Desde ahí puedes repetir este recorrido.';
+
+  @override
+  String get tourSignOut => 'Cierra sesión aquí cuando termines.';
+
+  @override
+  String tourProgress(Object current, Object total) {
+    return '$current de $total';
+  }
+
+  @override
+  String get tourNext => 'Siguiente';
+
+  @override
+  String get tourBack => 'Atrás';
+
+  @override
+  String get tourDone => 'Entendido';
+
+  @override
+  String get tourSkip => 'Saltar recorrido';
+
+  @override
+  String get takeTour => 'Hacer el recorrido';
+
+  @override
+  String get takeTourSubtitle => 'Un vistazo rápido al panel';
 }

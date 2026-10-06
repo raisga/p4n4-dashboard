@@ -13,6 +13,10 @@
   "tabs": ["services", "edge", "agent", "grafana"],
   "links": [{ "label": "Support", "url": "https://example.com/support" }],
   "defaults": { "host": "192.168.1.50", "themeMode": "light", "grafanaPath": "/d/edge/overview" },
+  "tour": {
+    "welcome": { "en": "Welcome to Acme Edge! Here's where everything is.", "es": "¡Te damos la bienvenida a Acme Edge! Así está organizado." },
+    "signOut": "Done for the day? Sign out here."
+  },
   "native": {
     "displayName": "Acme Edge",
     "applicationId": "com.example.acme.edge",

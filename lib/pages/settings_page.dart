@@ -77,7 +77,7 @@ List<_Category> _categories(BuildContext context) {
       Icons.person_outline,
       l.sectionAccount,
       summary: _accountView(l, session, brand),
-      keywords: [l.signOut, ?session.username],
+      keywords: [l.signOut, ?session.username, if (session.signedInRole == Role.normie) l.takeTour],
       build: (_) => const _AccountPage(),
     ),
     _Category(
@@ -737,7 +737,7 @@ class _AccountPage extends StatelessWidget {
     final l = context.l10n;
     final session = SessionScope.of(context);
     final brand = BrandScope.of(context);
-    return _Group(
+    final account = _Group(
       children: [
         Padding(
           padding: const EdgeInsets.all(20),
@@ -786,6 +786,30 @@ class _AccountPage extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+    // The tour is the normie view's (see HomeShell).
+    if (session.signedInRole != Role.normie) return account;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        account,
+        _Group(
+          children: [
+            _Tile(
+              icon: Icons.tour_outlined,
+              title: l.takeTour,
+              subtitle: l.takeTourSubtitle,
+              trailing: Icon(Icons.chevron_right, color: p4.muted),
+              onTap: () {
+                // Back to the home screen, which starts the tour once it's unseen.
+                final settings = SettingsScope.of(context);
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                settings.tourSeen = false;
+              },
+            ),
+          ],
         ),
       ],
     );

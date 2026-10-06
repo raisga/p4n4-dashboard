@@ -25,6 +25,8 @@ On launch you sign in to the connected deployment's p4n4-api with a username and
 
 Admins can **preview** the power or normie view from Settings → Views: the dashboard switches to that view under a banner with **Back to admin**. The preview is only on that device and ends on sign-out, restart or switching deployment; it doesn't change the account.
 
+The first time a normie signs in on a device, a short tour ([`flutter_intro`](https://pub.dev/packages/flutter_intro), `lib/widgets/tour.dart`) points out the app name, the navigation, the theme toggle, Settings and Sign out. **Skip tour** or finishing it marks it seen on that device, and Settings → Account → **Take the tour** shows it again. Admins previewing the normie view don't get it. A brand can rewrite any step's text (`tour` in brand.json, see [brands/README.md](brands/README.md)).
+
 The views decide what the dashboard shows. p4n4-api enforces what each role can do: normies can only read status and chat with agents, and the API turns down anything else they try, whatever the dashboard shows.
 
 Brand tabs come in one order for every view, after Home: **Agent → Grafana → Video → Edge → Services** by default. Admins drag them into another order in Settings → Views (**Reset order** goes back to the default); Home always stays first and Clients last. The order and each view's tabs are saved on the connected deployment's p4n4-api (`GET/PUT /api/v1/dashboard/views`, admins only to change), so they apply on every device; choices an admin made on a device before that are handed to the API on their next sign-in there.
@@ -48,9 +50,9 @@ On connect, the dashboard reads the deployment's `.p4n4.json` through p4n4-api (
 - `layers`: Services and Home show only those stacks (plus the API).
 - `dashboard.tabs`: brand tabs outside the list are hidden while connected.
 - `dashboard.grafana_path`: the Grafana tab's page, used ahead of the brand default and unless the deployment sets its own.
-- `dashboard.cameras`: the Video tab's cameras until the deployment saves its own, ahead of a brand `videoUrl`. Each is `{id, name}` plus an absolute `url`, or a `port` and `path` on the connected host (e.g. go2rtc's `{"port": 1984, "path": "/api/stream.mjpeg?src=floor"}`). The [`retail-vision`](https://github.com/raisga/p4n4-templates/tree/main/retail-vision) template uses it.
+- `dashboard.cameras`: the Video tab's cameras until the deployment saves its own, ahead of a brand `videoUrl`. Each is `{id, name}` plus an absolute `url`, or a `port` and `path` on the connected host (e.g. go2rtc's `{"port": 1984, "path": "/api/stream.mjpeg?src=floor"}`). The [`mqtt-influx-grafana-ollama-go2rtc`](https://github.com/raisga/p4n4-templates/tree/main/projects/mqtt-influx-grafana-ollama-go2rtc) template uses it, as the [road traffic use case](https://github.com/raisga/p4n4-templates/blob/main/docs/use-cases/road-traffic.md) shows.
 
-Without the API, every brand tab and stack is shown, as before. Status, project info and edge metrics use the signed-in account's token. The [greenhouse use case](https://github.com/raisga/p4n4-docs/blob/main/use-cases/greenhouse-telemetry.md) shows it end to end with the `mqtt-influx-grafana` template and the `verdant` brand.
+Without the API, every brand tab and stack is shown, as before. Status, project info and edge metrics use the signed-in account's token. The [greenhouse use case](https://github.com/raisga/p4n4-templates/blob/main/docs/use-cases/greenhouse-telemetry.md) shows it end to end with the `mqtt-influx-grafana` template and the `verdant` brand.
 
 ## Run as a service (web)
 
@@ -209,7 +211,7 @@ lib/
 ├── platform/              # web vs native: <iframe>/<img> views, port probes (conditional imports)
 ├── tabs/                  # one file per tab
 ├── pages/                 # settings (categories, search), sign-in, admin sections
-└── widgets/               # shared UI, sparkline, MJPEG viewer
+└── widgets/               # shared UI, sparkline, MJPEG viewer, the normie view's tour
 test/                      # unit, widget and brand tests
 android/ ios/ linux/ macos/ windows/   # native platform projects
 ```

@@ -74,6 +74,10 @@ What `apply` doesn't change:
     "videoUrl": "", "edgeDemo": false,
     "tabOrder": "edge,grafana,services,agent"   // optional; first tabs after Home, the rest follow in the default order
   },
+  "tour": {                             // optional; replaces the normie view's tour text, step by step
+    "welcome": { "en": "Welcome to Acme Edge!", "es": "¡Te damos la bienvenida a Acme Edge!" },
+    "signOut": "Done for the day? Sign out here."   // plain text: every language
+  },
   "native": {
     "displayName": "Acme Edge",         // home-screen / launcher name
     "applicationId": "com.example.acme.edge",   // Android
@@ -90,6 +94,7 @@ Only `id`, `appName`, `wordmark.text` and `native` are required. A theme's `id` 
 - **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`), `locale` (`en` | `es`; leave it out to follow the device's language), `textScale` (0.85–1.5, e.g. `1.25` for a wall-mounted screen), `highContrast`, `reduceMotion` (`true` | `false`), `temperatureUnit` (`auto` | `celsius` | `fahrenheit`), `timeFormat` (`auto` | `h12` | `h24`).
 - **Assistant.** `agentBackend` (`ollama` | `letta`) with `ollamaModel` or `lettaAgentId` names the brand's assistant. The assistant is a deployment-wide choice kept by p4n4-api (`/api/v1/agents/config`), so these are offered to it rather than applied: the first time an admin or power user signs in to a deployment where nobody has chosen one (with the Assistant tab in their view), the brand's is saved there, provided that model or agent is installed. After that the deployment's own choice stands, and changing these defaults doesn't touch it.
 - **Disabled tabs** also hide their section in Settings → Endpoints (and the category, if none is left).
+- **Tour.** The first time someone signs in to the normie view on a device, a short tour points out the shell: `welcome` (the wordmark), `navigation` (the rail or bottom bar, when the view has more than one screen), `theme`, `settings` and `signOut`. Each key in `tour` replaces that step's built-in text, either in every language (a string) or per language (`en`, `es`, or `*` as the fallback). Steps you leave out keep the built-in copy, translated. `check` rejects unknown steps and languages. The user can replay the tour from Settings → Account → **Take the tour**.
 - **Tab order.** `tabs` only picks tabs; they show in the default order (agent, grafana, video, edge, services) unless `defaults.tabOrder` sets another. Admins can still reorder them in Settings → Views; that's saved on each deployment's p4n4-api (`/api/v1/dashboard/views`) and wins over `defaults.tabOrder`, `powerTabs` and `normieTabs`, which apply until an admin changes them.
 
 ## Files

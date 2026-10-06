@@ -817,5 +817,36 @@
   },
   "timeFormat": "Time",
   "time12h": "12-hour",
-  "time24h": "24-hour"
+  "time24h": "24-hour",
+  "tourWelcome": "Welcome to {appName}! Here's a quick look around.",
+  "@tourWelcome": {
+    "description": "First step of the normie view's tour, pointing at the app name",
+    "placeholders": {
+      "appName": {
+        "type": "String"
+      }
+    }
+  },
+  "tourNavigation": "Your screens are here. Home shows how everything is doing; tap another screen to open it.",
+  "tourTheme": "Switch between a light and a dark look, or match your device.",
+  "tourSettings": "Language, text size and more are in Settings. You can take this tour again from there.",
+  "tourSignOut": "Sign out here when you're done.",
+  "tourProgress": "{current} of {total}",
+  "@tourProgress": {
+    "description": "Tour step counter, e.g. 2 of 5",
+    "placeholders": {
+      "current": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "tourNext": "Next",
+  "tourBack": "Back",
+  "tourDone": "Got it",
+  "tourSkip": "Skip tour",
+  "takeTour": "Take the tour",
+  "takeTourSubtitle": "A quick look around the dashboard"
 }
