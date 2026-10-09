@@ -9,7 +9,7 @@ services:
   tls:
     image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     container_name: p4n4-dashboard-tls
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-unless-stopped}
     depends_on: [dashboard]
     ports:
       - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_TLS_PORT:-443}:443"
