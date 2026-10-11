@@ -71,10 +71,11 @@ class ProjectInfo {
   }
 }
 
-/// A camera from the manifest's `dashboard.cameras`: an absolute `url`, or a
+/// A camera from the manifest's `dashboard.cameras`: an absolute `url`, a
 /// `port` and `path` on whichever host the dashboard is connected to (the
 /// manifest can't know it), e.g. go2rtc's `{"port": 1984, "path":
-/// "/api/stream.mjpeg?src=floor"}`.
+/// "/api/stream.mjpeg?src=floor"}`, or a `device` camera (`back` or `front`)
+/// of the phone or tablet the dashboard runs on.
 class ProjectCamera {
   const ProjectCamera({required this.id, required this.name, this.url, this.port, this.path = '/'});
 
@@ -84,16 +85,20 @@ class ProjectCamera {
   final int? port;
   final String path;
 
-  /// The [Camera] on [host]; [url] when set, else http://host:port/path.
+  /// The [Camera] on [host]; [url] (an http(s) URL or `device:<lens>`) when
+  /// set, else http://host:port/path.
   Camera on(String host) => Camera(id: id, name: name, url: url ?? 'http://$host:$port$path');
 
-  /// Null (skipped) unless it has an id, a name, and either an http(s) url or a port.
+  /// Null (skipped) unless it has an id, a name, and an http(s) url, a device lens or a port.
   static ProjectCamera? fromJson(Map<String, dynamic> j) {
     final (id, name, url, port, path) = (j['id'], j['name'], j['url'], j['port'], j['path'] ?? '/');
     if (id is! String || id.isEmpty || name is! String || name.isEmpty || path is! String || !path.startsWith('/')) {
       return null;
     }
     if (url is String && Camera.parseUrl(url) != null) return ProjectCamera(id: id, name: name, url: url);
+    if (j['device'] case final String lens when Camera.parseDevice('device:$lens') != null) {
+      return ProjectCamera(id: id, name: name, url: 'device:$lens');
+    }
     if (port is int && port > 0 && port < 65536) return ProjectCamera(id: id, name: name, port: port, path: path);
     return null;
   }

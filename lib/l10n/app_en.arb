@@ -705,7 +705,7 @@
   "addCamera": "Add camera",
   "addCameraButton": "Add camera",
   "noCameras": "No cameras",
-  "noCamerasTechnical": "Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera.",
+  "noCamerasTechnical": "Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera, or one of this device's cameras.",
   "noCamerasNormie": "No camera has been set up yet. Ask your administrator to add one.",
   "noCamerasConfigured": "No cameras set up",
   "cameraCount": "{count, plural, =1{1 camera} other{{count} cameras}}",
@@ -724,8 +724,8 @@
       }
     }
   },
-  "cameraUrl": "Stream, snapshot or video URL",
-  "cameraUrlError": "Enter an http:// or https:// URL",
+  "cameraUrl": "Stream, snapshot or video URL, or device camera",
+  "cameraUrlError": "Enter an http:// or https:// URL, device:back or device:front",
   "cameraExamples": "e.g.",
   "@cameraExamples": {
     "description": "Prefix of the camera URL examples"
@@ -737,6 +737,20 @@
   "cameraVideo": "Video",
   "@cameraVideo": {
     "description": "Badge on a camera playing a video file, like \"Live\" on a stream"
+  },
+  "backCamera": "Back camera",
+  "frontCamera": "Front camera",
+  "deviceCameraMissing": "This device has no such camera",
+  "deviceCameraOneAtATime": "This device shows one of its cameras at a time",
+  "deviceCameraShow": "Show this one",
+  "deviceCameraUnsupported": "Device cameras don't work in the app on {platform}",
+  "@deviceCameraUnsupported": {
+    "description": "{platform} is an OS name, e.g. linux",
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
   },
   "videoDemoSwitch": "Demo cameras",
   "useDemoCameras": "Use demo cameras",

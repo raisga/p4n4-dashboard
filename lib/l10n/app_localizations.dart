@@ -1847,7 +1847,7 @@ abstract class AppLocalizations {
   /// No description provided for @noCamerasTechnical.
   ///
   /// In en, this message translates to:
-  /// **'Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera.'**
+  /// **'Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera, or one of this device\'s cameras.'**
   String get noCamerasTechnical;
 
   /// No description provided for @noCamerasNormie.
@@ -1877,13 +1877,13 @@ abstract class AppLocalizations {
   /// No description provided for @cameraUrl.
   ///
   /// In en, this message translates to:
-  /// **'Stream, snapshot or video URL'**
+  /// **'Stream, snapshot or video URL, or device camera'**
   String get cameraUrl;
 
   /// No description provided for @cameraUrlError.
   ///
   /// In en, this message translates to:
-  /// **'Enter an http:// or https:// URL'**
+  /// **'Enter an http:// or https:// URL, device:back or device:front'**
   String get cameraUrlError;
 
   /// Prefix of the camera URL examples
@@ -1921,6 +1921,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Video'**
   String get cameraVideo;
+
+  /// No description provided for @backCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Back camera'**
+  String get backCamera;
+
+  /// No description provided for @frontCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Front camera'**
+  String get frontCamera;
+
+  /// No description provided for @deviceCameraMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no such camera'**
+  String get deviceCameraMissing;
+
+  /// No description provided for @deviceCameraOneAtATime.
+  ///
+  /// In en, this message translates to:
+  /// **'This device shows one of its cameras at a time'**
+  String get deviceCameraOneAtATime;
+
+  /// No description provided for @deviceCameraShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this one'**
+  String get deviceCameraShow;
+
+  /// {platform} is an OS name, e.g. linux
+  ///
+  /// In en, this message translates to:
+  /// **'Device cameras don\'t work in the app on {platform}'**
+  String deviceCameraUnsupported(String platform);
 
   /// No description provided for @videoDemoSwitch.
   ///

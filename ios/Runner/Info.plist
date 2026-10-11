@@ -9,6 +9,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Shows this device's cameras in the Video tab, when a camera is set to one.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connects to p4n4 services (Grafana, Ollama, cameras) on your local network.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

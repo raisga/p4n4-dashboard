@@ -990,7 +990,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noCameras => 'No cameras';
 
   @override
-  String get noCamerasTechnical => 'Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera.';
+  String get noCamerasTechnical =>
+      'Add the URL of an MJPEG stream, JPEG snapshot or video file from your edge camera, or one of this device\'s cameras.';
 
   @override
   String get noCamerasNormie => 'No camera has been set up yet. Ask your administrator to add one.';
@@ -1010,10 +1011,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cameraUrl => 'Stream, snapshot or video URL';
+  String get cameraUrl => 'Stream, snapshot or video URL, or device camera';
 
   @override
-  String get cameraUrlError => 'Enter an http:// or https:// URL';
+  String get cameraUrlError => 'Enter an http:// or https:// URL, device:back or device:front';
 
   @override
   String get cameraExamples => 'e.g.';
@@ -1032,6 +1033,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraVideo => 'Video';
+
+  @override
+  String get backCamera => 'Back camera';
+
+  @override
+  String get frontCamera => 'Front camera';
+
+  @override
+  String get deviceCameraMissing => 'This device has no such camera';
+
+  @override
+  String get deviceCameraOneAtATime => 'This device shows one of its cameras at a time';
+
+  @override
+  String get deviceCameraShow => 'Show this one';
+
+  @override
+  String deviceCameraUnsupported(String platform) {
+    return 'Device cameras don\'t work in the app on $platform';
+  }
 
   @override
   String get videoDemoSwitch => 'Demo cameras';

@@ -65,7 +65,7 @@ void main() {
       expect(p.tabs, isNull);
     });
 
-    test('reads cameras: an absolute url, or a port and path on the connected host', () {
+    test('reads cameras: an absolute url, a port and path on the connected host, or a device lens', () {
       final p = ProjectInfo.fromJson({
         'project': 'shop',
         'dashboard': {
@@ -73,20 +73,26 @@ void main() {
             {'id': 'floor', 'name': 'Sales floor', 'port': 1984, 'path': '/api/stream.mjpeg?src=floor'},
             {'id': 'door', 'name': 'Door', 'url': 'http://10.0.0.9:8080/?action=stream'},
             {'id': 'root', 'name': 'Root', 'port': 8081},
+            {'id': 'dashcam', 'name': 'Dash cam', 'device': 'back'},
+            {'id': 'pilot', 'name': 'Pilot cam', 'device': 'front'},
           ],
         },
       });
+      final cameras = [for (final c in p.cameras) c.on('shop.local')];
       expect(
-        [for (final c in p.cameras) c.on('shop.local').url],
+        [for (final c in cameras) c.url],
         [
           'http://shop.local:1984/api/stream.mjpeg?src=floor',
           'http://10.0.0.9:8080/?action=stream',
           'http://shop.local:8081/',
+          'device:back',
+          'device:front',
         ],
       );
+      expect([for (final c in cameras) c.device], [null, null, null, CameraLens.back, CameraLens.front]);
       expect(
         [for (final c in p.cameras) (c.id, c.name)],
-        [('floor', 'Sales floor'), ('door', 'Door'), ('root', 'Root')],
+        [('floor', 'Sales floor'), ('door', 'Door'), ('root', 'Root'), ('dashcam', 'Dash cam'), ('pilot', 'Pilot cam')],
       );
     });
 
@@ -100,6 +106,7 @@ void main() {
             {'id': 'y', 'name': 'Bad port', 'port': 70000},
             {'id': 'z', 'name': 'Bad url', 'url': 'rtsp://cam/stream'},
             {'id': 'w', 'name': 'Relative path', 'port': 1984, 'path': 'stream'},
+            {'id': 'v', 'name': 'Bad lens', 'device': 'side'},
             'not a camera',
             {'id': 'ok', 'name': 'Fine', 'port': 1984, 'path': '/s'},
           ],

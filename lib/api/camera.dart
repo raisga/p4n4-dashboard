@@ -1,5 +1,6 @@
-/// A camera feed: an MJPEG stream, a JPEG snapshot URL or a video file
-/// ([isVideo]).
+/// A camera feed: an MJPEG stream, a JPEG snapshot URL, a video file
+/// ([isVideo]), or one of this device's own cameras, `device:back` or
+/// `device:front` ([device]).
 class Camera {
   const Camera({required this.id, required this.name, required this.url});
 
@@ -15,6 +16,18 @@ class Camera {
     final u = Uri.tryParse(url.trim());
     return u != null && (u.scheme == 'http' || u.scheme == 'https') && u.host.isNotEmpty ? u : null;
   }
+
+  /// The lens of a `device:` camera, the device the dashboard runs on.
+  CameraLens? get device => parseDevice(url);
+
+  static CameraLens? parseDevice(String url) => switch (url.trim()) {
+    'device:back' => CameraLens.back,
+    'device:front' => CameraLens.front,
+    _ => null,
+  };
+
+  /// Whether the Video tab can show [url]: an http(s) URL or a `device:` camera.
+  static bool isValid(String url) => parseUrl(url) != null || parseDevice(url) != null;
 
   /// Whether [url] is a video file or playlist (played on a loop, muted)
   /// rather than an MJPEG stream or snapshot.
@@ -32,6 +45,9 @@ class Camera {
   factory Camera.fromJson(Map<String, dynamic> j) =>
       Camera(id: j['id'] as String, name: j['name'] as String, url: j['url'] as String);
 }
+
+/// Which of the device's own cameras a `device:` camera opens.
+enum CameraLens { back, front }
 
 /// Stand-in feeds for showing the Video tab without cameras: short, openly
 /// licensed H.264 clips (CC0 from MDN; Big Buck Bunny and Sintel are

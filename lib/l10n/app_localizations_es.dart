@@ -995,7 +995,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get noCamerasTechnical =>
-      'Añade la URL de un stream MJPEG, de una captura JPEG o de un archivo de vídeo de tu cámara edge.';
+      'Añade la URL de un stream MJPEG, de una captura JPEG o de un archivo de vídeo de tu cámara edge, o una de las cámaras de este dispositivo.';
 
   @override
   String get noCamerasNormie => 'Aún no se ha configurado ninguna cámara. Pide a tu administrador que añada una.';
@@ -1015,10 +1015,10 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get cameraUrl => 'URL de stream, captura o vídeo';
+  String get cameraUrl => 'URL de stream, captura o vídeo, o cámara del dispositivo';
 
   @override
-  String get cameraUrlError => 'Introduce una URL http:// o https://';
+  String get cameraUrlError => 'Introduce una URL http:// o https://, device:back o device:front';
 
   @override
   String get cameraExamples => 'p. ej.';
@@ -1037,6 +1037,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cameraVideo => 'Vídeo';
+
+  @override
+  String get backCamera => 'Cámara trasera';
+
+  @override
+  String get frontCamera => 'Cámara frontal';
+
+  @override
+  String get deviceCameraMissing => 'Este dispositivo no tiene esa cámara';
+
+  @override
+  String get deviceCameraOneAtATime => 'Este dispositivo muestra una de sus cámaras a la vez';
+
+  @override
+  String get deviceCameraShow => 'Mostrar esta';
+
+  @override
+  String deviceCameraUnsupported(String platform) {
+    return 'Las cámaras del dispositivo no funcionan en la app en $platform';
+  }
 
   @override
   String get videoDemoSwitch => 'Cámaras de demostración';

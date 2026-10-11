@@ -6,11 +6,13 @@ import '../core/settings.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/device_camera_view.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/video_view.dart';
 
 /// Live camera feeds from the edge device (MJPEG streams, JPEG snapshots or
-/// video files): one camera at a time, or all of them in a grid. Admins can
+/// video files) or from the device the dashboard runs on (`device:back`,
+/// `device:front`): one camera at a time, or all of them in a grid. Admins can
 /// swap in [demoCameras] to show it off without cameras.
 class VideoTab extends StatefulWidget {
   const VideoTab({super.key, required this.active});
@@ -66,6 +68,8 @@ class _VideoTabState extends State<VideoTab> {
         case final MjpegViewState v:
           v.reconnect();
         case final VideoViewState v:
+          v.reconnect();
+        case final DeviceCameraViewState v:
           v.reconnect();
       }
     }
@@ -194,10 +198,23 @@ class _VideoTabState extends State<VideoTab> {
     );
   }
 
-  Widget _view(Camera c) => switch (c.uri) {
-    final uri? when c.isVideo => VideoView(key: _key(c), uri: uri, active: widget.active && !_paused),
-    final uri? => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
-    null => Center(
+  /// This device opens one of its cameras at a time ([DeviceCameraView]):
+  /// the selected one if it is one, else the first shown.
+  String? _liveDevice(List<Camera> shown) {
+    final devices = shown.where((c) => c.device != null);
+    return (devices.where((c) => c.id == _selectedId).firstOrNull ?? devices.firstOrNull)?.id;
+  }
+
+  Widget _view(Camera c, {String? liveDevice}) => switch ((c.device, c.uri)) {
+    (final lens?, _) => DeviceCameraView(
+      key: _key(c),
+      lens: lens,
+      active: widget.active && !_paused && (liveDevice ?? c.id) == c.id,
+      onShow: () => setState(() => _selectedId = c.id),
+    ),
+    (_, final uri?) when c.isVideo => VideoView(key: _key(c), uri: uri, active: widget.active && !_paused),
+    (_, final uri?) => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
+    (null, null) => Center(
       child: Text(l.cameraInvalidUrl(c.name), style: p4.body(color: p4.err)),
     ),
   };
@@ -205,6 +222,7 @@ class _VideoTabState extends State<VideoTab> {
   /// Every camera at 16:9, as many columns as fit at ≥320px each.
   Widget _gridView(List<Camera> cameras) => LayoutBuilder(
     builder: (context, box) {
+      final liveDevice = _liveDevice(cameras);
       final cols = (box.maxWidth / 320).floor().clamp(1, cameras.length);
       return GridView.count(
         crossAxisCount: cols,
@@ -216,7 +234,7 @@ class _VideoTabState extends State<VideoTab> {
             Stack(
               fit: StackFit.expand,
               children: [
-                _view(c),
+                _view(c, liveDevice: liveDevice),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -275,7 +293,7 @@ class _CameraDialogState extends State<_CameraDialog> {
   late final _name = TextEditingController(text: widget.initial?.name ?? widget.defaultName);
   late final _url = TextEditingController(text: widget.initial?.url ?? widget.defaultUrl);
 
-  bool get _valid => Camera.parseUrl(_url.text) != null;
+  bool get _valid => Camera.isValid(_url.text);
 
   @override
   void dispose() {
@@ -331,7 +349,8 @@ class _CameraDialogState extends State<_CameraDialog> {
               '${pad}motion         http://host:8081/\n'
               '${pad}go2rtc         http://host:1984/api/stream.mjpeg?src=cam\n'
               '${pad}snapshot       http://host/snapshot.jpg\n'
-              '${pad}video file     http://host/clip.mp4',
+              '${pad}video file     http://host/clip.mp4\n'
+              '${pad}this device    device:back  device:front',
               style: p4.mono(size: 10, spacing: 0),
             ),
           ],

@@ -15,6 +15,7 @@ import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/pages/login_page.dart';
 import 'package:p4n4_dashboard/widgets/common.dart' show TagBadge;
+import 'package:p4n4_dashboard/widgets/device_camera_view.dart';
 import 'package:p4n4_dashboard/widgets/mjpeg_view.dart';
 import 'package:p4n4_dashboard/widgets/video_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -519,7 +520,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     final save = find.widgetWithText(FilledButton, 'Save');
-    final url = find.widgetWithText(TextField, 'Stream, snapshot or video URL');
+    final url = find.widgetWithText(TextField, 'Stream, snapshot or video URL, or device camera');
     await tester.enterText(url, 'not a url');
     await tester.pump();
     expect(tester.widget<FilledButton>(save).onPressed, isNull);
@@ -533,6 +534,32 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(settings.cameras.single.name, 'Gate');
     expect(find.byType(MjpegView), findsOneWidget);
+  });
+
+  testWidgets('a device: camera shows this device\'s own camera', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
+    SettingsScope.of(tester.element(find.byType(HomeShell))).cameras = const [
+      Camera(id: 'dashcam', name: 'Dash cam', url: 'device:back'),
+      Camera(id: 'pilot', name: 'Pilot cam', url: 'device:front'),
+    ];
+    await tester.tap(nav('Cameras'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.widget<DeviceCameraView>(find.byType(DeviceCameraView)).lens, CameraLens.back);
+    expect(find.byType(MjpegView), findsNothing);
+    expect(find.textContaining('invalid URL'), findsNothing);
+
+    // The grid keeps one of them live: the device opens one camera at a time.
+    List<CameraLens> live() => [
+      for (final v in tester.widgetList<DeviceCameraView>(find.byType(DeviceCameraView)))
+        if (v.active) v.lens,
+    ];
+    await tester.tap(find.byTooltip('All cameras'));
+    await tester.pump();
+    expect(find.byType(DeviceCameraView), findsNWidgets(2));
+    expect(live(), [CameraLens.back]);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Show this one'));
+    await tester.pump();
+    expect(live(), [CameraLens.front]);
   });
 
   testWidgets('admins swap in demo cameras, which play as video and leave the saved ones alone', (tester) async {
