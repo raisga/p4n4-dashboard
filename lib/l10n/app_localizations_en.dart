@@ -1193,4 +1193,66 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get takeTourSubtitle => 'A quick look around the dashboard';
+
+  @override
+  String get navFeed => 'Activity';
+
+  @override
+  String get shortcutFeedDesc => 'Live events, and the alerts that need someone.';
+
+  @override
+  String get feedEmpty => 'Nothing yet';
+
+  @override
+  String get feedEmptyMsg => 'Events and alerts show up here as they happen.';
+
+  @override
+  String get feedNotSetUp => 'No activity feed';
+
+  @override
+  String get feedNotSetUpMsg => 'This deployment doesn\'t publish one.';
+
+  @override
+  String get feedNotSetUpTechnical => 'The project has no feed: add dashboard.feed to its .p4n4.json.';
+
+  @override
+  String get feedUnavailable => 'Can\'t reach the activity feed';
+
+  @override
+  String get feedUnavailableMsg => 'Check that the store\'s services are running, then try again.';
+
+  @override
+  String feedPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count to review', one: '1 to review');
+    return '$_temp0';
+  }
+
+  @override
+  String get feedFilterAll => 'All';
+
+  @override
+  String get feedFilterAlerts => 'Alerts';
+
+  @override
+  String get feedFilterPending => 'To review';
+
+  @override
+  String get feedOlder => 'Older';
+
+  @override
+  String feedActionFailed(String error) {
+    return 'Couldn\'t do that: $error';
+  }
+
+  @override
+  String get feedDemoData => 'Demo data';
+
+  @override
+  String get feedStatusPending => 'To review';
+
+  @override
+  String get feedStatusAttended => 'Attended';
+
+  @override
+  String get feedStatusDismissed => 'Dismissed';
 }

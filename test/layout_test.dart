@@ -393,7 +393,7 @@ void main() {
       expect(rail().selectedIndex, 3, reason: 'Grafana stays open as it moves');
 
       await settings.resetTabOrder();
-      expect(settings.tabOrder, DashTab.values);
+      expect(settings.tabOrder, DashTab.defaults);
     }, () => viewsApi(saved));
     expect(saved.first['tab_order'], ['services', 'agent', 'grafana', 'video', 'edge']);
     expect(saved.last['tab_order'], isNull, reason: 'reset: the brand\'s order again');

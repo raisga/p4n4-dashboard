@@ -10,6 +10,7 @@ import '../core/settings.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/rich_message.dart';
 
 /// Chat with the deployment's assistant, an Ollama model or a Letta agent,
 /// through p4n4-api.
@@ -359,7 +360,10 @@ class _AgentTabState extends State<AgentTab> {
       message: l.assistantChatMsg,
       details: _technical ? (ollama ? l.agentOllamaMsg(BrandScope.of(context).platform) : l.agentLettaMsg) : null,
       actions: [
-        for (final q in [l.assistantSuggestStatus, l.assistantSuggestDevice, l.assistantSuggestHelp])
+        // The brand's own questions for this deployment (brand.json assistant.suggestions), else ours
+        for (final q
+            in BrandScope.of(context).suggestionsFor(l.localeName) ??
+                [l.assistantSuggestStatus, l.assistantSuggestDevice, l.assistantSuggestHelp])
           ActionChip(
             avatar: Icon(Icons.chat_bubble_outline, size: 16, color: p4.accent),
             label: Text(q),
@@ -486,8 +490,10 @@ class _Bubble extends StatelessWidget {
               const SizedBox(height: 4),
               if (msg.content.isEmpty && streaming)
                 SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
+              else if (user || error)
+                SelectableText(msg.content, style: p4.body(size: 15))
               else
-                SelectableText(msg.content, style: p4.body(size: 15)),
+                RichMessage(msg.content, style: p4.body(size: 15)),
             ],
           ),
         ),

@@ -8,7 +8,20 @@ import 'theme.dart';
 
 /// Tabs a brand can enable, in their default display order (after Home).
 /// Admins reorder them in Settings; see [AppSettings.tabOrder].
-enum DashTab { agent, grafana, video, edge, services }
+enum DashTab {
+  agent,
+  grafana,
+  video,
+  edge,
+  services,
+
+  /// The project's live events and alerts (`.p4n4.json` `dashboard.feed`).
+  /// Opt-in: a brand without a `tabs` list doesn't get it.
+  feed;
+
+  /// The tabs a brand gets when its brand.json lists none.
+  static const defaults = [agent, grafana, video, edge, services];
+}
 
 /// Steps of the first-run tour of the shell that normies get, in order. Their
 /// names are the keys of brand.json `tour`, which replaces their text.
@@ -42,6 +55,7 @@ class Brand {
     required this.links,
     required this.defaults,
     this.tour = const {},
+    this.assistantSuggestions = const {},
     this.logo,
   });
 
@@ -77,6 +91,14 @@ class Brand {
   /// [step]'s text from the brand in [language], if it has any.
   String? tourText(TourStep step, String language) => tour[step]?[language] ?? tour[step]?['*'];
 
+  /// Questions the Assistant tab offers to start a chat with, per language
+  /// code (`*` for every language), from brand.json `assistant.suggestions`.
+  /// Empty: the dashboard's own.
+  final Map<String, List<String>> assistantSuggestions;
+
+  /// The brand's starter questions in [language], or null to use the dashboard's.
+  List<String>? suggestionsFor(String language) => assistantSuggestions[language] ?? assistantSuggestions['*'];
+
   /// Asset path of an app-bar logo that replaces the text wordmark.
   final String? logo;
 
@@ -103,7 +125,7 @@ class Brand {
     final colors = (j['colors'] as Map?)?.cast<String, dynamic>() ?? const {};
     final displayFont = _font(fonts['display'], 'Plus Jakarta Sans');
     final monoFont = _font(fonts['mono'], 'JetBrains Mono');
-    final tabNames = (j['tabs'] as List?)?.cast<String>() ?? [for (final t in DashTab.values) t.name];
+    final tabNames = (j['tabs'] as List?)?.cast<String>() ?? [for (final t in DashTab.defaults) t.name];
     final tabs = [
       for (final t in DashTab.values)
         if (tabNames.contains(t.name)) t,
@@ -131,6 +153,7 @@ class Brand {
       ],
       defaults: ((j['defaults'] as Map?) ?? const {}).cast<String, Object>(),
       tour: _tour(j['tour']),
+      assistantSuggestions: _suggestions(((j['assistant'] as Map?) ?? const {})['suggestions']),
       logo: logo == null ? null : '$assetDir/$logo',
     );
   }
@@ -153,6 +176,20 @@ class Brand {
           Map texts when texts.values.every((t) => t is String) => texts.cast<String, String>(),
           _ => throw FormatException('brand.json tour.$key must be text or {language: text}'),
         },
+    };
+  }
+
+  /// brand.json `assistant.suggestions`: a list for every language, or {language: list}.
+  static Map<String, List<String>> _suggestions(Object? raw) {
+    List<String> list(Object? v) => switch (v) {
+      List l when l.isNotEmpty && l.every((q) => q is String && q.trim().isNotEmpty) => l.cast<String>(),
+      _ => throw const FormatException('brand.json assistant.suggestions must be non-empty lists of questions'),
+    };
+    return switch (raw) {
+      null => const {},
+      List _ => {'*': list(raw)},
+      Map m => {for (final e in m.entries) e.key as String: list(e.value)},
+      _ => throw const FormatException('brand.json assistant.suggestions must be a list or {language: list}'),
     };
   }
 

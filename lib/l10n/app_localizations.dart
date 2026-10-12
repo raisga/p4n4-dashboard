@@ -2209,6 +2209,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A quick look around the dashboard'**
   String get takeTourSubtitle;
+
+  /// No description provided for @navFeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get navFeed;
+
+  /// No description provided for @shortcutFeedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Live events, and the alerts that need someone.'**
+  String get shortcutFeedDesc;
+
+  /// No description provided for @feedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing yet'**
+  String get feedEmpty;
+
+  /// No description provided for @feedEmptyMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Events and alerts show up here as they happen.'**
+  String get feedEmptyMsg;
+
+  /// No description provided for @feedNotSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity feed'**
+  String get feedNotSetUp;
+
+  /// No description provided for @feedNotSetUpMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'This deployment doesn\'t publish one.'**
+  String get feedNotSetUpMsg;
+
+  /// No description provided for @feedNotSetUpTechnical.
+  ///
+  /// In en, this message translates to:
+  /// **'The project has no feed: add dashboard.feed to its .p4n4.json.'**
+  String get feedNotSetUpTechnical;
+
+  /// No description provided for @feedUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the activity feed'**
+  String get feedUnavailable;
+
+  /// No description provided for @feedUnavailableMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the store\'s services are running, then try again.'**
+  String get feedUnavailableMsg;
+
+  /// No description provided for @feedPending.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 to review} other{{count} to review}}'**
+  String feedPending(int count);
+
+  /// No description provided for @feedFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get feedFilterAll;
+
+  /// No description provided for @feedFilterAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts'**
+  String get feedFilterAlerts;
+
+  /// No description provided for @feedFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'To review'**
+  String get feedFilterPending;
+
+  /// No description provided for @feedOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Older'**
+  String get feedOlder;
+
+  /// No description provided for @feedActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t do that: {error}'**
+  String feedActionFailed(String error);
+
+  /// No description provided for @feedDemoData.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo data'**
+  String get feedDemoData;
+
+  /// No description provided for @feedStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'To review'**
+  String get feedStatusPending;
+
+  /// No description provided for @feedStatusAttended.
+  ///
+  /// In en, this message translates to:
+  /// **'Attended'**
+  String get feedStatusAttended;
+
+  /// No description provided for @feedStatusDismissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismissed'**
+  String get feedStatusDismissed;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

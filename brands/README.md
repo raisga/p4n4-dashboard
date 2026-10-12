@@ -67,12 +67,15 @@ What `apply` doesn't change:
     "light": { "accent": "#0F766E" },
     "dark":  { "accent": "#2DD4BF", "bg": "#07110F" }
   },
-  "tabs": ["services", "edge", "agent", "grafana"],   // subset of services, edge, agent, grafana, video
+  "tabs": ["services", "edge", "agent", "grafana"],   // subset of services, edge, agent, grafana, video, feed
   "links": [{ "label": "Support", "url": "https://…" }],
   "defaults": {                         // first-run settings; the user can change them
     "host": "192.168.1.50", "themeMode": "light", "grafanaPath": "/d/edge/overview",
     "videoUrl": "", "edgeDemo": false,
     "tabOrder": "edge,grafana,services,agent"   // optional; first tabs after Home, the rest follow in the default order
+  },
+  "assistant": {                        // optional; the Assistant tab's starter questions
+    "suggestions": { "es": ["¿Qué pasó ayer?"], "en": ["What happened yesterday?"] }
   },
   "tour": {                             // optional; replaces the normie view's tour text, step by step
     "welcome": { "en": "Welcome to Acme Edge!", "es": "¡Te damos la bienvenida a Acme Edge!" },
@@ -93,6 +96,8 @@ Only `id`, `appName`, `wordmark.text` and `native` are required. A theme's `id` 
 - **Colors.** Color tokens are the fields of `P4Colors` in `lib/core/theme.dart`: `bg`, `bg2`, `bg3`, `accent`, `accent2`, `onAccent`, `amber`, `blue`, `heading`, `text`, `muted`, `border`, `border2`, `ok`, `warn`, `err`. `check` and `apply` warn when a text color falls below WCAG AA contrast (4.5:1) against any surface in that mode. Light and dark are validated separately, so a teal that works on black may need a darker step on white.
 - **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`), `locale` (`en` | `es`; leave it out to follow the device's language), `textScale` (0.85–1.5, e.g. `1.25` for a wall-mounted screen), `highContrast`, `reduceMotion` (`true` | `false`), `temperatureUnit` (`auto` | `celsius` | `fahrenheit`), `timeFormat` (`auto` | `h12` | `h24`).
 - **Assistant.** `agentBackend` (`ollama` | `letta`) with `ollamaModel` or `lettaAgentId` names the brand's assistant. The assistant is a deployment-wide choice kept by p4n4-api (`/api/v1/agents/config`), so these are offered to it rather than applied: the first time an admin or power user signs in to a deployment where nobody has chosen one (with the Assistant tab in their view), the brand's is saved there, provided that model or agent is installed. After that the deployment's own choice stands, and changing these defaults doesn't touch it.
+- **Starter questions.** `assistant.suggestions` replaces the Assistant tab's three built-in questions (shown before a chat starts) with the brand's own, e.g. about a store rather than a device: a list for every language, or per language (`en`, `es`, or `*` as the fallback). A language without a list keeps the built-in questions. `check` rejects empty lists and unknown languages.
+- **Feed.** `feed` is opt-in: a brand without a `tabs` list gets the other five. The tab shows only when the connected project also serves a feed (`.p4n4.json` `dashboard.tabs` and `dashboard.feed`, see the dashboard README's feed contract), and only then does it join Settings → Views.
 - **Disabled tabs** also hide their section in Settings → Endpoints (and the category, if none is left).
 - **Tour.** The first time someone signs in to the normie view on a device, a short tour points out the shell: `welcome` (the wordmark), `navigation` (the rail or bottom bar, when the view has more than one screen), `theme`, `settings` and `signOut`. Each key in `tour` replaces that step's built-in text, either in every language (a string) or per language (`en`, `es`, or `*` as the fallback). Steps you leave out keep the built-in copy, translated. `check` rejects unknown steps and languages. The user can replay the tour from Settings → Account → **Take the tour**.
 - **Tab order.** `tabs` only picks tabs; they show in the default order (agent, grafana, video, edge, services) unless `defaults.tabOrder` sets another. Admins can still reorder them in Settings → Views; that's saved on each deployment's p4n4-api (`/api/v1/dashboard/views`) and wins over `defaults.tabOrder`, `powerTabs` and `normieTabs`, which apply until an admin changes them.

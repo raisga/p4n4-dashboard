@@ -189,6 +189,39 @@ By default the Edge tab polls `GET {p4n4-api}/api/v1/edge/metrics` every 2 s. Th
 
 Only `cpu_percent` and `mem_percent` are required. Tiles for the other fields only appear when the field is present.
 
+## Feed contract
+
+The Feed tab (opt-in, `feed` in brand.json `tabs`) lists a project's live events and alerts, and lets operators and admins act on alerts. It reads `GET {p4n4-api}/api/v1/feed`, which relays the project's own feed: `.p4n4.json` names it in `dashboard.feed`, with the layer `.env` variable p4n4-api sends as a bearer token, so the upstream's credential never reaches a browser:
+
+```json
+"dashboard": {
+  "tabs": ["agent", "grafana", "feed"],
+  "feed": { "url": "http://localhost:8090/api/v1/feed", "token": { "layer": "iot", "env": "INGEST_READ_TOKEN" } }
+}
+```
+
+The upstream answers `GET <url>?limit=50&before=<next_before>` with:
+
+```json
+{
+  "title": "Live activity",
+  "items": [
+    {
+      "id": "ALT-20261003-000001", "time": "2026-10-03T18:15:00-05:00", "kind": "alert",
+      "title": "Fitting room assistance", "subtitle": "Tries it on · Fitting rooms",
+      "detail": "Assist at the fitting room: offer another size.", "badge": "A3",
+      "tone": "info", "status": "pending_review",
+      "actions": [{ "id": "attended", "label": "Attend" }, { "id": "dismissed", "label": "Dismiss" }],
+      "meta": { "camera_id": "cam-04", "zone_id": "b-fitting" }, "synthetic": true
+    }
+  ],
+  "counts": { "pending": 1 },
+  "next_before": 1791074857.9
+}
+```
+
+Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended` and `dismissed` are shown translated, other values as they are. An action posts `POST <url>/<id>/action` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
+
 ## Layout
 
 ```

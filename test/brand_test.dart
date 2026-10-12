@@ -72,7 +72,7 @@ void main() {
     final brand = loadBrand('p4n4');
     expect(brand.dark.accent, P4Colors.dark.accent);
     expect(brand.light.bg, P4Colors.light.bg);
-    expect(brand.tabs, DashTab.values);
+    expect(brand.tabs, DashTab.defaults);
   });
 
   test('colour overrides apply per mode and leave other tokens alone', () {
@@ -93,7 +93,7 @@ void main() {
     expect(brand.platform, 'p4n4');
     expect(brand.wordmarkSuffix, '');
     expect(brand.displayFont, 'Plus Jakarta Sans');
-    expect(brand.tabs, DashTab.values);
+    expect(brand.tabs, DashTab.defaults);
     expect(brand.logo, isNull);
   });
 

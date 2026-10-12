@@ -862,5 +862,38 @@
   "tourDone": "Got it",
   "tourSkip": "Skip tour",
   "takeTour": "Take the tour",
-  "takeTourSubtitle": "A quick look around the dashboard"
+  "takeTourSubtitle": "A quick look around the dashboard",
+  "navFeed": "Activity",
+  "shortcutFeedDesc": "Live events, and the alerts that need someone.",
+  "feedEmpty": "Nothing yet",
+  "feedEmptyMsg": "Events and alerts show up here as they happen.",
+  "feedNotSetUp": "No activity feed",
+  "feedNotSetUpMsg": "This deployment doesn't publish one.",
+  "feedNotSetUpTechnical": "The project has no feed: add dashboard.feed to its .p4n4.json.",
+  "feedUnavailable": "Can't reach the activity feed",
+  "feedUnavailableMsg": "Check that the store's services are running, then try again.",
+  "feedPending": "{count, plural, =1{1 to review} other{{count} to review}}",
+  "@feedPending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "feedFilterAll": "All",
+  "feedFilterAlerts": "Alerts",
+  "feedFilterPending": "To review",
+  "feedOlder": "Older",
+  "feedActionFailed": "Couldn't do that: {error}",
+  "@feedActionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "feedDemoData": "Demo data",
+  "feedStatusPending": "To review",
+  "feedStatusAttended": "Attended",
+  "feedStatusDismissed": "Dismissed"
 }

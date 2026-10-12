@@ -295,6 +295,7 @@ class _OverviewTabState extends State<OverviewTab> {
       DashTab.agent => (Icons.forum_outlined, l.shortcutAssistantDesc),
       DashTab.grafana => (Icons.show_chart, l.shortcutDashboardsDesc),
       DashTab.video => (Icons.videocam_outlined, l.shortcutCameraDesc),
+      DashTab.feed => (Icons.dynamic_feed_outlined, l.shortcutFeedDesc),
     };
     return Card(
       clipBehavior: Clip.antiAlias,

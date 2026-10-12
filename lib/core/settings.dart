@@ -422,13 +422,22 @@ class AppSettings extends ChangeNotifier {
   List<String> _viewNames(List<String>? fromApi, String key, String fallback) =>
       fromApi ?? _str(key, fallback).split(',');
 
+  /// The tabs this deployment knows: [DashTab.defaults], plus the feed when the
+  /// connected project serves one. An opt-in tab stays out of views and saved
+  /// orders until then, so an API that predates it is never sent its name.
+  List<DashTab> get knownTabs => [
+    ...DashTab.defaults,
+    if (_project?.tabs?.contains(DashTab.feed) ?? false) DashTab.feed,
+  ];
+
   /// The order of the brand tabs, after Home, in every view. Set by an admin
   /// (or a brand's `tabOrder` default); tabs it leaves out follow in their
   /// default order.
   List<DashTab> get tabOrder {
-    final byName = DashTab.values.asNameMap();
+    final known = knownTabs;
+    final byName = known.asNameMap();
     final saved = {for (final n in _viewNames(_views?.tabOrder, 'tabOrder', '')) ?byName[n]};
-    return [...saved, ...DashTab.values.where((t) => !saved.contains(t))];
+    return [...saved, ...known.where((t) => !saved.contains(t))];
   }
 
   /// Saves the order for every device (admins only; the API checks).
@@ -442,8 +451,8 @@ class AppSettings extends ChangeNotifier {
   /// Admins always see every tab.
   List<DashTab> tabsFor(Role view) {
     final names = switch (view) {
-      Role.admin => [for (final t in DashTab.values) t.name],
-      Role.power => _viewNames(_views?.powerTabs, 'powerTabs', DashTab.values.map((t) => t.name).join(',')),
+      Role.admin => [for (final t in knownTabs) t.name],
+      Role.power => _viewNames(_views?.powerTabs, 'powerTabs', knownTabs.map((t) => t.name).join(',')),
       // `clientTabs` is the brand default from before there were three views.
       Role.normie => _views?.normieTabs ?? _str('normieTabs', _str('clientTabs', 'agent,grafana,video')).split(','),
     };

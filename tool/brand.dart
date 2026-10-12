@@ -26,7 +26,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-const _tabs = ['services', 'edge', 'agent', 'grafana', 'video'];
+const _tabs = ['services', 'edge', 'agent', 'grafana', 'video', 'feed'];
 const _tourSteps = ['welcome', 'navigation', 'theme', 'settings', 'signOut'];
 const _tokens = [
   'bg', 'bg2', 'bg3', 'accent', 'accent2', 'onAccent', 'amber', 'blue', //
@@ -208,7 +208,8 @@ Map<String, dynamic> _validate(Directory dir) {
   final logo = j['logo'];
   if (logo != null && !File('${dir.path}/$logo').existsSync()) errors.add('logo "$logo" not found');
 
-  final tabs = (j['tabs'] as List?)?.cast<String>() ?? _tabs;
+  // Without a list a brand gets every tab but the opt-in feed (lib/core/brand.dart DashTab.defaults)
+  final tabs = (j['tabs'] as List?)?.cast<String>() ?? [..._tabs.where((t) => t != 'feed')];
   for (final t in tabs) {
     if (!_tabs.contains(t)) errors.add('unknown tab "$t" (valid: ${_tabs.join(', ')})');
   }
@@ -234,6 +235,21 @@ Map<String, dynamic> _validate(Directory dir) {
     } else if (value is! String || value.trim().isEmpty) {
       errors.add('tour.$key must be text, or an object of language code → text');
     }
+  }
+
+  final assistant = j['assistant'];
+  if (assistant != null && assistant is! Map) errors.add('assistant must be an object');
+  final suggestions = (assistant as Map?)?['suggestions'];
+  bool questions(Object? v) => v is List && v.isNotEmpty && v.every((q) => q is String && q.trim().isNotEmpty);
+  if (suggestions is Map) {
+    for (final MapEntry(key: lang, :value) in suggestions.entries) {
+      if (lang != '*' && !languages.contains(lang)) {
+        errors.add('assistant.suggestions.$lang is not a dashboard language (valid: ${languages.join(', ')}, or *)');
+      }
+      if (!questions(value)) errors.add('assistant.suggestions.$lang must be a non-empty list of questions');
+    }
+  } else if (suggestions != null && !questions(suggestions)) {
+    errors.add('assistant.suggestions must be a list of questions, or an object of language code → list');
   }
 
   final native = j['native'];

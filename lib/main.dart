@@ -21,6 +21,7 @@ import 'pages/settings_page.dart';
 import 'tabs/agent_tab.dart';
 import 'tabs/clients_tab.dart';
 import 'tabs/edge_tab.dart';
+import 'tabs/feed_tab.dart';
 import 'tabs/grafana_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/services_tab.dart';
@@ -163,7 +164,8 @@ enum Screen {
   edge,
   agent,
   grafana,
-  video;
+  video,
+  feed;
 
   static Screen of(DashTab t) => values.byName(t.name);
 
@@ -178,6 +180,7 @@ final _dests = {
   Screen.agent: _Dest((l) => l.navAgent, Icons.forum_outlined, Icons.forum),
   Screen.grafana: _Dest((l) => l.navGrafana, Icons.show_chart_outlined, Icons.show_chart),
   Screen.video: _Dest((l) => l.navVideo, Icons.videocam_outlined, Icons.videocam),
+  Screen.feed: _Dest((l) => l.navFeed, Icons.dynamic_feed_outlined, Icons.dynamic_feed),
 };
 
 /// Screens for [role]: Home, then the brand tabs in the admin's
@@ -260,6 +263,7 @@ class _HomeShellState extends State<HomeShell> {
     Screen.agent => const AgentTab(),
     Screen.grafana => const GrafanaTab(),
     Screen.video => VideoTab(active: active),
+    Screen.feed => FeedTab(active: active),
   };
 
   @override
