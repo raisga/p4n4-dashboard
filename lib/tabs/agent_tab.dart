@@ -19,7 +19,12 @@ import '../widgets/rich_message.dart';
 /// users choose it here; viewers just chat, and the API holds them to the
 /// chosen one whatever this screen shows.
 class AgentTab extends StatefulWidget {
-  const AgentTab({super.key});
+  const AgentTab({super.key, this.ask});
+
+  /// A question asked from elsewhere (Home's `ask:` links). The tab takes it
+  /// (sets it back to null) once the assistant has loaded: sent when it can
+  /// be, else left in the composer.
+  final ValueNotifier<String?>? ask;
 
   @override
   State<AgentTab> createState() => _AgentTabState();
@@ -45,6 +50,22 @@ class _AgentTabState extends State<AgentTab> {
   bool get _technical => SessionScope.of(context).isTechnical;
 
   @override
+  void initState() {
+    super.initState();
+    widget.ask?.addListener(_takeAsked);
+  }
+
+  @override
+  void didUpdateWidget(AgentTab old) {
+    super.didUpdateWidget(old);
+    if (widget.ask != old.ask) {
+      old.ask?.removeListener(_takeAsked);
+      widget.ask?.addListener(_takeAsked);
+      _takeAsked();
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final api = SettingsScope.of(context).apiUri;
@@ -56,6 +77,7 @@ class _AgentTabState extends State<AgentTab> {
 
   @override
   void dispose() {
+    widget.ask?.removeListener(_takeAsked);
     _reply?.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -85,6 +107,23 @@ class _AgentTabState extends State<AgentTab> {
       });
     } catch (e) {
       if (mounted && api == _api) setState(() => _loadError = e);
+    }
+    if (mounted && api == _api) _takeAsked();
+  }
+
+  /// Takes [AgentTab.ask]'s question once loading is over: sends it, or,
+  /// when it can't be sent now (no model, a reply streaming, loading
+  /// failed), leaves it in the composer to send by hand.
+  void _takeAsked() {
+    final ask = widget.ask;
+    final question = ask?.value;
+    if (ask == null || question == null) return;
+    if (_loadError == null && (_options == null || _saving)) return; // still loading: [_load] or [_choose] calls again
+    ask.value = null;
+    if (_target != null && _config != null && !_busy) {
+      _send(question);
+    } else {
+      setState(() => _input.text = question);
     }
   }
 
@@ -131,7 +170,10 @@ class _AgentTabState extends State<AgentTab> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.assistantSaveFailed('$e'))));
       await _load();
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        _takeAsked();
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api/edge_metrics.dart';
+import '../api/project.dart';
 import '../api/services.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
@@ -12,21 +13,26 @@ import '../core/settings.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/markdown_panel.dart';
 
 const _interval = Duration(seconds: 30);
 
-/// Home, every view's first tab: one big "is everything OK" card, the
+/// Home, every view's first tab: the project's own Markdown when it has some
+/// (`HOME.md`, see [fetchProjectHome]), one big "is everything OK" card, the
 /// device's readings in plain language and large shortcuts to the other tabs.
 /// For viewers it's free of service and stack names, hosts, ports and URLs:
 /// what's broken is said as what people use (the assistant, charts).
 class OverviewTab extends StatefulWidget {
-  const OverviewTab({super.key, required this.active, required this.shortcuts, required this.onOpen});
+  const OverviewTab({super.key, required this.active, required this.shortcuts, required this.onOpen, this.onAsk});
 
   final bool active;
 
   /// Tabs to offer as shortcut cards.
   final List<DashTab> shortcuts;
   final ValueChanged<DashTab> onOpen;
+
+  /// Opens the Assistant and asks it a question (HOME.md's `ask:` links).
+  final ValueChanged<String>? onAsk;
 
   @override
   State<OverviewTab> createState() => _OverviewTabState();
@@ -42,6 +48,13 @@ class _OverviewTabState extends State<OverviewTab> {
   bool _metricsLoading = false;
   Timer? _timer;
   String? _metricsKey;
+
+  // The connected project's HOME.md in the app's language, null while it has
+  // none; read again on reconnecting, switching language, refreshing, and
+  // coming back to the tab.
+  String? _home;
+  ProjectInfo? _homeProject;
+  String? _homeLang;
 
   // Service status comes from the shared StatusMonitor; only edge metrics are polled here.
   late StatusMonitor _monitor;
@@ -62,13 +75,23 @@ class _OverviewTabState extends State<OverviewTab> {
       _metrics = null;
       _fetchMetrics();
     }
+    final lang = Localizations.localeOf(context).languageCode;
+    if (s.project != _homeProject || lang != _homeLang) {
+      _homeProject = s.project;
+      _homeLang = lang;
+      _home = null;
+      _fetchHome();
+    }
     _schedule();
   }
 
   @override
   void didUpdateWidget(OverviewTab old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) _fetchMetrics();
+    if (widget.active && !old.active) {
+      _fetchMetrics();
+      _fetchHome();
+    }
     _schedule();
   }
 
@@ -96,7 +119,19 @@ class _OverviewTabState extends State<OverviewTab> {
   bool get _showsDevice =>
       BrandScope.of(context).tabs.contains(DashTab.edge) && SettingsScope.of(context).projectAllows(DashTab.edge);
 
-  Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics()).wait;
+  Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics(), _fetchHome()).wait;
+
+  /// Only once p4n4-api has described the project: without it there's no file to read.
+  Future<void> _fetchHome() async {
+    final (project, lang) = (_homeProject, _homeLang);
+    if (project == null) return;
+    try {
+      final home = await fetchProjectHome(_target.api, lang: lang);
+      if (mounted && project == _homeProject && lang == _homeLang && home != _home) setState(() => _home = home);
+    } catch (_) {
+      // Keep what's shown; the next refresh tries again.
+    }
+  }
 
   Future<void> _fetchMetrics() async {
     if (_metricsLoading || !_showsDevice) return;
@@ -134,6 +169,15 @@ class _OverviewTabState extends State<OverviewTab> {
           trailing: RefreshButton(busy: _loading, onPressed: _refresh),
         ),
         const SizedBox(height: 24),
+        if (_home case final home?) ...[
+          MarkdownPanel(
+            home,
+            tabs: {for (final t in widget.shortcuts) t.name},
+            onTab: (name) => widget.onOpen(DashTab.values.byName(name)),
+            onAsk: widget.shortcuts.contains(DashTab.agent) ? widget.onAsk : null,
+          ),
+          const SizedBox(height: 16),
+        ],
         _summary(),
         if (_showsDevice) ...[const SizedBox(height: 16), _device()],
         if (widget.shortcuts.isNotEmpty) ...[

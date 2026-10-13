@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/project.dart';
@@ -8,7 +13,9 @@ import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
+import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:p4n4_dashboard/main.dart';
+import 'package:p4n4_dashboard/widgets/markdown_panel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
@@ -198,6 +205,49 @@ void main() {
     });
   });
 
+  group('fetchProjectHome', () {
+    Future<String?> fetch(http.Response Function(http.Request r) answer, [List<Uri>? asked]) => http.runWithClient(
+      () => fetchProjectHome(Uri.parse('http://pi:8000/')),
+      () => MockClient((r) async {
+        asked?.add(r.url);
+        return answer(r);
+      }),
+    );
+
+    test('reads the Markdown as UTF-8', () async {
+      final asked = <Uri>[];
+      final body = utf8.encode(jsonEncode({'markdown': '# Invernadero\n\nRiego automático.'}));
+      final md = await fetch(
+        (_) => http.Response.bytes(body, 200, headers: {'content-type': 'application/json'}),
+        asked,
+      );
+      expect(md, '# Invernadero\n\nRiego automático.');
+      expect(asked, [Uri.parse('http://pi:8000/api/v1/project/home')]);
+    });
+
+    test('asks for the given language', () async {
+      final asked = <Uri>[];
+      await http.runWithClient(
+        () => fetchProjectHome(Uri.parse('http://pi:8000/'), lang: 'es'),
+        () => MockClient((r) async {
+          asked.add(r.url);
+          return http.Response('', 204);
+        }),
+      );
+      expect(asked, [Uri.parse('http://pi:8000/api/v1/project/home?lang=es')]);
+    });
+
+    test('is null without a file, with an empty one, or with an API that predates it', () async {
+      expect(await fetch((_) => http.Response('', 204)), isNull);
+      expect(await fetch((_) => http.Response('{"markdown": " \\n"}', 200)), isNull);
+      expect(await fetch((_) => http.Response('{"error": {"code": "not_found"}}', 404)), isNull);
+    });
+
+    test('fails on other errors, so what is shown stays', () {
+      expect(fetch((_) => http.Response('', 500)), throwsA(isA<http.ClientException>()));
+    });
+  });
+
   group('ProjectWatcher', () {
     test('loads the project, and reloads it when the deployment changes', () async {
       final s = await _load();
@@ -316,5 +366,94 @@ void main() {
     }
     expect(aiStack, findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Home shows the project\'s HOME.md, and nothing without one', (tester) async {
+    SharedPreferences.setMockInitialValues({'edgeDemo': true, 'tourSeen': true, 'role': Role.admin.name});
+    final brand = loadBrand('p4n4');
+    final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
+    final session = await Session.load(settings, probe: (_) async => AuthMode.unreachable);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    String? home = '# Welcome to the greenhouse\n\n| Zone | Crop |\n|---|---|\n| A | Basil |';
+    final asked = <Uri>[];
+    final client = MockClient((r) async {
+      if (r.url.path != '/api/v1/project/home') return http.Response('', 404);
+      asked.add(r.url);
+      return home == null ? http.Response('', 204) : http.Response(jsonEncode({'markdown': home}), 200);
+    });
+    await http.runWithClient(() async {
+      await tester.pumpWidget(
+        BrandScope(
+          brand: brand,
+          child: SettingsScope(
+            settings: settings,
+            child: SessionScope(session: session, child: const DashboardApp()),
+          ),
+        ),
+      );
+      await tester.pump();
+      // Not read until p4n4-api has described the project.
+      expect(find.byType(MarkdownBody), findsNothing);
+
+      settings.project = ProjectInfo.fromJson(_templateProject);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(MarkdownBody), findsOneWidget);
+      expect(find.text('Welcome to the greenhouse'), findsOneWidget);
+      expect(find.text('Basil'), findsOneWidget);
+      expect(asked.last.queryParameters, {'lang': 'en'});
+
+      // Reconnecting to a project without one hides the block.
+      home = null;
+      settings.project = ProjectInfo.fromJson({..._templateProject, 'project': 'other'});
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(MarkdownBody), findsNothing);
+    }, () => client);
+    expect(tester.takeException(), isNull);
+  });
+
+  group('MarkdownPanel', () {
+    /// What the panel's links opened: tab names, and `ask:` questions as `ask:<question>`.
+    Future<List<String>> pumpPanel(WidgetTester tester, String md, Set<String> tabs, {bool canAsk = true}) async {
+      final opened = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(P4Colors.light),
+          home: Scaffold(
+            body: MarkdownPanel(md, tabs: tabs, onTab: opened.add, onAsk: canAsk ? (q) => opened.add('ask:$q') : null),
+          ),
+        ),
+      );
+      return opened;
+    }
+
+    testWidgets('a tab: link opens that tab', (tester) async {
+      final opened = await pumpPanel(tester, '[Open the charts](tab:grafana)', {'grafana'});
+      await tester.tap(find.textContaining('Open the charts', findRichText: true));
+      expect(opened, ['grafana']);
+    });
+
+    testWidgets('a link to a tab that is not there is plain text', (tester) async {
+      final opened = await pumpPanel(tester, 'See [the cameras](tab:video) now', {'grafana'});
+      expect(find.textContaining('See the cameras now', findRichText: true), findsOneWidget);
+      await tester.tap(find.textContaining('See the cameras now', findRichText: true));
+      expect(opened, isEmpty);
+    });
+
+    testWidgets('an ask: link asks the assistant its text', (tester) async {
+      final opened = await pumpPanel(tester, '[Is any unit on warning?](ask:)', {});
+      await tester.tap(find.textContaining('Is any unit on warning?', findRichText: true));
+      expect(opened, ['ask:Is any unit on warning?']);
+    });
+
+    testWidgets('an ask: link without an assistant is plain text', (tester) async {
+      final opened = await pumpPanel(tester, 'Try [Is any unit on warning?](ask:) there', {}, canAsk: false);
+      expect(find.textContaining('Try Is any unit on warning? there', findRichText: true), findsOneWidget);
+      await tester.tap(find.textContaining('Try Is any unit on warning? there', findRichText: true));
+      expect(opened, isEmpty);
+    });
   });
 }

@@ -111,6 +111,24 @@ Future<ProjectInfo> fetchProject(Uri apiBase) async {
   return ProjectInfo.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
 }
 
+/// `GET /api/v1/project/home`: the Markdown the Home tab shows above
+/// everything else (`dashboard.home` in `.p4n4.json`, else the project's
+/// `HOME.md`), in [lang] when the project has it (`HOME.es.md`). Null when
+/// there's none to show: p4n4-api answers 204 for a missing or empty file,
+/// and 404 when it predates the endpoint.
+Future<String?> fetchProjectHome(Uri apiBase, {String? lang}) async {
+  final url = apiBase.resolve('api/v1/project/home${lang == null ? '' : '?lang=${Uri.encodeQueryComponent(lang)}'}');
+  final res = await http.get(url).timeout(const Duration(seconds: 5));
+  return switch (res.statusCode) {
+    200 => switch (jsonDecode(utf8.decode(res.bodyBytes))) {
+      {'markdown': final String md} when md.trim().isNotEmpty => md,
+      _ => null,
+    },
+    204 || 404 => null,
+    final code => throw http.ClientException('HTTP $code', res.request?.url),
+  };
+}
+
 /// Keeps something the connected deployment's p4n4-api says in step with it:
 /// reads it whenever the API URL or host changes, hands it to [apply] (null
 /// while switching), and retries every [retry] while the API can't be

@@ -8,6 +8,7 @@ import 'package:p4n4_dashboard/api/agent_client.dart' show AgentBackend;
 import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
+import 'package:p4n4_dashboard/api/project.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
@@ -612,10 +613,12 @@ void main() {
     const models = ['qwen2.5:0.5b', 'llama3.2'];
 
     /// p4n4-api's agents endpoints; everything else (status checks) is a 404.
-    /// [chosenAt] says when an operator chose the assistant (null: never).
-    MockClient api(List<http.Request> seen, {String? chosenAt}) => MockClient((r) async {
+    /// [chosenAt] says when an operator chose the assistant (null: never);
+    /// [home] is the project's HOME.md.
+    MockClient api(List<http.Request> seen, {String? chosenAt, String? home}) => MockClient((r) async {
       seen.add(r);
       return switch ((r.method, r.url.path)) {
+        ('GET', '/api/v1/project/home') when home != null => http.Response(jsonEncode({'markdown': home}), 200),
         ('GET', '/api/v1/agents/config') => http.Response(
           jsonEncode({'backend': 'ollama', 'model': null, 'agent_id': null, 'updated_at': chosenAt}),
           200,
@@ -671,6 +674,52 @@ void main() {
         reason: 'the first listed, as the API picks',
       );
       expect(seen.where((r) => r.method == 'PUT'), isEmpty);
+    });
+
+    testWidgets('an ask: link on Home opens it and asks the question', (tester) async {
+      final seen = <http.Request>[];
+      await http.runWithClient(() async {
+        await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
+        SettingsScope.of(tester.element(find.byType(HomeShell))).project = ProjectInfo.fromJson({'project': 'plant'});
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.textContaining('Is any unit on warning?', findRichText: true));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('All good.'), findsOneWidget);
+      }, () => api(seen, home: '[Is any unit on warning?](ask:)'));
+
+      final chat = seen.singleWhere((r) => r.url.path == '/api/v1/agents/chat');
+      expect((jsonDecode(chat.body) as Map)['messages'], [
+        {'role': 'user', 'content': 'Is any unit on warning?'},
+      ]);
+    });
+
+    testWidgets('on a phone with the Assistant past the bar, it asks once loaded', (tester) async {
+      final seen = <http.Request>[];
+      await http.runWithClient(() async {
+        await pumpAt(
+          tester,
+          const Size(390, 844),
+          ThemeMode.light,
+          role: Role.normie,
+          prefs: {'normieTabs': 'services,edge,grafana,video,agent', 'tabOrder': 'services,edge,grafana,video,agent'},
+        );
+        expect(nav('Assistant'), findsNothing);
+        SettingsScope.of(tester.element(find.byType(HomeShell))).project = ProjectInfo.fromJson({'project': 'plant'});
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tapAt(
+          tester.getTopLeft(find.textContaining('Is any unit on warning?', findRichText: true)) + const Offset(20, 8),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('All good.'), findsOneWidget);
+      }, () => api(seen, home: '[Is any unit on warning?](ask:)'));
+      expect(seen.where((r) => r.url.path == '/api/v1/agents/chat'), hasLength(1));
     });
 
     testWidgets('power users choose its model for everyone', (tester) async {

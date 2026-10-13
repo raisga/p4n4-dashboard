@@ -218,6 +218,9 @@ class _HomeShellState extends State<HomeShell> {
   /// The tour group running (or about to start); null once the tour is seen.
   String? _tourGroup;
 
+  /// A question for the Assistant from Home (HOME.md's `ask:` links), until it takes it.
+  final _ask = ValueNotifier<String?>(null);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -228,6 +231,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     // e.g. the session expired mid-tour: don't leave the tour over the sign-in page.
     if (_tourGroup != null && _intro.status.isOpen) _intro.dispose();
+    _ask.dispose();
     super.dispose();
   }
 
@@ -256,11 +260,15 @@ class _HomeShellState extends State<HomeShell> {
       active: active,
       shortcuts: [for (final s in all) ?s.tab],
       onOpen: (t) => open(Screen.of(t)),
+      onAsk: (q) {
+        _ask.value = q;
+        open(Screen.agent);
+      },
     ),
     Screen.clients => ClientsTab(active: active),
     Screen.services => ServicesTab(active: active),
     Screen.edge => EdgeTab(active: active),
-    Screen.agent => const AgentTab(),
+    Screen.agent => AgentTab(ask: _ask),
     Screen.grafana => const GrafanaTab(),
     Screen.video => VideoTab(active: active),
     Screen.feed => FeedTab(active: active),
