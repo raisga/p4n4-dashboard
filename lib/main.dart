@@ -10,6 +10,7 @@ import 'api/project.dart';
 import 'api/status_monitor.dart';
 import 'api/views.dart';
 import 'core/brand.dart';
+import 'core/chat_history.dart';
 import 'core/runtime_config.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
@@ -221,10 +222,27 @@ class _HomeShellState extends State<HomeShell> {
   /// A question for the Assistant from Home (HOME.md's `ask:` links), until it takes it.
   final _ask = ValueNotifier<String?>(null);
 
+  /// Every tab, kept by identity: a layout change (rail ↔ bottom bar) moves
+  /// them instead of rebuilding them, so the chat and webviews survive it.
+  final _tabs = GlobalKey();
+
+  /// The Assistant conversation of who's signed in, and its storage key.
+  ChatHistory? _chat;
+  String? _chatId;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _intro = Intro.of(context);
+    final settings = SettingsScope.of(context);
+    final session = SessionScope.of(context);
+    final who = session.username ?? session.signedInRole?.name ?? '';
+    final id = '${settings.deployment.id}.$who';
+    if (id != _chatId) {
+      _chat?.dispose();
+      _chat = ChatHistory(settings, settings.deployment, who);
+      _chatId = id;
+    }
   }
 
   @override
@@ -232,6 +250,7 @@ class _HomeShellState extends State<HomeShell> {
     // e.g. the session expired mid-tour: don't leave the tour over the sign-in page.
     if (_tourGroup != null && _intro.status.isOpen) _intro.dispose();
     _ask.dispose();
+    _chat?.dispose();
     super.dispose();
   }
 
@@ -254,11 +273,11 @@ class _HomeShellState extends State<HomeShell> {
     }),
   );
 
-  /// [all] and [open] are for Home's shortcut cards.
+  /// [all] and [open] are for Home's `tab:` links and device details link.
   Widget _page(Screen screen, bool active, List<Screen> all, ValueChanged<Screen> open) => switch (screen) {
     Screen.home => OverviewTab(
       active: active,
-      shortcuts: [for (final s in all) ?s.tab],
+      tabs: [for (final s in all) ?s.tab],
       onOpen: (t) => open(Screen.of(t)),
       onAsk: (q) {
         _ask.value = q;
@@ -268,7 +287,7 @@ class _HomeShellState extends State<HomeShell> {
     Screen.clients => ClientsTab(active: active),
     Screen.services => ServicesTab(active: active),
     Screen.edge => EdgeTab(active: active),
-    Screen.agent => AgentTab(ask: _ask),
+    Screen.agent => AgentTab(history: _chat!, ask: _ask),
     Screen.grafana => const GrafanaTab(),
     Screen.video => VideoTab(active: active),
     Screen.feed => FeedTab(active: active),
@@ -283,25 +302,14 @@ class _HomeShellState extends State<HomeShell> {
     final role = session.role!;
     final all = screensFor(role, brand, settings);
     final wide = MediaQuery.sizeOf(context).width >= 800;
-    // A phone bottom bar fits five destinations; the rest open from the app bar.
-    final screens = wide ? all : all.take(5).toList();
-    final extra = all.skip(screens.length);
-    final index = screens.indexOf(_selected ?? Screen.home).clamp(0, screens.length - 1);
+    final current = all.contains(_selected) ? _selected! : Screen.home;
+    // A phone bottom bar fits five destinations; the rest open from the app
+    // bar, the open one taking the bar's last place.
+    final screens = wide || all.length <= 5 ? all : [...all.take(4), all.indexOf(current) >= 4 ? current : all[4]];
+    final extra = all.where((s) => !screens.contains(s));
+    final index = screens.indexOf(current);
     void select(int i) => setState(() => _selected = screens[i]);
-    void open(Screen s) {
-      if (screens.contains(s)) {
-        setState(() => _selected = s);
-        return;
-      }
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(title: Text(_dests[s]!.label(l))),
-            body: _page(s, true, all, open),
-          ),
-        ),
-      );
-    }
+    void open(Screen s) => setState(() => _selected = s);
 
     // Navigation needs at least two destinations; a single-screen view gets none.
     final nav = screens.length > 1;
@@ -325,12 +333,11 @@ class _HomeShellState extends State<HomeShell> {
     }
     Widget target(TourStep step, Widget child) =>
         tour ? TourTarget(group: tourGroup, step: step, steps: tourSteps, child: child) : child;
-    // IndexedStack keeps chat history and webviews alive; polling tabs pause via `active`.
+    // IndexedStack keeps every tab alive, the bar's or not; polling tabs pause via `active`.
     final body = IndexedStack(
-      index: index,
-      children: [
-        for (final (i, s) in screens.indexed) KeyedSubtree(key: ValueKey(s), child: _page(s, index == i, all, open)),
-      ],
+      key: _tabs,
+      index: all.indexOf(current),
+      children: [for (final s in all) KeyedSubtree(key: ValueKey(s), child: _page(s, s == current, all, open))],
     );
 
     return Scaffold(

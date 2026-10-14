@@ -19,7 +19,31 @@ class ChatMessage {
   /// For `error` messages: what went wrong.
   final AgentException? error;
 
+  /// For replies: the tools the agent ran for it, while it's on screen (not saved).
+  final List<ToolStep> steps = [];
+
   Map<String, String> toJson() => {'role': role, 'content': content};
+}
+
+/// A tool the agent runs while it answers (its stream's `step` chunks), so
+/// the chat can show what is being looked up.
+class ToolStep {
+  ToolStep(this.tool, this.labels);
+
+  final String tool;
+
+  /// What to call it per language, e.g. `{'en': 'the alerts', 'es': 'las alertas'}`.
+  final Map<String, String> labels;
+
+  bool done = false;
+  bool ok = true;
+
+  /// How much of the reply had arrived when it finished (set by the chat), to
+  /// tell whether the model has written anything since.
+  int? textAt;
+
+  /// The label in [language] (e.g. `es` or `es_PA`), else English, else none.
+  String? label(String language) => labels[language.split('_').first] ?? labels['en'];
 }
 
 class AgentOption {
@@ -131,12 +155,21 @@ class AgentApi {
   /// no state, so it gets the whole history; Letta only the last message.
   /// Both get the system's current status, so questions like "is everything
   /// running?" have something to go on.
-  Stream<String> send(AgentBackend backend, String id, List<ChatMessage> history) => switch (backend) {
-    AgentBackend.ollama => _ollama(id, history),
+  ///
+  /// [onStep] gets each tool the agent runs, when it starts and again (the
+  /// same [ToolStep]) when it's done. Only p4n4's agent says; plain Ollama
+  /// and Letta never call it.
+  Stream<String> send(
+    AgentBackend backend,
+    String id,
+    List<ChatMessage> history, {
+    void Function(ToolStep step)? onStep,
+  }) => switch (backend) {
+    AgentBackend.ollama => _ollama(id, history, onStep),
     AgentBackend.letta => _letta(id, history),
   };
 
-  Stream<String> _ollama(String model, List<ChatMessage> history) async* {
+  Stream<String> _ollama(String model, List<ChatMessage> history, void Function(ToolStep step)? onStep) async* {
     final client = http.Client();
     try {
       final req = http.Request('POST', _url('/chat'))
@@ -162,10 +195,22 @@ class AgentApi {
       // cancelling first can beat the stream's own end, and browsers then report the
       // request as aborted (net::ERR_ABORTED).
       var done = false;
+      final running = <String, ToolStep>{};
       await for (final line in lines) {
         if (done || line.trim().isEmpty) continue;
         final chunk = jsonDecode(line) as Map<String, dynamic>;
         if (chunk['error'] != null) throw AgentException(chunk['error'].toString(), statusCode: 502);
+        if (chunk['step'] case {'tool': final String tool, 'state': final String state} && final Map step) {
+          if (state == 'running') {
+            final labels = step['label'] is Map ? (step['label'] as Map) : const {};
+            onStep?.call(running[tool] = ToolStep(tool, {for (final e in labels.entries) '${e.key}': '${e.value}'}));
+          } else if (running.remove(tool) case final s?) {
+            s
+              ..done = true
+              ..ok = step['ok'] != false;
+            onStep?.call(s);
+          }
+        }
         final text = (chunk['message'] as Map?)?['content'] as String?;
         if (text != null && text.isNotEmpty) yield text;
         done = chunk['done'] == true;

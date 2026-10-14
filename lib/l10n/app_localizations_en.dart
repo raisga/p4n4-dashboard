@@ -470,9 +470,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get secretsHidden => 'Secrets hidden';
 
   @override
-  String get goToTag => 'Go to';
-
-  @override
   String get summaryChecking => 'Checking your system…';
 
   @override
@@ -570,21 +567,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceDetails => 'Details';
-
-  @override
-  String get shortcutServicesDesc => 'Open the apps running on your system.';
-
-  @override
-  String get shortcutDeviceDesc => 'How hard your device is working, live.';
-
-  @override
-  String get shortcutAssistantDesc => 'Ask about your system in plain words.';
-
-  @override
-  String get shortcutDashboardsDesc => 'Charts and history from your sensors.';
-
-  @override
-  String get shortcutCameraDesc => 'Watch your live camera feeds.';
 
   @override
   String servicesApiUnreachable(String platform) {
@@ -916,6 +898,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agentStopped => '(stopped)';
 
   @override
+  String get agentThinking => 'Thinking…';
+
+  @override
+  String agentStepLookup(String what) {
+    return 'Looking up $what';
+  }
+
+  @override
+  String get agentStepData => 'Looking up data';
+
+  @override
+  String get agentWriting => 'Writing the answer…';
+
+  @override
+  String agentElapsed(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String agentWaitLast(int seconds) {
+    return 'The last answer took $seconds s.';
+  }
+
+  @override
+  String get agentWaitHint => 'Answers can take up to a minute.';
+
+  @override
   String get bubbleYou => 'You';
 
   @override
@@ -1196,9 +1205,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navFeed => 'Activity';
-
-  @override
-  String get shortcutFeedDesc => 'Live events, and the alerts that need someone.';
 
   @override
   String get feedEmpty => 'Nothing yet';

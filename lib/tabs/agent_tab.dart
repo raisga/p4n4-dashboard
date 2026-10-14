@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../api/agent_client.dart';
 import '../core/brand.dart';
+import '../core/chat_history.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -19,7 +20,10 @@ import '../widgets/rich_message.dart';
 /// users choose it here; viewers just chat, and the API holds them to the
 /// chosen one whatever this screen shows.
 class AgentTab extends StatefulWidget {
-  const AgentTab({super.key, this.ask});
+  const AgentTab({super.key, required this.history, this.ask});
+
+  /// The conversation, kept by the shell so it outlives this tab.
+  final ChatHistory history;
 
   /// A question asked from elsewhere (Home's `ask:` links). The tab takes it
   /// (sets it back to null) once the assistant has loaded: sent when it can
@@ -37,7 +41,7 @@ class _AgentTabState extends State<AgentTab> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
-  final _messages = <ChatMessage>[];
+  List<ChatMessage> get _messages => widget.history.messages;
 
   AgentApi? _api;
   AssistantConfig? _config;
@@ -46,6 +50,11 @@ class _AgentTabState extends State<AgentTab> {
   bool _saving = false;
   StreamSubscription<String>? _reply;
 
+  /// When the reply streaming now was asked for, and how long the last one
+  /// took, for the wait it shows.
+  DateTime? _started;
+  Duration? _lastTook;
+
   bool get _busy => _reply != null;
   bool get _technical => SessionScope.of(context).isTechnical;
 
@@ -53,11 +62,18 @@ class _AgentTabState extends State<AgentTab> {
   void initState() {
     super.initState();
     widget.ask?.addListener(_takeAsked);
+    widget.history.addListener(_redraw);
   }
+
+  void _redraw() => setState(() {});
 
   @override
   void didUpdateWidget(AgentTab old) {
     super.didUpdateWidget(old);
+    if (widget.history != old.history) {
+      old.history.removeListener(_redraw);
+      widget.history.addListener(_redraw);
+    }
     if (widget.ask != old.ask) {
       old.ask?.removeListener(_takeAsked);
       widget.ask?.addListener(_takeAsked);
@@ -78,7 +94,14 @@ class _AgentTabState extends State<AgentTab> {
   @override
   void dispose() {
     widget.ask?.removeListener(_takeAsked);
-    _reply?.cancel();
+    widget.history.removeListener(_redraw);
+    // A reply still streaming ends here, as if stopped.
+    if (_reply != null) {
+      _reply!.cancel();
+      final reply = _messages.last;
+      if (reply.content.isEmpty) _messages.remove(reply);
+      widget.history.changed();
+    }
     _input.dispose();
     _scroll.dispose();
     _focus.dispose();
@@ -184,23 +207,36 @@ class _AgentTabState extends State<AgentTab> {
     if (text.isEmpty || _busy || target == null || config == null) return;
 
     final reply = ChatMessage('assistant', '');
-    setState(() {
-      _messages.add(ChatMessage('user', text));
-      _input.clear();
-    });
+    widget.history.add(ChatMessage('user', text));
+    _input.clear();
     final history = List.of(_messages);
-    setState(() => _messages.add(reply));
+    widget.history.add(reply);
     _scrollToEnd();
 
+    final started = _started = DateTime.now();
     _reply = _api!
-        .send(config.backend, target, history)
+        .send(
+          config.backend,
+          target,
+          history,
+          onStep: (step) {
+            if (!reply.steps.contains(step)) reply.steps.add(step);
+            if (step.done) step.textAt = reply.content.trimRight().length;
+            widget.history.changed(save: false);
+            _scrollToEnd();
+          },
+        )
         .listen(
           (chunk) {
-            setState(() => reply.content += chunk);
+            reply.content += chunk;
+            widget.history.changed(save: false);
             _scrollToEnd();
           },
           onError: (Object e) => _finish(reply, error: e is AgentException ? e : AgentException('$e')),
-          onDone: () => _finish(reply),
+          onDone: () {
+            if (reply.content.isNotEmpty) _lastTook = DateTime.now().difference(started);
+            _finish(reply);
+          },
           cancelOnError: true,
         );
   }
@@ -212,15 +248,14 @@ class _AgentTabState extends State<AgentTab> {
 
   void _finish(ChatMessage reply, {AgentException? error}) {
     if (!mounted) return;
-    setState(() {
-      _reply = null;
-      if (error != null) {
-        if (reply.content.isEmpty) _messages.remove(reply);
-        _messages.add(ChatMessage('error', _describe(error), error: error));
-      } else if (reply.content.isEmpty) {
-        reply.content = l.agentStopped;
-      }
-    });
+    setState(() => _reply = null);
+    if (error != null) {
+      if (reply.content.isEmpty) _messages.remove(reply);
+      widget.history.add(ChatMessage('error', _describe(error), error: error));
+    } else {
+      if (reply.content.isEmpty) reply.content = l.agentStopped;
+      widget.history.changed();
+    }
     // Someone changed the assistant meanwhile: pick up the new one.
     if (error?.code == 'assistant_restricted') _load();
     _scrollToEnd();
@@ -352,7 +387,7 @@ class _AgentTabState extends State<AgentTab> {
               ],
               if (_messages.isNotEmpty)
                 OutlinedButton.icon(
-                  onPressed: _busy ? null : () => setState(_messages.clear),
+                  onPressed: _busy ? null : widget.history.clear,
                   icon: const Icon(Icons.add_comment_outlined, size: 18),
                   label: Text(l.clear),
                 ),
@@ -419,7 +454,10 @@ class _AgentTabState extends State<AgentTab> {
     controller: _scroll,
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
     itemCount: _messages.length,
-    itemBuilder: (context, i) => _Bubble(_messages[i], streaming: _busy && i == _messages.length - 1),
+    itemBuilder: (context, i) {
+      final streaming = _busy && i == _messages.length - 1;
+      return _Bubble(_messages[i], streaming: streaming, started: streaming ? _started : null, lastTook: _lastTook);
+    },
   );
 
   Widget _composer() {
@@ -480,10 +518,15 @@ class _AgentTabState extends State<AgentTab> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble(this.msg, {required this.streaming});
+  const _Bubble(this.msg, {required this.streaming, this.started, this.lastTook});
 
   final ChatMessage msg;
   final bool streaming;
+
+  /// While [streaming]: when the question was sent, and how long the last
+  /// answer took, if one finished this session.
+  final DateTime? started;
+  final Duration? lastTook;
 
   @override
   Widget build(BuildContext context) {
@@ -530,16 +573,139 @@ class _Bubble extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              if (msg.content.isEmpty && streaming)
-                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent))
-              else if (user || error)
+              for (final step in msg.steps)
+                if (step.done) _StepRow(_stepText(l, step), icon: step.ok ? Icons.check : Icons.error_outline),
+              if (user || error)
                 SelectableText(msg.content, style: p4.body(size: 15))
-              else
+              else if (msg.content.isNotEmpty)
                 RichMessage(msg.content, style: p4.body(size: 15)),
+              if (streaming && _waiting) ...[
+                if (msg.content.isNotEmpty) const SizedBox(height: 8),
+                _Waiting(
+                  phase: switch (msg.steps.where((s) => !s.done).lastOrNull) {
+                    final running? => _stepText(l, running),
+                    null when msg.steps.isNotEmpty => l.agentWriting,
+                    null => l.agentThinking,
+                  },
+                  started: started ?? DateTime.now(),
+                  lastTook: lastTook,
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// No words yet, or none since the last lookup (the model may write a
+  /// sentence before looking something up, then go quiet while it reads it).
+  bool get _waiting => switch (msg.steps.lastOrNull) {
+    _ when msg.content.isEmpty => true,
+    null => false,
+    final last => !last.done || msg.content.trimRight().length == last.textAt,
+  };
+
+  static String _stepText(AppLocalizations l, ToolStep step) => switch (step.label(l.localeName)) {
+    final label? => l.agentStepLookup(label),
+    null => l.agentStepData,
+  };
+}
+
+/// A finished lookup, above the reply.
+class _StepRow extends StatelessWidget {
+  const _StepRow(this.text, {required this.icon});
+
+  final String text;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: icon == Icons.check ? p4.muted : p4.err),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(text, style: p4.body(size: 13, color: p4.muted)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the assistant is doing until its first words arrive, with the seconds
+/// since the question, and after a while how long answers take.
+class _Waiting extends StatefulWidget {
+  const _Waiting({required this.phase, required this.started, this.lastTook});
+
+  final String phase;
+  final DateTime started;
+  final Duration? lastTook;
+
+  /// Waits longer than this get the hint.
+  static const hintAfter = Duration(seconds: 10);
+
+  @override
+  State<_Waiting> createState() => _WaitingState();
+}
+
+class _WaitingState extends State<_Waiting> {
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    final l = context.l10n;
+    final elapsed = DateTime.now().difference(widget.started);
+    final last = widget.lastTook;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent)),
+            const SizedBox(width: 8),
+            // Announced when the phase changes; the seconds aren't, or a screen reader would read every tick
+            Flexible(
+              child: Semantics(liveRegion: true, child: Text(widget.phase, style: p4.body(size: 14))),
+            ),
+            const SizedBox(width: 8),
+            ExcludeSemantics(
+              child: Text(
+                l.agentElapsed(elapsed.inSeconds),
+                style: p4.body(size: 13, color: p4.muted).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+              ),
+            ),
+          ],
+        ),
+        if (elapsed >= _Waiting.hintAfter)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              last != null ? l.agentWaitLast(last.inSeconds) : l.agentWaitHint,
+              style: p4.body(size: 12, color: p4.muted),
+            ),
+          ),
+      ],
     );
   }
 }

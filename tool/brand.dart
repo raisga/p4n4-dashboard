@@ -252,6 +252,34 @@ Map<String, dynamic> _validate(Directory dir) {
     errors.add('assistant.suggestions must be a list of questions, or an object of language code → list');
   }
 
+  final video = j['video'];
+  if (video != null && video is! Map) errors.add('video must be an object');
+  final demo = (video as Map?)?['demoCameras'];
+  if (demo != null && demo is! List) errors.add('video.demoCameras must be a list');
+  final ids = <Object?>{};
+  for (final (i, c) in ((demo as List?) ?? const []).indexed) {
+    final url = c is Map ? c['url'] : null;
+    if (c is! Map || [c['id'], c['name'], url].any((v) => v is! String || v.trim().isEmpty)) {
+      errors.add('video.demoCameras[$i] needs an id, a name and a url');
+    } else if (!ids.add(c['id'])) {
+      errors.add('video.demoCameras[$i]: id "${c['id']}" is used twice');
+    } else if (Uri.tryParse(url as String) case final u
+        when u == null || (u.hasScheme && !u.isScheme('http') && !u.isScheme('https'))) {
+      errors.add('video.demoCameras[$i].url must be an http(s) URL or a path on the dashboard (demo/<file>.mp4)');
+    }
+  }
+  final credits = video?['demoCredits'];
+  if (credits is Map) {
+    for (final MapEntry(key: lang, value: text) in credits.entries) {
+      if (lang != '*' && !languages.contains(lang)) {
+        errors.add('video.demoCredits.$lang is not a dashboard language (valid: ${languages.join(', ')}, or *)');
+      }
+      if (text is! String || text.trim().isEmpty) errors.add('video.demoCredits.$lang must be a non-empty string');
+    }
+  } else if (credits != null && (credits is! String || credits.trim().isEmpty)) {
+    errors.add('video.demoCredits must be text, or an object of language code → text');
+  }
+
   final native = j['native'];
   if (native is! Map) {
     errors.add('native must be an object');

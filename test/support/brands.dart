@@ -15,10 +15,11 @@ Directory brandDir(String id) => _roots
 
 /// Reads `<brandDir>/brand.json` straight from disk, independent of whichever
 /// brand is currently applied to assets/brand/. The logo is dropped because
-/// only the applied brand's files are in the test asset bundle.
-Brand loadBrand(String id) {
+/// only the applied brand's files are in the test asset bundle. [extra]
+/// replaces top-level fields.
+Brand loadBrand(String id, {Map<String, dynamic> extra = const {}}) {
   final json = jsonDecode(File('${brandDir(id).path}/brand.json').readAsStringSync()) as Map<String, dynamic>;
-  return Brand.fromJson(json..remove('logo'));
+  return Brand.fromJson({...json, ...extra}..remove('logo'));
 }
 
 List<String> brandIds() => [

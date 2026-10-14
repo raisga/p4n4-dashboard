@@ -13,6 +13,13 @@
   "tabs": ["services", "edge", "agent", "grafana"],
   "links": [{ "label": "Support", "url": "https://example.com/support" }],
   "defaults": { "host": "192.168.1.50", "themeMode": "light", "grafanaPath": "/d/edge/overview" },
+  "video": {
+    "demoCameras": [
+      { "id": "line-1", "name": "Line 1", "url": "demo/line-1.mp4" },
+      { "id": "dock", "name": "Dock", "url": "https://example.com/demo/dock.mp4" }
+    ],
+    "demoCredits": { "en": "Demo footage: Acme's own.", "es": "Imágenes de demostración: de Acme." }
+  },
   "tour": {
     "welcome": { "en": "Welcome to Acme Edge! Here's where everything is.", "es": "¡Te damos la bienvenida a Acme Edge! Así está organizado." },
     "signOut": "Done for the day? Sign out here."

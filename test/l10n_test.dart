@@ -21,7 +21,7 @@ Map<String, dynamic> _arb(String code) =>
 Set<String> _placeholders(String message) =>
     RegExp(r'\{(\w+)[,}]').allMatches(message).map((m) => m[1]!).toSet()..remove('other');
 
-/// [label] in the navigation rail or bar; page titles and Home's shortcuts reuse the same words.
+/// [label] in the navigation rail or bar; page titles reuse the same words.
 Finder nav(String label) => find.descendant(
   of: find.byWidgetPredicate((w) => w is NavigationRail || w is NavigationBar),
   matching: find.text(label),

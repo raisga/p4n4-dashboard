@@ -908,12 +908,6 @@ abstract class AppLocalizations {
   /// **'Secrets hidden'**
   String get secretsHidden;
 
-  /// No description provided for @goToTag.
-  ///
-  /// In en, this message translates to:
-  /// **'Go to'**
-  String get goToTag;
-
   /// No description provided for @summaryChecking.
   ///
   /// In en, this message translates to:
@@ -1099,36 +1093,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Details'**
   String get deviceDetails;
-
-  /// No description provided for @shortcutServicesDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Open the apps running on your system.'**
-  String get shortcutServicesDesc;
-
-  /// No description provided for @shortcutDeviceDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'How hard your device is working, live.'**
-  String get shortcutDeviceDesc;
-
-  /// No description provided for @shortcutAssistantDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask about your system in plain words.'**
-  String get shortcutAssistantDesc;
-
-  /// No description provided for @shortcutDashboardsDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Charts and history from your sensors.'**
-  String get shortcutDashboardsDesc;
-
-  /// No description provided for @shortcutCameraDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Watch your live camera feeds.'**
-  String get shortcutCameraDesc;
 
   /// No description provided for @servicesApiUnreachable.
   ///
@@ -1706,6 +1670,48 @@ abstract class AppLocalizations {
   /// **'(stopped)'**
   String get agentStopped;
 
+  /// Assistant reply in progress, before it looks anything up
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get agentThinking;
+
+  /// A tool the assistant runs; {what} is the tool's label from the agent, e.g. 'the alerts'
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up {what}'**
+  String agentStepLookup(String what);
+
+  /// A tool the assistant runs, when the agent gives it no label
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up data'**
+  String get agentStepData;
+
+  /// Assistant reply in progress, after its lookups
+  ///
+  /// In en, this message translates to:
+  /// **'Writing the answer…'**
+  String get agentWriting;
+
+  /// Seconds since the question was sent, next to the reply's progress
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String agentElapsed(int seconds);
+
+  /// Shown when a reply takes a while, if an earlier one finished in this session
+  ///
+  /// In en, this message translates to:
+  /// **'The last answer took {seconds} s.'**
+  String agentWaitLast(int seconds);
+
+  /// Shown when a reply takes a while and no earlier one finished in this session
+  ///
+  /// In en, this message translates to:
+  /// **'Answers can take up to a minute.'**
+  String get agentWaitHint;
+
   /// Chat bubble author
   ///
   /// In en, this message translates to:
@@ -2215,12 +2221,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Activity'**
   String get navFeed;
-
-  /// No description provided for @shortcutFeedDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Live events, and the alerts that need someone.'**
-  String get shortcutFeedDesc;
 
   /// No description provided for @feedEmpty.
   ///

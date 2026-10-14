@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../api/camera.dart';
+import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -13,7 +15,8 @@ import '../widgets/video_view.dart';
 /// Live camera feeds from the edge device (MJPEG streams, JPEG snapshots or
 /// video files) or from the device the dashboard runs on (`device:back`,
 /// `device:front`): one camera at a time, or all of them in a grid. Admins can
-/// swap in [demoCameras] to show it off without cameras.
+/// swap in demo cameras to show it off without cameras: the brand's
+/// ([Brand.demoCameras]), else the built-in [demoCameras].
 class VideoTab extends StatefulWidget {
   const VideoTab({super.key, required this.active});
 
@@ -80,7 +83,10 @@ class _VideoTabState extends State<VideoTab> {
     final s = SettingsScope.of(context);
     final session = SessionScope.of(context);
     final demo = s.videoDemo;
-    final cameras = demo ? demoCameras : s.cameras;
+    final brand = BrandScope.of(context);
+    final branded = brand.demoCamerasOn(kIsWeb ? Uri.base : null);
+    final cameras = !demo ? s.cameras : (branded.isEmpty ? demoCameras : branded);
+    final credits = branded.isEmpty ? l.videoDemoCredits : brand.demoCreditsFor(l.localeName);
     // Only admins and power users see URLs or change cameras; demo cameras
     // aren't the deployment's to change.
     final technical = session.isTechnical;
@@ -154,12 +160,12 @@ class _VideoTabState extends State<VideoTab> {
             final c => _view(c),
           },
         ),
-        if (demo)
+        if (demo && credits != null)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             color: p4.bg2,
-            child: Text(l.videoDemoCredits, style: p4.body(size: 11, color: p4.muted)),
+            child: Text(credits, style: p4.body(size: 11, color: p4.muted)),
           ),
       ],
     );

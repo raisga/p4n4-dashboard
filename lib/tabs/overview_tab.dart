@@ -17,18 +17,18 @@ import '../widgets/markdown_panel.dart';
 
 const _interval = Duration(seconds: 30);
 
-/// Home, every view's first tab: the project's own Markdown when it has some
-/// (`HOME.md`, see [fetchProjectHome]), one big "is everything OK" card, the
-/// device's readings in plain language and large shortcuts to the other tabs.
+/// Home, every view's first tab: one big "is everything OK" card, the device's
+/// readings in plain language, and the project's own Markdown when it has some
+/// (`HOME.md`, see [fetchProjectHome]).
 /// For viewers it's free of service and stack names, hosts, ports and URLs:
 /// what's broken is said as what people use (the assistant, charts).
 class OverviewTab extends StatefulWidget {
-  const OverviewTab({super.key, required this.active, required this.shortcuts, required this.onOpen, this.onAsk});
+  const OverviewTab({super.key, required this.active, required this.tabs, required this.onOpen, this.onAsk});
 
   final bool active;
 
-  /// Tabs to offer as shortcut cards.
-  final List<DashTab> shortcuts;
+  /// Tabs this view has, for HOME.md's `tab:` links and the device details link.
+  final List<DashTab> tabs;
   final ValueChanged<DashTab> onOpen;
 
   /// Opens the Assistant and asks it a question (HOME.md's `ask:` links).
@@ -169,22 +169,16 @@ class _OverviewTabState extends State<OverviewTab> {
           trailing: RefreshButton(busy: _loading, onPressed: _refresh),
         ),
         const SizedBox(height: 24),
-        if (_home case final home?) ...[
-          MarkdownPanel(
-            home,
-            tabs: {for (final t in widget.shortcuts) t.name},
-            onTab: (name) => widget.onOpen(DashTab.values.byName(name)),
-            onAsk: widget.shortcuts.contains(DashTab.agent) ? widget.onAsk : null,
-          ),
-          const SizedBox(height: 16),
-        ],
         _summary(),
         if (_showsDevice) ...[const SizedBox(height: 16), _device()],
-        if (widget.shortcuts.isNotEmpty) ...[
-          const SizedBox(height: 36),
-          Text(l.goToTag, style: p4.display(size: 17)),
-          const SizedBox(height: 12),
-          TileGrid(minWidth: 280, children: [for (final t in widget.shortcuts) _shortcut(t)]),
+        if (_home case final home?) ...[
+          const SizedBox(height: 16),
+          MarkdownPanel(
+            home,
+            tabs: {for (final t in widget.tabs) t.name},
+            onTab: (name) => widget.onOpen(DashTab.values.byName(name)),
+            onAsk: widget.tabs.contains(DashTab.agent) ? widget.onAsk : null,
+          ),
         ],
       ],
     );
@@ -270,7 +264,7 @@ class _OverviewTabState extends State<OverviewTab> {
   Widget _device() {
     final m = _metrics;
     final f = context.formats;
-    final details = widget.shortcuts.contains(DashTab.edge);
+    final details = widget.tabs.contains(DashTab.edge);
     return Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,52 +323,6 @@ class _OverviewTabState extends State<OverviewTab> {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _shortcut(DashTab tab) {
-    final (icon, desc) = switch (tab) {
-      DashTab.services => (Icons.apps_outlined, l.shortcutServicesDesc),
-      DashTab.edge => (Icons.memory_outlined, l.shortcutDeviceDesc),
-      DashTab.agent => (Icons.forum_outlined, l.shortcutAssistantDesc),
-      DashTab.grafana => (Icons.show_chart, l.shortcutDashboardsDesc),
-      DashTab.video => (Icons.videocam_outlined, l.shortcutCameraDesc),
-      DashTab.feed => (Icons.dynamic_feed_outlined, l.shortcutFeedDesc),
-    };
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => widget.onOpen(tab),
-        hoverColor: p4.bg3,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: p4.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(Radii.control + 2),
-                ),
-                child: Icon(icon, color: p4.accent, size: 26),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l.tabName(tab), style: p4.display(size: 17)),
-                    const SizedBox(height: 4),
-                    Text(desc, style: p4.body(size: 14, color: p4.muted)),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: p4.muted),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

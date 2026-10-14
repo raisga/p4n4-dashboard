@@ -95,6 +95,18 @@ server {
         proxy_read_timeout 300s;
     }
 
+    # A brand's demo cameras (brand.json video.demoCameras, "demo/<file>"):
+    # the video files in DASHBOARD_DEMO_DIR, mounted here. Video files only,
+    # so a credits or notes file next to them isn't served.
+    location /demo/ {
+        location ~ ^/demo/[A-Za-z0-9_-]+\.(mp4|m4v|webm|ogv|mov)$ {
+            root /usr/share/nginx;
+            add_header Cache-Control "no-cache" always;
+            include /etc/nginx/security_headers.conf;
+        }
+        return 404;
+    }
+
     # Entry points revalidate, so a new release is picked up right away.
     location ~* ^/(index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|manifest\.json|version\.json)$ {
         add_header Cache-Control "no-cache" always;
@@ -103,7 +115,12 @@ server {
         try_files $uri /index.html;
     }
 
+    # The rest revalidate too (a 304 while unchanged): main.dart.js and the
+    # assets (brand.json) keep their names across builds, and without this a
+    # browser serves the last image's from cache for hours.
     location / {
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/security_headers.conf;
         try_files $uri $uri/ /index.html;
     }
 

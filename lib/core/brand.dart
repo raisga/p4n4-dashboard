@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../api/camera.dart';
 import 'theme.dart';
 
 /// Tabs a brand can enable, in their default display order (after Home).
@@ -56,6 +57,8 @@ class Brand {
     required this.defaults,
     this.tour = const {},
     this.assistantSuggestions = const {},
+    this.demoCameras = const [],
+    this.demoCredits = const {},
     this.logo,
   });
 
@@ -99,6 +102,34 @@ class Brand {
   /// The brand's starter questions in [language], or null to use the dashboard's.
   List<String>? suggestionsFor(String language) => assistantSuggestions[language] ?? assistantSuggestions['*'];
 
+  /// The Video tab's demo cameras, from brand.json `video.demoCameras`, in
+  /// place of the built-in [demoCameras] (camera.dart): each an http(s) `url`,
+  /// or a path the web app resolves against its own page (the dashboard's
+  /// container serves `/demo/` from `DASHBOARD_DEMO_DIR`). Empty: the built-in
+  /// ones. Resolve them with [demoCamerasOn].
+  final List<Camera> demoCameras;
+
+  /// [demoCameras] that can play here: absolute URLs as they are, paths
+  /// resolved against [page] (the web app's address; null on native, where
+  /// they're left out). Ids get a `demo-` prefix, so they never collide with
+  /// the deployment's own cameras.
+  List<Camera> demoCamerasOn(Uri? page) => [
+    for (final c in demoCameras)
+      if (Camera.parseUrl(c.url) != null || page != null)
+        Camera(
+          id: 'demo-${c.id}',
+          name: c.name,
+          url: Camera.parseUrl(c.url) != null ? c.url : page!.resolve(c.url).toString(),
+        ),
+  ];
+
+  /// The credit line under [demoCameras], per language code (`*` for every
+  /// language), from brand.json `video.demoCredits`.
+  final Map<String, String> demoCredits;
+
+  /// The credit line for the brand's demo footage in [language], if it has one.
+  String? demoCreditsFor(String language) => demoCredits[language] ?? demoCredits['*'];
+
   /// Asset path of an app-bar logo that replaces the text wordmark.
   final String? logo;
 
@@ -134,6 +165,11 @@ class Brand {
     if (unknown.isNotEmpty) throw FormatException('Unknown tabs in brand.json: ${unknown.join(', ')}');
     if (tabs.isEmpty) throw const FormatException('brand.json must enable at least one tab');
     final logo = j['logo'] as String?;
+    final video = switch (j['video']) {
+      null => const <String, dynamic>{},
+      Map m => m.cast<String, dynamic>(),
+      _ => throw const FormatException('brand.json video must be an object'),
+    };
 
     return Brand(
       id: j['id'] as String,
@@ -154,6 +190,8 @@ class Brand {
       defaults: ((j['defaults'] as Map?) ?? const {}).cast<String, Object>(),
       tour: _tour(j['tour']),
       assistantSuggestions: _suggestions(((j['assistant'] as Map?) ?? const {})['suggestions']),
+      demoCameras: _demoCameras(video['demoCameras']),
+      demoCredits: _texts(video['demoCredits'], 'video.demoCredits'),
       logo: logo == null ? null : '$assetDir/$logo',
     );
   }
@@ -171,12 +209,43 @@ class Brand {
     final steps = TourStep.values.asNameMap();
     return {
       for (final MapEntry(:key, :value) in ((raw as Map?) ?? const {}).entries)
-        steps[key] ?? (throw FormatException('Unknown tour step "$key" in brand.json')): switch (value) {
-          String text => {'*': text},
-          Map texts when texts.values.every((t) => t is String) => texts.cast<String, String>(),
-          _ => throw FormatException('brand.json tour.$key must be text or {language: text}'),
-        },
+        steps[key] ?? (throw FormatException('Unknown tour step "$key" in brand.json')): _texts(value, 'tour.$key'),
     };
+  }
+
+  /// Text for every language, or {language: text}; empty when [raw] is null.
+  static Map<String, String> _texts(Object? raw, String key) => switch (raw) {
+    null => const {},
+    String text => {'*': text},
+    Map texts when texts.values.every((t) => t is String) => texts.cast<String, String>(),
+    _ => throw FormatException('brand.json $key must be text or {language: text}'),
+  };
+
+  /// brand.json `video.demoCameras`: {id, name, url}, the url an http(s) URL
+  /// or a path on the dashboard's own origin.
+  static List<Camera> _demoCameras(Object? raw) {
+    final cameras = [
+      for (final c in switch (raw) {
+        null => const [],
+        List l => l,
+        _ => throw const FormatException('brand.json video.demoCameras must be a list'),
+      })
+        switch (c) {
+          {'id': final String id, 'name': final String name, 'url': final String url}
+              when id.isNotEmpty &&
+                  name.isNotEmpty &&
+                  url.trim().isNotEmpty &&
+                  (Camera.parseUrl(url) != null || !Uri.parse(url).hasScheme) =>
+            Camera(id: id, name: name, url: url.trim()),
+          _ => throw FormatException(
+            'brand.json video.demoCameras: $c needs an id, a name and an http(s) url or a path',
+          ),
+        },
+    ];
+    if (cameras.map((c) => c.id).toSet().length != cameras.length) {
+      throw const FormatException('brand.json video.demoCameras ids must be unique');
+    }
+    return cameras;
   }
 
   /// brand.json `assistant.suggestions`: a list for every language, or {language: list}.

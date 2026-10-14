@@ -77,6 +77,10 @@ What `apply` doesn't change:
   "assistant": {                        // optional; the Assistant tab's starter questions
     "suggestions": { "es": ["¿Qué pasó ayer?"], "en": ["What happened yesterday?"] }
   },
+  "video": {                            // optional; the Video tab's demo cameras, in place of the built-in ones
+    "demoCameras": [{ "id": "line-1", "name": "Line 1", "url": "demo/line-1.mp4" }],
+    "demoCredits": { "en": "Demo footage: …", "es": "Imágenes de demostración: …" }
+  },
   "tour": {                             // optional; replaces the normie view's tour text, step by step
     "welcome": { "en": "Welcome to Acme Edge!", "es": "¡Te damos la bienvenida a Acme Edge!" },
     "signOut": "Done for the day? Sign out here."   // plain text: every language
@@ -99,6 +103,7 @@ Only `id`, `appName`, `wordmark.text` and `native` are required. A theme's `id` 
 - **Starter questions.** `assistant.suggestions` replaces the Assistant tab's three built-in questions (shown before a chat starts) with the brand's own, e.g. about a store rather than a device: a list for every language, or per language (`en`, `es`, or `*` as the fallback). A language without a list keeps the built-in questions. `check` rejects empty lists and unknown languages.
 - **Feed.** `feed` is opt-in: a brand without a `tabs` list gets the other five. The tab shows only when the connected project also serves a feed (`.p4n4.json` `dashboard.tabs` and `dashboard.feed`, see the dashboard README's feed contract), and only then does it join Settings → Views.
 - **Disabled tabs** also hide their section in Settings → Endpoints (and the category, if none is left).
+- **Demo cameras.** `video.demoCameras` replaces the four built-in demo cameras (admins' film button on the Video tab) with the brand's own footage: each an `id`, a `name` and a `url`, either an http(s) URL or a path such as `demo/line-1.mp4`. The web app resolves a path against its own page, and the container serves `/demo/` from `DASHBOARD_DEMO_DIR` (video files only), so the clips stay out of the image and out of git, and play with no other stack running. Native builds leave paths out, and fall back to the built-in cameras when nothing is left. `video.demoCredits` is the line under them (text, or per language); without it there's none. `check` rejects missing fields, repeated ids, other URL schemes and unknown languages.
 - **Tour.** The first time someone signs in to the normie view on a device, a short tour points out the shell: `welcome` (the wordmark), `navigation` (the rail or bottom bar, when the view has more than one screen), `theme`, `settings` and `signOut`. Each key in `tour` replaces that step's built-in text, either in every language (a string) or per language (`en`, `es`, or `*` as the fallback). Steps you leave out keep the built-in copy, translated. `check` rejects unknown steps and languages. The user can replay the tour from Settings → Account → **Take the tour**.
 - **Tab order.** `tabs` only picks tabs; they show in the default order (agent, grafana, video, edge, services) unless `defaults.tabOrder` sets another. Admins can still reorder them in Settings → Views; that's saved on each deployment's p4n4-api (`/api/v1/dashboard/views`) and wins over `defaults.tabOrder`, `powerTabs` and `normieTabs`, which apply until an admin changes them.
 

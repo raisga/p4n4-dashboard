@@ -24,6 +24,10 @@ services:
       - /tmp
       - /var/cache/nginx
       - /etc/nginx/conf.d:uid=101,gid=101      # rendered from templates at start, as the image's nginx user
+    volumes:
+      # Video files for a brand's demo cameras, served at /demo/ (e.g. a
+      # project's edge/clips); an empty volume by default
+      - ${DASHBOARD_DEMO_DIR:-demo}:/usr/share/nginx/demo:ro
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     healthcheck:
@@ -39,3 +43,6 @@ networks:
   p4n4-net:
     external: true
     name: p4n4-net
+
+volumes:
+  demo:

@@ -106,7 +106,7 @@ void main() {
       expect(settings.tabOrder, DashTab.defaults);
       expect(settings.tabsFor(Role.power), isNot(contains(DashTab.feed)));
       settings.project = ProjectInfo.fromJson({
-        'name': 'aioros-alpha',
+        'name': 'demo-site',
         'layers': ['iot'],
         'dashboard': {
           'tabs': ['agent', 'grafana', 'feed'],

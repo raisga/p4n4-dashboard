@@ -121,6 +121,27 @@ void main() {
     expect(brand.tourText(TourStep.theme, 'en'), isNull);
   });
 
+  test('demo cameras play absolute URLs anywhere, and paths on the web app\'s origin', () {
+    final brand = Brand.fromJson(
+      _minimal({
+        'video': {
+          'demoCameras': [
+            {'id': 'rack', 'name': 'Rack', 'url': 'https://cdn.example.com/rack.mp4'},
+            {'id': 'fitting', 'name': 'Fitting room', 'url': 'demo/fitting.mp4'},
+          ],
+          'demoCredits': 'Example footage',
+        },
+      }),
+    );
+    expect([for (final c in brand.demoCamerasOn(null)) c.url], ['https://cdn.example.com/rack.mp4']);
+    final web = brand.demoCamerasOn(Uri.parse('https://store.example.com/dash/index.html'));
+    expect([for (final c in web) c.id], ['demo-rack', 'demo-fitting']);
+    expect(web.last.url, 'https://store.example.com/dash/demo/fitting.mp4');
+    expect(web.every((c) => c.isVideo), isTrue);
+    expect(brand.demoCreditsFor('es'), 'Example footage');
+    expect(Brand.fromJson(_minimal()).demoCamerasOn(Uri.parse('https://x/')), isEmpty);
+  });
+
   test('invalid brand config is rejected', () {
     expect(() => Brand.fromJson(_minimal({'tabs': <String>[]})), throwsFormatException);
     expect(
@@ -177,6 +198,29 @@ void main() {
       ),
       throwsFormatException,
     );
+    for (final video in [
+      'cams',
+      {'demoCameras': 'cam.mp4'},
+      {
+        'demoCameras': [
+          {'id': 'a', 'name': 'A'},
+        ],
+      },
+      {
+        'demoCameras': [
+          {'id': 'a', 'name': 'A', 'url': 'ftp://cam/a.mp4'},
+        ],
+      },
+      {
+        'demoCameras': [
+          {'id': 'a', 'name': 'A', 'url': 'demo/a.mp4'},
+          {'id': 'a', 'name': 'B', 'url': 'demo/b.mp4'},
+        ],
+      },
+      {'demoCredits': 1},
+    ]) {
+      expect(() => Brand.fromJson(_minimal({'video': video})), throwsFormatException, reason: '$video');
+    }
   });
 
   test('brand defaults seed settings until the user changes them', () async {

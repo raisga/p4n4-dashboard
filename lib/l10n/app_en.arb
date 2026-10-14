@@ -373,7 +373,6 @@
   "copySettings": "Copy settings",
   "settingsDump": "Settings dump",
   "secretsHidden": "Secrets hidden",
-  "goToTag": "Go to",
   "summaryChecking": "Checking your system…",
   "summaryCheckingSub": "This takes a few seconds.",
   "summaryUnavailable": "Service status unavailable",
@@ -419,11 +418,6 @@
   "levelWarm": "Warm",
   "levelHot": "Hot",
   "deviceDetails": "Details",
-  "shortcutServicesDesc": "Open the apps running on your system.",
-  "shortcutDeviceDesc": "How hard your device is working, live.",
-  "shortcutAssistantDesc": "Ask about your system in plain words.",
-  "shortcutDashboardsDesc": "Charts and history from your sensors.",
-  "shortcutCameraDesc": "Watch your live camera feeds.",
   "servicesApiUnreachable": "Can't reach {platform}-api, so status comes from checking each service's port.",
   "@servicesApiUnreachable": {
     "placeholders": {
@@ -664,6 +658,49 @@
   "agentMessageHint": "Ask a question… (Shift+Enter for a new line)",
   "agentSelectFirst": "Choose a model or agent first",
   "agentStopped": "(stopped)",
+  "agentThinking": "Thinking…",
+  "@agentThinking": {
+    "description": "Assistant reply in progress, before it looks anything up"
+  },
+  "agentStepLookup": "Looking up {what}",
+  "@agentStepLookup": {
+    "description": "A tool the assistant runs; {what} is the tool's label from the agent, e.g. 'the alerts'",
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "agentStepData": "Looking up data",
+  "@agentStepData": {
+    "description": "A tool the assistant runs, when the agent gives it no label"
+  },
+  "agentWriting": "Writing the answer…",
+  "@agentWriting": {
+    "description": "Assistant reply in progress, after its lookups"
+  },
+  "agentElapsed": "{seconds} s",
+  "@agentElapsed": {
+    "description": "Seconds since the question was sent, next to the reply's progress",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "agentWaitLast": "The last answer took {seconds} s.",
+  "@agentWaitLast": {
+    "description": "Shown when a reply takes a while, if an earlier one finished in this session",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "agentWaitHint": "Answers can take up to a minute.",
+  "@agentWaitHint": {
+    "description": "Shown when a reply takes a while and no earlier one finished in this session"
+  },
   "bubbleYou": "You",
   "@bubbleYou": {
     "description": "Chat bubble author"
@@ -864,7 +901,6 @@
   "takeTour": "Take the tour",
   "takeTourSubtitle": "A quick look around the dashboard",
   "navFeed": "Activity",
-  "shortcutFeedDesc": "Live events, and the alerts that need someone.",
   "feedEmpty": "Nothing yet",
   "feedEmptyMsg": "Events and alerts show up here as they happen.",
   "feedNotSetUp": "No activity feed",

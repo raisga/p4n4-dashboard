@@ -23,7 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
 
-/// [label] in the navigation rail or bar; page titles and Home's shortcuts reuse the same words.
+/// [label] in the navigation rail or bar; page titles reuse the same words.
 Finder nav(String label) => find.descendant(
   of: find.byWidgetPredicate((w) => w is NavigationRail || w is NavigationBar),
   matching: find.text(label),
@@ -59,6 +59,7 @@ void main() {
     Role? role = Role.admin,
     Map<String, Object> prefs = const {},
     Map<String, Object> brandDefaults = const {},
+    Map<String, dynamic> brandExtra = const {},
   }) async {
     SharedPreferences.setMockInitialValues({
       'edgeDemo': true,
@@ -67,7 +68,7 @@ void main() {
       'role': ?role?.name,
       ...prefs,
     });
-    final brand = loadBrand(brandId);
+    final brand = loadBrand(brandId, extra: brandExtra);
     final settings = await AppSettings.load(
       defaults: {...brand.defaults, ...brandDefaults},
       secrets: MemorySecretStore(),
@@ -592,6 +593,38 @@ void main() {
     expect(find.textContaining('Blender Foundation'), findsNothing);
   });
 
+  testWidgets("a brand's demo cameras replace the built-in ones, with its credits", (tester) async {
+    await pumpAt(
+      tester,
+      const Size(1280, 800),
+      ThemeMode.light,
+      brandExtra: {
+        'video': {
+          'demoCameras': [
+            {'id': 'rack', 'name': 'Rack', 'url': 'http://store.local/rack.mp4'},
+            {'id': 'fitting', 'name': 'Fitting room', 'url': 'http://store.local/fitting.mp4'},
+            // Served by the web app's own origin: left out on native
+            {'id': 'web', 'name': 'Web only', 'url': 'demo/web.mp4'},
+          ],
+          'demoCredits': {'en': 'Store footage', 'es': 'Imágenes de la tienda'},
+        },
+      },
+    );
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    settings.cameras = cameras;
+    await tester.tap(nav('Cameras'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byTooltip('Demo cameras'));
+    await tester.pump();
+    expect(find.text('Store footage'), findsOneWidget);
+    expect(find.textContaining('Blender Foundation'), findsNothing);
+    await tester.tap(find.byTooltip('All cameras'));
+    await tester.pump();
+    expect(find.text('2 cameras'), findsOneWidget);
+    expect(find.byType(VideoView), findsNWidgets(2));
+  });
+
   testWidgets('without cameras, admins are offered the demo ones; normies are not', (tester) async {
     await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
     await tester.tap(nav('Cameras'));
@@ -676,6 +709,43 @@ void main() {
       expect(seen.where((r) => r.method == 'PUT'), isEmpty);
     });
 
+    testWidgets('its chat survives a resize across the rail/bar breakpoint and a reload', (tester) async {
+      final seen = <http.Request>[];
+      await http.runWithClient(() async {
+        await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
+        await tester.tap(nav('Assistant'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.text('Is everything running normally?'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('All good.'), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'And the pumps?');
+
+        for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+          tester.view.physicalSize = size;
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(find.byType(NavigationBar), size.width < 800 ? findsOneWidget : findsNothing);
+          expect(find.text('All good.'), findsOneWidget, reason: '$size');
+          expect(find.text('And the pumps?'), findsOneWidget, reason: 'the unsent draft, at $size');
+        }
+
+        // Reload: a fresh app on the same device storage.
+        final prefs = await SharedPreferences.getInstance();
+        final saved = {
+          for (final k in prefs.getKeys().where((k) => k == 'deployments' || k.startsWith('chat.'))) k: prefs.get(k)!,
+        };
+        await tester.pumpWidget(const SizedBox());
+        await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie, prefs: saved);
+        await tester.tap(nav('Assistant'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Is everything running normally?'), findsOneWidget);
+        expect(find.text('All good.'), findsOneWidget);
+      }, () => api(seen));
+    });
+
     testWidgets('an ask: link on Home opens it and asks the question', (tester) async {
       final seen = <http.Request>[];
       await http.runWithClient(() async {
@@ -711,9 +781,11 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        await tester.tapAt(
-          tester.getTopLeft(find.textContaining('Is any unit on warning?', findRichText: true)) + const Offset(20, 8),
-        );
+        // HOME.md comes last on Home, below the fold on a phone.
+        final link = find.textContaining('Is any unit on warning?', findRichText: true);
+        await tester.ensureVisible(link);
+        await tester.pump();
+        await tester.tapAt(tester.getTopLeft(link) + const Offset(20, 8));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.pump(const Duration(milliseconds: 300));

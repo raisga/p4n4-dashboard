@@ -178,6 +178,40 @@ void main() {
       expect(cancelledEarly, isFalse);
     });
 
+    test("the agent's steps reach onStep, not the reply", () async {
+      final lines = [
+        {
+          'message': {'content': ''},
+          'step': {
+            'tool': 'get_alerts',
+            'label': {'en': 'the alerts', 'es': 'las alertas'},
+            'state': 'running',
+          },
+        },
+        {
+          'message': {'content': ''},
+          'step': {'tool': 'get_alerts', 'label': {}, 'state': 'done', 'ok': false},
+        },
+        {
+          'message': {'content': 'None.'},
+          'done': true,
+        },
+      ];
+      final seen = <String>[];
+      final reply = await http.runWithClient(
+        () => api.send(AgentBackend.ollama, 'm', [
+          ChatMessage('user', 'hi'),
+        ], onStep: (s) => seen.add('${s.tool} ${s.label('es_PA')} ${s.label('fr')} done=${s.done} ok=${s.ok}')).join(),
+        () => MockClient((_) async => http.Response(lines.map(jsonEncode).join('\n'), 200)),
+      );
+      expect(reply, 'None.');
+      expect(seen, [
+        'get_alerts las alertas the alerts done=false ok=true',
+        // The same step, finished: its labels are the ones it started with
+        'get_alerts las alertas the alerts done=true ok=false',
+      ]);
+    });
+
     test('Letta gets only the new message, with the system status', () async {
       late http.Request sent;
       final reply = await http.runWithClient(

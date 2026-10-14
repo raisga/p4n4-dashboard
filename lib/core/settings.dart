@@ -379,6 +379,26 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  static String _chatKey(Deployment d, String who) => 'chat.${d.id}.$who';
+
+  /// The Assistant conversation [who] had on [d], as `{role, content}` maps.
+  /// Kept on this device so it outlives a reload and signing out and back in.
+  List<Map<String, String>> chatOf(Deployment d, String who) {
+    try {
+      return [
+        for (final m in jsonDecode(_prefs.getString(_chatKey(d, who)) ?? '[]') as List)
+          (m as Map).cast<String, String>(),
+      ];
+    } on Object {
+      return []; // unreadable: start over
+    }
+  }
+
+  /// Stores (or, empty, forgets) [who]'s conversation on [d]. It changes with
+  /// every message, so this doesn't notify listeners.
+  Future<void> setChatOf(Deployment d, String who, List<Map<String, String>> messages) =>
+      messages.isEmpty ? _prefs.remove(_chatKey(d, who)) : _prefs.setString(_chatKey(d, who), jsonEncode(messages));
+
   /// The deployment whose p4n4-api serves [url], if any.
   Deployment? deploymentForApi(Uri url) {
     final target = url.toString();
@@ -548,6 +568,9 @@ class AppSettings extends ChangeNotifier {
     await _saveDeployments();
     notifyListeners();
     for (final d in removed) {
+      for (final key in _prefs.getKeys().where((k) => k.startsWith('chat.${d.id}.')).toList()) {
+        await _prefs.remove(key);
+      }
       for (final key in secretKeys) {
         if (_secrets.remove(_secretId(d, key)) != null && _secretsOk) {
           try {
