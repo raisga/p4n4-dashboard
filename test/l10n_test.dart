@@ -124,37 +124,43 @@ void main() {
     expect(find.byTooltip('Cerrar sesión'), findsOneWidget);
   });
 
-  // Spanish runs longer than English: nothing may overflow on a phone.
-  for (final role in Role.values) {
-    testWidgets('Spanish fits a phone in the ${role.name} view', (tester) async {
-      await pump(tester, {'locale': 'es'}, role: role, size: const Size(390, 844));
-      for (final d in tester.widgetList<NavigationDestination>(find.byType(NavigationDestination)).toList()) {
-        await tester.tap(nav(d.label));
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(tester.takeException(), isNull, reason: d.label);
-      }
-      await tester.tap(find.byTooltip('Ajustes'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(find.text('Idioma y región'), findsOneWidget);
-      expect(tester.takeException(), isNull, reason: 'settings');
-      // Every category's page, one at a time.
-      final categories = find.byIcon(Icons.chevron_right);
-      for (var i = 0; i < categories.evaluate().length; i++) {
-        await tester.ensureVisible(categories.at(i));
-        await tester.tap(categories.at(i));
+  // Spanish, French and German run longer than English: nothing may overflow on a phone.
+  for (final (code, name, settings, region) in [
+    ('es', 'Spanish', 'Ajustes', 'Idioma y región'),
+    ('fr', 'French', 'Réglages', 'Langue et région'),
+    ('de', 'German', 'Einstellungen', 'Sprache und Region'),
+  ]) {
+    for (final role in Role.values) {
+      testWidgets('$name fits a phone in the ${role.name} view', (tester) async {
+        await pump(tester, {'locale': code}, role: role, size: const Size(390, 844));
+        for (final d in tester.widgetList<NavigationDestination>(find.byType(NavigationDestination)).toList()) {
+          await tester.tap(nav(d.label));
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(tester.takeException(), isNull, reason: d.label);
+        }
+        await tester.tap(find.byTooltip(settings));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
-        expect(tester.takeException(), isNull, reason: 'settings category $i');
-        await tester.tap(find.byType(BackButton)); // pageBack() looks for an English tooltip
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
-      }
-    });
+        expect(find.text(region), findsOneWidget);
+        expect(tester.takeException(), isNull, reason: 'settings');
+        // Every category's page, one at a time.
+        final categories = find.byIcon(Icons.chevron_right);
+        for (var i = 0; i < categories.evaluate().length; i++) {
+          await tester.ensureVisible(categories.at(i));
+          await tester.tap(categories.at(i));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(tester.takeException(), isNull, reason: 'settings category $i');
+          await tester.tap(find.byType(BackButton)); // pageBack() looks for an English tooltip
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+      });
+    }
   }
 
   testWidgets('an unsupported device language falls back to English', (tester) async {
-    tester.platformDispatcher.localesTestValue = const [Locale('fr', 'FR')];
+    tester.platformDispatcher.localesTestValue = const [Locale('sv', 'SE')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     await pump(tester, {});
     expect(nav('Home'), findsOneWidget);

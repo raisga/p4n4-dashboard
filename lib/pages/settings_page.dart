@@ -1215,10 +1215,8 @@ class _LanguagePage extends StatelessWidget {
 
 /// The device's language if the dashboard has it, else English (what
 /// MaterialApp falls back to).
-String _deviceLanguage(BuildContext context) => basicLocaleListResolution(
-  View.of(context).platformDispatcher.locales,
-  AppLocalizations.supportedLocales,
-).languageCode;
+String _deviceLanguage(BuildContext context) =>
+    basicLocaleListResolution(View.of(context).platformDispatcher.locales, appLocales).languageCode;
 
 Future<void> _pickLanguage(BuildContext context, AppSettings s) async {
   final code = await showDialog<String>(context: context, builder: (_) => const _LanguageDialog());

@@ -53,6 +53,15 @@ const knownLanguages = <String, LanguageName>{
 LanguageName languageName(String code) =>
     knownLanguages[code] ?? (native: code.toUpperCase(), english: code.toUpperCase());
 
+/// [AppLocalizations.supportedLocales] with English first. A device language the
+/// dashboard lacks resolves to the first of these, and the generated list is
+/// alphabetical (German would come first).
+final List<Locale> appLocales = [
+  const Locale('en'),
+  for (final l in AppLocalizations.supportedLocales)
+    if (l.languageCode != 'en') l,
+];
+
 /// Every language the dashboard is translated into (one per ARB file), by code,
 /// in alphabetical order of their own names.
 final List<String> supportedLanguages = [for (final l in AppLocalizations.supportedLocales) l.languageCode]

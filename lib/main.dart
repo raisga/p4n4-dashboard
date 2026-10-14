@@ -106,7 +106,7 @@ class _DashboardAppState extends State<DashboardApp> {
       // The language picked in Settings, else the device's if supported, else English.
       locale: settings.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: appLocales,
       // Keyed by role so switching views starts from a fresh shell.
       home: role == null ? const LoginPage() : HomeShell(key: ValueKey(role)),
     );

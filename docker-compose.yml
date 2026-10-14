@@ -6,7 +6,7 @@
 #   make up-local                                    # build the image from source instead
 services:
   dashboard:
-    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.1.0}
+    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.2.0}
     container_name: p4n4-dashboard
     restart: ${RESTART_POLICY:-unless-stopped}
     ports:

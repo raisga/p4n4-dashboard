@@ -37,7 +37,11 @@ Settings (the ⚙ button) are grouped into categories: a list beside the open on
 
 ## Languages
 
-The dashboard is in English (the default) and Spanish. It follows the device's language, falling back to English for any other, and **Settings → Language & region** overrides that. A brand can pick the first-run language with `"locale": "es"` in its `defaults` (see [brands/README.md](brands/README.md)).
+The dashboard is in English (the default), Spanish, French, German, Italian, Portuguese (Brazilian), Dutch, Japanese, Korean and Chinese (Simplified). It follows the device's language, falling back to English for any other, and **Settings → Language & region** overrides that. A brand can pick the first-run language with `"locale": "es"` in its `defaults` (see [brands/README.md](brands/README.md)).
+
+**Machine-drafted translations.** French (`fr`), German (`de`), Italian (`it`), Portuguese (`pt`, written as Brazilian Portuguese), Dutch (`nl`), Japanese (`ja`), Korean (`ko`) and Chinese (`zh`, Simplified) are drafts nobody fluent has checked yet. Have a native speaker review a language's ARB file before a client sees it, then move it out of this list.
+
+**Fonts for Japanese, Korean and Chinese.** Brand fonts carry Latin glyphs only. Native builds fall back to the system's CJK fonts. The web build's engine downloads Noto fallbacks from fonts.gstatic.com at runtime, so a web dashboard on a network without internet access shows empty boxes for those scripts: bundle a Noto CJK font in the brand (or allow that domain) before shipping one of them to an offline store.
 
 Every label lives in `lib/l10n/app_<code>.arb`. `app_en.arb` is the template, with a description for messages that need context. Flutter generates `AppLocalizations` (`lib/l10n/app_localizations*.dart`) from them on `flutter pub get` and on every build. Widgets read strings with `context.l10n` (`lib/l10n/l10n.dart`). To change a label, edit it in every ARB file. To add a language, add `app_<code>.arb` with every key of `app_en.arb` (the picker lists it by itself; only a language missing from `knownLanguages` in `lib/l10n/l10n.dart` needs its name added there), and add its code to `CFBundleLocalizations` in `ios/Runner/Info.plist` and `macos/Runner/Info.plist`. `test/l10n_test.dart` checks that every language has every message, with the same placeholders, and that Spanish fits a phone in every view and every settings page; `test/preferences_test.dart` does the same at the largest text size.
 
