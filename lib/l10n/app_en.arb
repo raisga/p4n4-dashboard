@@ -528,7 +528,6 @@
   "tcpOnly": "No web page",
   "stackIot": "IoT stack",
   "stackAi": "AI stack",
-  "stackEdge": "Edge stack",
   "stackApi": "API gateway",
   "serviceGrafanaDesc": "Dashboards and charts",
   "serviceNodeRedDesc": "Flow automation",
@@ -599,9 +598,14 @@
   "factDisk": "Storage used",
   "factLoad": "Load average",
   "factUptime": "Running for",
-  "sparkStart": "2 min ago",
+  "sparkStart": "{minutes} min ago",
   "@sparkStart": {
-    "description": "Left end of a two-minute sparkline"
+    "description": "Left end of a two-minute sparkline",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
   },
   "sparkNow": "Now",
   "@sparkNow": {
@@ -790,6 +794,94 @@
     }
   },
   "videoDemoSwitch": "Demo cameras",
+  "videoGridDefault": "Open on all cameras",
+  "@videoGridDefault": {
+    "description": "Settings → Appearance → Video: whether the Video tab opens on every camera in a grid rather than one"
+  },
+  "alertSound": "Alert sound",
+  "alertDismiss": "Dismiss alert",
+  "visionPerson": "Person",
+  "@visionPerson": {
+    "description": "A person, in the key to the colours of the vision overlay's boxes"
+  },
+  "visionPeople": "{count, plural, =0{No one in view} =1{1 person} other{{count} people}}",
+  "@visionPeople": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sectionChats": "Chats",
+  "chatsNote": "Chats linked to the project's bot get its alerts as they happen, and can ask it about the project. In a linked group, everyone can.",
+  "chatsLink": "Link a chat",
+  "chatsLinkHow": "Open the link on the phone that will use the bot, or send this command to {bot}. For a group, add the bot to the group first, then send the command there.",
+  "@chatsLinkHow": {
+    "placeholders": {
+      "bot": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsTheBot": "the bot",
+  "chatsCodeExpires": "Works once, until {time}.",
+  "@chatsCodeExpires": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsCopyLink": "Copy link",
+  "chatsCopyCommand": "Copy command",
+  "chatsNone": "No chats linked yet.",
+  "chatsLinkedBy": "Linked {date} by {who}",
+  "@chatsLinkedBy": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "who": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsLinkedOn": "Linked {date}",
+  "@chatsLinkedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsMuted": "Muted: {codes}",
+  "@chatsMuted": {
+    "placeholders": {
+      "codes": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsUnlink": "Unlink",
+  "chatsUnlinkTitle": "Unlink {name}?",
+  "@chatsUnlinkTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsUnlinkBody": "It stops getting alerts, and the bot stops answering it. The chat is told.",
+  "chatsLoadFailed": "Couldn't load the chats: {error}",
+  "@chatsLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsMock": "Mock mode: the bot logs its messages instead of sending them.",
+  "chatsOff": "Off: the bot has no token.",
   "useDemoCameras": "Use demo cameras",
   "videoDemoCredits": "Demo footage: clips from MDN (CC0); Big Buck Bunny and Sintel © Blender Foundation (CC BY 3.0).",
   "videoUnsupported": "Video files don't play in the app on {platform}",
@@ -931,5 +1023,132 @@
   "feedDemoData": "Demo data",
   "feedStatusPending": "To review",
   "feedStatusAttended": "Attended",
-  "feedStatusDismissed": "Dismissed"
+  "feedStatusDismissed": "Dismissed",
+  "changePassword": "Change password",
+  "changePasswordSubtitle": "Signs you out on your other devices",
+  "changePasswordTitle": "Choose a new password",
+  "changePasswordBody": "An admin asks you to choose your own password before you continue.",
+  "fieldCurrentPassword": "Current password",
+  "fieldNewPassword": "New password",
+  "fieldRepeatPassword": "Repeat new password",
+  "passwordsDontMatch": "The passwords don't match",
+  "passwordCurrentWrong": "The current password is wrong",
+  "passwordChanged": "Password changed",
+  "signOutUserTooltip": "Sign out everywhere",
+  "signOutUserTitle": "Sign {user} out everywhere?",
+  "@signOutUserTitle": {
+    "placeholders": {
+      "user": {
+        "type": "String"
+      }
+    }
+  },
+  "signOutUserBody": "They'll have to sign in again on every device. Their password stays the same.",
+  "signOutSelfBody": "You'll have to sign in again here and on your other devices. Your password stays the same.",
+  "userLastSignIn": "Last signed in {when}",
+  "@userLastSignIn": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "userNeverSignedIn": "Never signed in",
+  "userMustChangePassword": "Must choose a new password",
+  "mustChangeAtFirstSignIn": "Choose their own password at first sign-in",
+  "mustChangeAtNextSignIn": "Choose a new password at next sign-in",
+  "sectionAudit": "Audit log",
+  "auditNote": "Who changed what on this deployment, newest first",
+  "auditCount": "{count, plural, =1{1 change} other{{count} changes}}, newest first",
+  "@auditCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "auditEmpty": "Nothing has changed yet",
+  "auditLoadFailed": "Couldn't load the audit log: {error}",
+  "@auditLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "auditLoadMore": "Load more",
+  "sectionBanner": "Banner",
+  "bannerNone": "No banner",
+  "bannerShowing": "Showing on every device until you clear it",
+  "bannerShowingUntil": "Showing on every device until {when}",
+  "@bannerShowingUntil": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerText": "Message",
+  "bannerHint": "Maintenance today 3–4 pm",
+  "bannerInfo": "Info",
+  "bannerWarning": "Warning",
+  "bannerUntilCleared": "Until cleared",
+  "bannerForHours": "{hours, plural, =1{For 1 hour} other{For {hours} hours}}",
+  "@bannerForHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "bannerClear": "Clear",
+  "bannerShow": "Show",
+  "viewStartTab": "Opens on",
+  "viewHomeCards": "Home shows",
+  "homeCardStatus": "Status",
+  "homeCardDevice": "Device readings",
+  "homeCardPage": "Project page",
+  "viewGrafanaPage": "Grafana page",
+  "viewGrafanaPageHelp": "Empty: the deployment's page",
+  "viewCameras": "Cameras",
+  "viewCameraOverlay": "Vision overlay",
+  "viewAlerts": "Alerts that pop up",
+  "alertsAll": "All",
+  "alertsReview": "Only those to review",
+  "alertsOff": "None",
+  "viewAlertSound": "Chime for alerts to review",
+  "sectionDevice": "This device",
+  "deviceKiosk": "Kiosk mode",
+  "kioskModeHelp": "Locks this device to a viewer account: no sign-out or settings, and it starts over when nobody uses it",
+  "kioskNeedsAccounts": "Needs sign-in with p4n4-api accounts",
+  "kioskIdleReset": "Start over when idle",
+  "idleSignOut": "Sign admins and power users out when idle",
+  "idleNever": "Never",
+  "idleAfterMinutes": "{count, plural, =1{After 1 minute} other{After {count} minutes}}",
+  "@idleAfterMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "startKioskTitle": "Turn on kiosk mode",
+  "startKioskBody": "Sign this device in with a viewer account. People here can't sign out or change settings, and it starts over when nobody uses it.",
+  "kioskTurnOn": "Turn on",
+  "leaveKiosk": "Leave kiosk mode",
+  "leaveKioskBody": "Sign in with an admin account. This device then stays signed in as that admin.",
+  "kioskNeedsViewer": "That's not a viewer account.",
+  "kioskNeedsAdmin": "That's not an admin account.",
+  "startTabDefault": "Default",
+  "chartHistory": "Chart history",
+  "minutesCount": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@minutesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "defaultCamera": "Default camera",
+  "defaultCameraFirst": "The first one"
 }

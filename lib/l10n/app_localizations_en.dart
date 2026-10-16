@@ -664,9 +664,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stackAi => 'AI stack';
 
   @override
-  String get stackEdge => 'Edge stack';
-
-  @override
   String get stackApi => 'API gateway';
 
   @override
@@ -794,7 +791,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get factUptime => 'Running for';
 
   @override
-  String get sparkStart => '2 min ago';
+  String sparkStart(int minutes) {
+    return '$minutes min ago';
+  }
 
   @override
   String get sparkNow => 'Now';
@@ -1067,6 +1066,99 @@ class AppLocalizationsEn extends AppLocalizations {
   String get videoDemoSwitch => 'Demo cameras';
 
   @override
+  String get videoGridDefault => 'Open on all cameras';
+
+  @override
+  String get alertSound => 'Alert sound';
+
+  @override
+  String get alertDismiss => 'Dismiss alert';
+
+  @override
+  String get visionPerson => 'Person';
+
+  @override
+  String visionPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people',
+      one: '1 person',
+      zero: 'No one in view',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sectionChats => 'Chats';
+
+  @override
+  String get chatsNote =>
+      'Chats linked to the project\'s bot get its alerts as they happen, and can ask it about the project. In a linked group, everyone can.';
+
+  @override
+  String get chatsLink => 'Link a chat';
+
+  @override
+  String chatsLinkHow(String bot) {
+    return 'Open the link on the phone that will use the bot, or send this command to $bot. For a group, add the bot to the group first, then send the command there.';
+  }
+
+  @override
+  String get chatsTheBot => 'the bot';
+
+  @override
+  String chatsCodeExpires(String time) {
+    return 'Works once, until $time.';
+  }
+
+  @override
+  String get chatsCopyLink => 'Copy link';
+
+  @override
+  String get chatsCopyCommand => 'Copy command';
+
+  @override
+  String get chatsNone => 'No chats linked yet.';
+
+  @override
+  String chatsLinkedBy(String date, String who) {
+    return 'Linked $date by $who';
+  }
+
+  @override
+  String chatsLinkedOn(String date) {
+    return 'Linked $date';
+  }
+
+  @override
+  String chatsMuted(String codes) {
+    return 'Muted: $codes';
+  }
+
+  @override
+  String get chatsUnlink => 'Unlink';
+
+  @override
+  String chatsUnlinkTitle(String name) {
+    return 'Unlink $name?';
+  }
+
+  @override
+  String get chatsUnlinkBody => 'It stops getting alerts, and the bot stops answering it. The chat is told.';
+
+  @override
+  String chatsLoadFailed(String error) {
+    return 'Couldn\'t load the chats: $error';
+  }
+
+  @override
+  String get chatsMock => 'Mock mode: the bot logs its messages instead of sending them.';
+
+  @override
+  String get chatsOff => 'Off: the bot has no token.';
+
+  @override
   String get useDemoCameras => 'Use demo cameras';
 
   @override
@@ -1261,4 +1353,245 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedStatusDismissed => 'Dismissed';
+
+  @override
+  String get changePassword => 'Change password';
+
+  @override
+  String get changePasswordSubtitle => 'Signs you out on your other devices';
+
+  @override
+  String get changePasswordTitle => 'Choose a new password';
+
+  @override
+  String get changePasswordBody => 'An admin asks you to choose your own password before you continue.';
+
+  @override
+  String get fieldCurrentPassword => 'Current password';
+
+  @override
+  String get fieldNewPassword => 'New password';
+
+  @override
+  String get fieldRepeatPassword => 'Repeat new password';
+
+  @override
+  String get passwordsDontMatch => 'The passwords don\'t match';
+
+  @override
+  String get passwordCurrentWrong => 'The current password is wrong';
+
+  @override
+  String get passwordChanged => 'Password changed';
+
+  @override
+  String get signOutUserTooltip => 'Sign out everywhere';
+
+  @override
+  String signOutUserTitle(String user) {
+    return 'Sign $user out everywhere?';
+  }
+
+  @override
+  String get signOutUserBody => 'They\'ll have to sign in again on every device. Their password stays the same.';
+
+  @override
+  String get signOutSelfBody =>
+      'You\'ll have to sign in again here and on your other devices. Your password stays the same.';
+
+  @override
+  String userLastSignIn(String when) {
+    return 'Last signed in $when';
+  }
+
+  @override
+  String get userNeverSignedIn => 'Never signed in';
+
+  @override
+  String get userMustChangePassword => 'Must choose a new password';
+
+  @override
+  String get mustChangeAtFirstSignIn => 'Choose their own password at first sign-in';
+
+  @override
+  String get mustChangeAtNextSignIn => 'Choose a new password at next sign-in';
+
+  @override
+  String get sectionAudit => 'Audit log';
+
+  @override
+  String get auditNote => 'Who changed what on this deployment, newest first';
+
+  @override
+  String auditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count changes', one: '1 change');
+    return '$_temp0, newest first';
+  }
+
+  @override
+  String get auditEmpty => 'Nothing has changed yet';
+
+  @override
+  String auditLoadFailed(String error) {
+    return 'Couldn\'t load the audit log: $error';
+  }
+
+  @override
+  String get auditLoadMore => 'Load more';
+
+  @override
+  String get sectionBanner => 'Banner';
+
+  @override
+  String get bannerNone => 'No banner';
+
+  @override
+  String get bannerShowing => 'Showing on every device until you clear it';
+
+  @override
+  String bannerShowingUntil(String when) {
+    return 'Showing on every device until $when';
+  }
+
+  @override
+  String get bannerText => 'Message';
+
+  @override
+  String get bannerHint => 'Maintenance today 3–4 pm';
+
+  @override
+  String get bannerInfo => 'Info';
+
+  @override
+  String get bannerWarning => 'Warning';
+
+  @override
+  String get bannerUntilCleared => 'Until cleared';
+
+  @override
+  String bannerForHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(hours, locale: localeName, other: 'For $hours hours', one: 'For 1 hour');
+    return '$_temp0';
+  }
+
+  @override
+  String get bannerClear => 'Clear';
+
+  @override
+  String get bannerShow => 'Show';
+
+  @override
+  String get viewStartTab => 'Opens on';
+
+  @override
+  String get viewHomeCards => 'Home shows';
+
+  @override
+  String get homeCardStatus => 'Status';
+
+  @override
+  String get homeCardDevice => 'Device readings';
+
+  @override
+  String get homeCardPage => 'Project page';
+
+  @override
+  String get viewGrafanaPage => 'Grafana page';
+
+  @override
+  String get viewGrafanaPageHelp => 'Empty: the deployment\'s page';
+
+  @override
+  String get viewCameras => 'Cameras';
+
+  @override
+  String get viewCameraOverlay => 'Vision overlay';
+
+  @override
+  String get viewAlerts => 'Alerts that pop up';
+
+  @override
+  String get alertsAll => 'All';
+
+  @override
+  String get alertsReview => 'Only those to review';
+
+  @override
+  String get alertsOff => 'None';
+
+  @override
+  String get viewAlertSound => 'Chime for alerts to review';
+
+  @override
+  String get sectionDevice => 'This device';
+
+  @override
+  String get deviceKiosk => 'Kiosk mode';
+
+  @override
+  String get kioskModeHelp =>
+      'Locks this device to a viewer account: no sign-out or settings, and it starts over when nobody uses it';
+
+  @override
+  String get kioskNeedsAccounts => 'Needs sign-in with p4n4-api accounts';
+
+  @override
+  String get kioskIdleReset => 'Start over when idle';
+
+  @override
+  String get idleSignOut => 'Sign admins and power users out when idle';
+
+  @override
+  String get idleNever => 'Never';
+
+  @override
+  String idleAfterMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'After $count minutes',
+      one: 'After 1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get startKioskTitle => 'Turn on kiosk mode';
+
+  @override
+  String get startKioskBody =>
+      'Sign this device in with a viewer account. People here can\'t sign out or change settings, and it starts over when nobody uses it.';
+
+  @override
+  String get kioskTurnOn => 'Turn on';
+
+  @override
+  String get leaveKiosk => 'Leave kiosk mode';
+
+  @override
+  String get leaveKioskBody => 'Sign in with an admin account. This device then stays signed in as that admin.';
+
+  @override
+  String get kioskNeedsViewer => 'That\'s not a viewer account.';
+
+  @override
+  String get kioskNeedsAdmin => 'That\'s not an admin account.';
+
+  @override
+  String get startTabDefault => 'Default';
+
+  @override
+  String get chartHistory => 'Chart history';
+
+  @override
+  String minutesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count minutes', one: '1 minute');
+    return '$_temp0';
+  }
+
+  @override
+  String get defaultCamera => 'Default camera';
+
+  @override
+  String get defaultCameraFirst => 'The first one';
 }

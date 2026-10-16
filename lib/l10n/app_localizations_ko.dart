@@ -662,9 +662,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get stackAi => 'AI 스택';
 
   @override
-  String get stackEdge => '엣지 스택';
-
-  @override
   String get stackApi => 'API 게이트웨이';
 
   @override
@@ -791,7 +788,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get factUptime => '가동 시간';
 
   @override
-  String get sparkStart => '2분 전';
+  String sparkStart(int minutes) {
+    return '$minutes분 전';
+  }
 
   @override
   String get sparkNow => '지금';
@@ -1060,6 +1059,92 @@ class AppLocalizationsKo extends AppLocalizations {
   String get videoDemoSwitch => '데모 카메라';
 
   @override
+  String get videoGridDefault => '모든 카메라를 표시하며 열기';
+
+  @override
+  String get alertSound => '알림 소리';
+
+  @override
+  String get alertDismiss => '알림 닫기';
+
+  @override
+  String get visionPerson => '사람';
+
+  @override
+  String visionPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count명');
+    return '$_temp0';
+  }
+
+  @override
+  String get sectionChats => '채팅';
+
+  @override
+  String get chatsNote => '프로젝트 봇에 연결된 채팅은 알림을 발생 즉시 받고, 봇에게 프로젝트에 대해 물어볼 수 있습니다. 연결된 그룹에서는 누구나 가능합니다.';
+
+  @override
+  String get chatsLink => '채팅 연결';
+
+  @override
+  String chatsLinkHow(String bot) {
+    return '봇을 사용할 휴대폰에서 링크를 열거나 이 명령을 $bot에게 보내세요. 그룹이라면 먼저 봇을 그룹에 추가한 뒤 그곳에서 명령을 보내세요.';
+  }
+
+  @override
+  String get chatsTheBot => '봇';
+
+  @override
+  String chatsCodeExpires(String time) {
+    return '한 번만, $time까지 사용할 수 있습니다.';
+  }
+
+  @override
+  String get chatsCopyLink => '링크 복사';
+
+  @override
+  String get chatsCopyCommand => '명령 복사';
+
+  @override
+  String get chatsNone => '아직 연결된 채팅이 없습니다.';
+
+  @override
+  String chatsLinkedBy(String date, String who) {
+    return '$date에 $who님이 연결함';
+  }
+
+  @override
+  String chatsLinkedOn(String date) {
+    return '$date에 연결됨';
+  }
+
+  @override
+  String chatsMuted(String codes) {
+    return '음소거: $codes';
+  }
+
+  @override
+  String get chatsUnlink => '연결 해제';
+
+  @override
+  String chatsUnlinkTitle(String name) {
+    return '$name 연결을 해제할까요?';
+  }
+
+  @override
+  String get chatsUnlinkBody => '더 이상 알림을 받지 않고 봇도 응답하지 않습니다. 채팅에 알려 드립니다.';
+
+  @override
+  String chatsLoadFailed(String error) {
+    return '채팅을 불러오지 못했습니다: $error';
+  }
+
+  @override
+  String get chatsMock => '모의 모드: 봇이 메시지를 보내지 않고 기록만 합니다.';
+
+  @override
+  String get chatsOff => '꺼짐: 봇에 토큰이 없습니다.';
+
+  @override
   String get useDemoCameras => '데모 카메라 사용';
 
   @override
@@ -1252,4 +1337,237 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get feedStatusDismissed => '무시됨';
+
+  @override
+  String get changePassword => '비밀번호 변경';
+
+  @override
+  String get changePasswordSubtitle => '다른 기기에서는 로그아웃됩니다';
+
+  @override
+  String get changePasswordTitle => '새 비밀번호 설정';
+
+  @override
+  String get changePasswordBody => '계속하기 전에 본인 비밀번호를 설정하라고 관리자가 요청했습니다.';
+
+  @override
+  String get fieldCurrentPassword => '현재 비밀번호';
+
+  @override
+  String get fieldNewPassword => '새 비밀번호';
+
+  @override
+  String get fieldRepeatPassword => '새 비밀번호 확인';
+
+  @override
+  String get passwordsDontMatch => '비밀번호가 일치하지 않습니다';
+
+  @override
+  String get passwordCurrentWrong => '현재 비밀번호가 올바르지 않습니다';
+
+  @override
+  String get passwordChanged => '비밀번호를 변경했습니다';
+
+  @override
+  String get signOutUserTooltip => '모든 곳에서 로그아웃';
+
+  @override
+  String signOutUserTitle(String user) {
+    return '$user을(를) 모든 곳에서 로그아웃할까요?';
+  }
+
+  @override
+  String get signOutUserBody => '모든 기기에서 다시 로그인해야 합니다. 비밀번호는 그대로입니다.';
+
+  @override
+  String get signOutSelfBody => '이 기기와 다른 기기에서 다시 로그인해야 합니다. 비밀번호는 그대로입니다.';
+
+  @override
+  String userLastSignIn(String when) {
+    return '마지막 로그인: $when';
+  }
+
+  @override
+  String get userNeverSignedIn => '로그인한 적 없음';
+
+  @override
+  String get userMustChangePassword => '새 비밀번호 설정 필요';
+
+  @override
+  String get mustChangeAtFirstSignIn => '처음 로그인할 때 본인 비밀번호 설정';
+
+  @override
+  String get mustChangeAtNextSignIn => '다음 로그인 때 새 비밀번호 설정';
+
+  @override
+  String get sectionAudit => '감사 로그';
+
+  @override
+  String get auditNote => '이 배포에서 누가 무엇을 바꿨는지, 최신순';
+
+  @override
+  String auditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '변경 $count건');
+    return '$_temp0, 최신순';
+  }
+
+  @override
+  String get auditEmpty => '아직 변경 사항이 없습니다';
+
+  @override
+  String auditLoadFailed(String error) {
+    return '감사 로그를 불러오지 못했습니다: $error';
+  }
+
+  @override
+  String get auditLoadMore => '더 보기';
+
+  @override
+  String get sectionBanner => '배너';
+
+  @override
+  String get bannerNone => '배너 없음';
+
+  @override
+  String get bannerShowing => '해제할 때까지 모든 기기에 표시 중';
+
+  @override
+  String bannerShowingUntil(String when) {
+    return '$when까지 모든 기기에 표시 중';
+  }
+
+  @override
+  String get bannerText => '메시지';
+
+  @override
+  String get bannerHint => '오늘 오후 3–4시 점검';
+
+  @override
+  String get bannerInfo => '안내';
+
+  @override
+  String get bannerWarning => '경고';
+
+  @override
+  String get bannerUntilCleared => '해제할 때까지';
+
+  @override
+  String bannerForHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(hours, locale: localeName, other: '$hours시간 동안');
+    return '$_temp0';
+  }
+
+  @override
+  String get bannerClear => '해제';
+
+  @override
+  String get bannerShow => '표시';
+
+  @override
+  String get viewStartTab => '처음 열리는 탭';
+
+  @override
+  String get viewHomeCards => '홈에 표시';
+
+  @override
+  String get homeCardStatus => '상태';
+
+  @override
+  String get homeCardDevice => '기기 측정값';
+
+  @override
+  String get homeCardPage => '프로젝트 페이지';
+
+  @override
+  String get viewGrafanaPage => 'Grafana 페이지';
+
+  @override
+  String get viewGrafanaPageHelp => '비워 두면 배포의 페이지';
+
+  @override
+  String get viewCameras => '카메라';
+
+  @override
+  String get viewCameraOverlay => '비전 오버레이';
+
+  @override
+  String get viewAlerts => '표시할 알림';
+
+  @override
+  String get alertsAll => '모두';
+
+  @override
+  String get alertsReview => '검토가 필요한 것만';
+
+  @override
+  String get alertsOff => '없음';
+
+  @override
+  String get viewAlertSound => '검토할 알림에 소리 내기';
+
+  @override
+  String get sectionDevice => '이 기기';
+
+  @override
+  String get deviceKiosk => '키오스크 모드';
+
+  @override
+  String get kioskModeHelp => '이 기기를 뷰어 계정에 고정합니다. 로그아웃이나 설정 변경이 안 되며, 아무도 쓰지 않으면 처음 상태로 돌아갑니다';
+
+  @override
+  String get kioskNeedsAccounts => 'p4n4-api 계정으로 로그인해야 합니다';
+
+  @override
+  String get kioskIdleReset => '사용하지 않으면 처음으로';
+
+  @override
+  String get idleSignOut => '사용하지 않으면 관리자와 고급 사용자 로그아웃';
+
+  @override
+  String get idleNever => '안 함';
+
+  @override
+  String idleAfterMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count분 후');
+    return '$_temp0';
+  }
+
+  @override
+  String get startKioskTitle => '키오스크 모드 켜기';
+
+  @override
+  String get startKioskBody => '뷰어 계정으로 이 기기에 로그인합니다. 여기서는 로그아웃하거나 설정을 바꿀 수 없으며, 아무도 쓰지 않으면 처음 상태로 돌아갑니다.';
+
+  @override
+  String get kioskTurnOn => '켜기';
+
+  @override
+  String get leaveKiosk => '키오스크 모드 나가기';
+
+  @override
+  String get leaveKioskBody => '관리자 계정으로 로그인하세요. 이 기기는 그 관리자로 로그인된 상태가 됩니다.';
+
+  @override
+  String get kioskNeedsViewer => '뷰어 계정이 아닙니다.';
+
+  @override
+  String get kioskNeedsAdmin => '관리자 계정이 아닙니다.';
+
+  @override
+  String get startTabDefault => '기본값';
+
+  @override
+  String get chartHistory => '차트 기록';
+
+  @override
+  String minutesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count분');
+    return '$_temp0';
+  }
+
+  @override
+  String get defaultCamera => '기본 카메라';
+
+  @override
+  String get defaultCameraFirst => '첫 번째 카메라';
 }

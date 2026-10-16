@@ -5,12 +5,15 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/agent_client.dart' show AgentBackend, AssistantConfig;
+import '../api/banner.dart' show DashboardBanner;
 import '../api/camera.dart';
 import '../api/fleet.dart';
 import '../api/project.dart';
 import '../api/services.dart' show StackDef;
 import '../api/status_monitor.dart';
+import '../api/view_settings.dart' show DashboardViewSettings, ViewPrefs, saveViewSettings;
 import '../api/views.dart';
+import '../api/vision.dart' show VisionBundle;
 import 'brand.dart';
 import 'role.dart';
 import 'secrets.dart';
@@ -30,6 +33,8 @@ const profileKeys = {
   'cameras',
   'videoDemo',
   'session',
+  'myStartTab',
+  'defaultCamera',
 };
 
 /// Profile keys that say where the services are, cleared by
@@ -146,6 +151,8 @@ class AppSettings extends ChangeNotifier {
           await _prefs.setBool(key, v);
         case double v:
           await _prefs.setDouble(key, v);
+        case int v:
+          await _prefs.setInt(key, v);
       }
     }
     notifyListeners();
@@ -262,6 +269,75 @@ class AppSettings extends ChangeNotifier {
   bool get reduceMotion => _bool('reduceMotion', false);
   set reduceMotion(bool v) => _set('reduceMotion', v);
 
+  // An admin's or power user's own defaults on this device (Settings →
+  // Appearance). Start tab and camera are per deployment: each has its own.
+
+  /// The tab this device opens on (`home` or a tab's name), over the view's
+  /// start tab; empty for the view's.
+  String get myStartTab => _str('myStartTab', '');
+  set myStartTab(String v) => _set('myStartTab', v);
+
+  /// The camera the Cameras tab shows first, by id; empty for the first one.
+  String get defaultCamera => _str('defaultCamera', '');
+  set defaultCamera(String v) => _set('defaultCamera', v);
+
+  /// How many minutes of readings the Device tab's charts show.
+  int get edgeHistoryMinutes => switch (_int('edgeHistoryMinutes', 2)) {
+    final m when edgeHistoryOptions.contains(m) => m,
+    _ => 2,
+  };
+  set edgeHistoryMinutes(int v) => _set('edgeHistoryMinutes', v);
+
+  static const edgeHistoryOptions = [2, 10, 30];
+
+  // This device as a shared screen (Settings → This device). App-wide: they're
+  // about the device, whichever deployment it shows.
+
+  /// Kiosk mode: the viewer (normie) view is locked on this device. No sign
+  /// out, theme or settings but Accessibility; an admin's sign-in leaves it.
+  bool get kiosk => _bool('kiosk', false);
+
+  /// Turns kiosk mode on or off. Turning it on keeps the accessibility
+  /// settings as they are now, for [restoreKioskAccessibility].
+  set kiosk(bool v) {
+    if (v) {
+      _prefs.setString(
+        'kioskAccessibility',
+        jsonEncode({'textScale': textScale, 'highContrast': highContrast, 'reduceMotion': reduceMotion}),
+      );
+    }
+    _set('kiosk', v);
+  }
+
+  /// Puts text size, contrast and motion back to what they were when kiosk
+  /// mode was turned on: a visitor's larger text doesn't stay for the next.
+  void restoreKioskAccessibility() {
+    final Map<String, Object?> saved;
+    try {
+      saved = (jsonDecode(_prefs.getString('kioskAccessibility') ?? '{}') as Map).cast();
+    } on Object {
+      return;
+    }
+    if (saved['textScale'] case num v when v != textScale) textScale = v.toDouble();
+    if (saved['highContrast'] case bool v when v != highContrast) highContrast = v;
+    if (saved['reduceMotion'] case bool v when v != reduceMotion) reduceMotion = v;
+  }
+
+  /// Minutes without a touch or key after which a kiosk goes back to where
+  /// it starts, its conversation cleared; 0 never.
+  int get kioskIdleReset => _int('kioskIdleReset', 5);
+  set kioskIdleReset(int v) => _set('kioskIdleReset', v);
+
+  /// Minutes without a touch or key after which an admin or power user is
+  /// signed out on this device; 0 never.
+  int get idleSignOut => _int('idleSignOut', 0);
+  set idleSignOut(int v) => _set('idleSignOut', v);
+
+  int _int(String key, int fallback) => switch (_raw(key, null) ?? _default<Object>(key)) {
+    num v => v.toInt(),
+    _ => fallback,
+  };
+
   /// Whether this device has shown (or been told to skip) the normie view's
   /// tour of the shell. Settings → Account → Take the tour clears it.
   bool get tourSeen => _bool('tourSeen', false);
@@ -317,11 +393,16 @@ class AppSettings extends ChangeNotifier {
   bool get grafanaKiosk => _bool('grafanaKiosk', true);
   set grafanaKiosk(bool v) => _set('grafanaKiosk', v);
 
-  Uri get grafanaUri {
+  Uri get grafanaUri => grafanaUriFor(Role.admin);
+
+  /// The Grafana page [view] opens: its own (Settings → Views), else the
+  /// deployment's. Normies always get kiosk mode: Grafana's menus aren't theirs.
+  Uri grafanaUriFor(Role view) {
     final base = grafanaBase.isNotEmpty ? baseUri(grafanaBase) : url(3000, '/');
+    final path = prefsFor(view).grafanaPath ?? grafanaPath;
     // Relative to the base, so a proxy prefix (/grafana/) is kept.
-    final u = base.resolve(grafanaPath.replaceFirst(RegExp('^/+'), ''));
-    if (!grafanaKiosk) return u;
+    final u = base.resolve(path.replaceFirst(RegExp('^/+'), ''));
+    if (!grafanaKiosk && view != Role.normie) return u;
     return u.replace(queryParameters: {...u.queryParameters, 'kiosk': '1'});
   }
 
@@ -353,6 +434,26 @@ class AppSettings extends ChangeNotifier {
   /// Show [demoCameras] in place of [cameras] (which stay as they are).
   bool get videoDemo => _bool('videoDemo', false);
   set videoDemo(bool v) => _set('videoDemo', v);
+
+  /// Open the Video tab on every camera at once, rather than one. App-wide,
+  /// like the theme: it's how this device shows them.
+  bool get videoGrid => _bool('videoGrid', true);
+  set videoGrid(bool v) => _set('videoGrid', v);
+
+  /// What the connected project draws over its cameras (see [VisionWatcher]);
+  /// null until p4n4-api has answered, or when the project has none.
+  VisionBundle? get vision => _vision;
+  VisionBundle? _vision;
+  set vision(VisionBundle? v) {
+    if (v == null && _vision == null) return;
+    _vision = v;
+    notifyListeners();
+  }
+
+  /// Chime when an alert that asks to check something (a risk) comes in.
+  /// App-wide, like the theme: it's about this device's speakers.
+  bool get alertSound => _bool('alertSound', true);
+  set alertSound(bool v) => _set('alertSound', v);
 
   /// A camera id not used by any of [cameras].
   String newCameraId() => _newId(cameras.map((c) => c.id));
@@ -416,9 +517,48 @@ class AppSettings extends ChangeNotifier {
   DashboardViews? get views => _views;
   DashboardViews? _views;
   set views(DashboardViews? v) {
-    if (v == null && _views == null) return;
+    if (v == _views) return;
     _views = v;
     notifyListeners();
+  }
+
+  /// The message an admin put above every view (see [BannerWatcher]); null
+  /// until p4n4-api has answered, or without the API.
+  DashboardBanner? get banner => _banner;
+  DashboardBanner? _banner;
+  set banner(DashboardBanner? v) {
+    if (v == _banner) return;
+    _banner = v;
+    notifyListeners();
+  }
+
+  /// What else each view shows (see [ViewSettingsWatcher]); null until
+  /// p4n4-api has answered, or without the API.
+  DashboardViewSettings? get viewSettings => _viewSettings;
+  DashboardViewSettings? _viewSettings;
+  set viewSettings(DashboardViewSettings? v) {
+    if (v == _viewSettings) return;
+    _viewSettings = v;
+    notifyListeners();
+  }
+
+  /// [view]'s settings; the defaults for admins, and until the API answers.
+  ViewPrefs prefsFor(Role view) => _viewSettings?.of(view) ?? const ViewPrefs();
+
+  /// Shows [prefs] for [view] at once and saves them on the connected
+  /// deployment's p4n4-api (admins only; the API checks); if that fails, puts
+  /// them back and rethrows.
+  Future<void> setPrefsFor(Role view, ViewPrefs prefs) async {
+    final before = _viewSettings;
+    final next = (before ?? const DashboardViewSettings()).withView(view, prefs);
+    viewSettings = next;
+    try {
+      await saveViewSettings(apiUri, next);
+    } catch (_) {
+      _viewSettings = before;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   static const _localViewKeys = ['tabOrder', 'powerTabs', 'normieTabs'];

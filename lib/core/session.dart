@@ -20,6 +20,17 @@ enum SignInMode {
   local,
 }
 
+/// An account of the wrong kind for a kiosk change: turning kiosk mode on
+/// takes a viewer (normie) account, leaving it an admin's.
+class KioskAccountException implements Exception {
+  const KioskAccountException(this.expected);
+
+  final Role expected;
+
+  @override
+  String toString() => 'Needs ${expected.name} account';
+}
+
 /// Who is signed in to the connected deployment.
 ///
 /// Each deployment runs its own p4n4-api with its own accounts, so sign-in is
@@ -96,12 +107,58 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
   SignInMode? get mode => SignInMode.values.asNameMap()[_info?['mode']];
   String? get username => _info?['user'] as String?;
 
+  /// Kiosk mode applies: this device is a kiosk and its viewer account is
+  /// signed in. An admin or power user who signs in on it gets their own
+  /// view as usual.
+  bool get kioskLocked => settings.kiosk && signedInRole == Role.normie;
+
+  /// Turns this device into a kiosk signed in with the viewer (normie)
+  /// account [username], ending the current sign-in here. Throws
+  /// [KioskAccountException] for another kind of account, and like
+  /// [signInWithPassword] otherwise.
+  Future<void> startKiosk(String username, String password) =>
+      _switchAccount(username, password, Role.normie, kiosk: true);
+
+  /// Leaves kiosk mode with an admin's sign-in, which this device then keeps;
+  /// the viewer account is signed out here.
+  Future<void> leaveKiosk(String username, String password) =>
+      _switchAccount(username, password, Role.admin, kiosk: false);
+
+  Future<void> _switchAccount(String username, String password, Role expected, {required bool kiosk}) async {
+    final d = settings.deployment;
+    final api = settings.apiUriOf(d);
+    final tokens = await auth.signIn(api, username.trim(), password);
+    if (roleForApi(tokens.role) != expected) {
+      unawaited(auth.signOutApi(api, tokens.refresh));
+      throw KioskAccountException(expected);
+    }
+    final old = settings.apiRefreshTokenOf(d);
+    _preview = null;
+    // Kiosk first: the new account's view must never show, even for a frame,
+    // without it (a normie's first-run tour would start).
+    settings.kiosk = kiosk;
+    await _store(d, tokens);
+    if (old.isNotEmpty) unawaited(auth.signOutApi(api, old));
+  }
+
+  /// An admin wants this account to choose a new password before anything
+  /// else (the API turns everything else down until then).
+  bool get passwordChangeRequired => _info?['mustChange'] == true;
+
   /// Signs in to the connected deployment's p4n4-api. Throws
   /// [auth.AuthException] for a wrong password or rate limit, and
   /// `http.ClientException` / `TimeoutException` when the API is unreachable.
   Future<void> signInWithPassword(String username, String password) async {
     final d = settings.deployment;
     final tokens = await auth.signIn(settings.apiUriOf(d), username.trim(), password);
+    await _store(d, tokens);
+  }
+
+  /// Changes the signed-in user's password. Their other sign-ins end; this
+  /// one carries on with new tokens. Throws like [auth.changePassword].
+  Future<void> changePassword(String current, String next) async {
+    final d = settings.deployment;
+    final tokens = await auth.changePassword(settings.apiUriOf(d), current, next);
     await _store(d, tokens);
   }
 
@@ -134,10 +191,15 @@ class Session extends ChangeNotifier implements auth.ApiCredentials {
   Future<void> _store(Deployment d, auth.ApiTokens tokens) async {
     _access[d.id] = tokens.access;
     await settings.setApiRefreshToken(d, tokens.refresh);
-    final info = {'mode': SignInMode.api.name, 'role': roleForApi(tokens.role).name, 'user': tokens.username};
-    // A role change on the API applies on the next refresh.
+    final info = {
+      'mode': SignInMode.api.name,
+      'role': roleForApi(tokens.role).name,
+      'user': tokens.username,
+      if (tokens.passwordChangeRequired) 'mustChange': true,
+    };
+    // A role change (or a new password asked for) on the API applies on the next refresh.
     final old = settings.sessionOf(d);
-    if (old?['role'] != info['role'] || old?['user'] != info['user'] || old?['mode'] != info['mode']) {
+    if (['role', 'user', 'mode', 'mustChange'].any((k) => old?[k] != info[k])) {
       await settings.setSessionOf(d, info);
     }
   }

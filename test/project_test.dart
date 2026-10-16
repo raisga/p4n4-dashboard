@@ -134,6 +134,16 @@ void main() {
       expect([for (final st in stacks) st.suffix].where(p.hasStack), ['iot', 'api']);
       expect(ProjectInfo.fromJson({'project': 'x'}).hasStack('ai'), isTrue);
     });
+
+    test('a legacy edge layer shows the AI stack, where the inference runner is now', () {
+      final p = ProjectInfo.fromJson({
+        'project': 'old',
+        'layers': ['iot', 'edge'],
+      });
+      expect([for (final st in stacks) st.suffix].where(p.hasStack), ['iot', 'ai', 'api']);
+      final ai = stacks.firstWhere((st) => st.suffix == 'ai');
+      expect([for (final s in ai.services) s.name], contains('EI Runner'));
+    });
   });
 
   group('AppSettings.project', () {
@@ -447,6 +457,55 @@ void main() {
       final opened = await pumpPanel(tester, '[Is any unit on warning?](ask:)', {});
       await tester.tap(find.textContaining('Is any unit on warning?', findRichText: true));
       expect(opened, ['ask:Is any unit on warning?']);
+    });
+
+    testWidgets('tab: and ask: links are chips, with the tab\'s icon or the assistant\'s', (tester) async {
+      await pumpPanel(tester, 'See [the charts](tab:grafana) or ask [Any alerts?](ask:)', {'grafana'});
+      expect(find.byIcon(Icons.show_chart_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.auto_awesome_outlined), findsOneWidget);
+      expect(find.byType(InkWell), findsNWidgets(2));
+    });
+
+    testWidgets('a chip too long for a phone stays one line, and asks the whole question', (tester) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const question = 'Is any unit on warning right now, or was one this week?';
+      final opened = await pumpPanel(tester, '[$question](ask:)', {});
+      final label = find.text(question);
+      expect(tester.getSize(label).height, lessThan(24), reason: 'one line, not wrapped');
+      await tester.tapAt(tester.getTopLeft(label) + const Offset(20, 4));
+      expect(opened, ['ask:$question']);
+      expect(find.byTooltip(question), findsOneWidget);
+    });
+
+    testWidgets('a web link stays in its paragraph', (tester) async {
+      await pumpPanel(tester, 'Visit [the site](https://example.com) today', {});
+      expect(find.textContaining('Visit', findRichText: true), findsOneWidget);
+      expect(find.text('the site'), findsOneWidget);
+      expect(find.byType(InkWell), findsNothing);
+    });
+
+    testWidgets('on a phone a table scrolls sideways instead of squeezing its columns', (tester) async {
+      const table = '| A | B | C |\n|---|---|---|\n| one | two | three |';
+      Finder sideways() =>
+          find.byWidgetPredicate((w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
+      addTearDown(tester.view.reset);
+      tester.view.devicePixelRatio = 1;
+
+      tester.view.physicalSize = const Size(1200, 800);
+      await pumpPanel(tester, table, {});
+      expect(sideways(), findsNothing);
+
+      tester.view.physicalSize = const Size(390, 844);
+      await pumpPanel(tester, table, {});
+      expect(sideways(), findsOneWidget);
+    });
+
+    testWidgets('a section heading keeps its text', (tester) async {
+      await pumpPanel(tester, '### Where to look\n\nText', {});
+      expect(find.text('Where to look'), findsOneWidget);
     });
 
     testWidgets('an ask: link without an assistant is plain text', (tester) async {

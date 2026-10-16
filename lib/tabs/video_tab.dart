@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../api/camera.dart';
+import '../api/vision.dart';
+import '../api/vision_live.dart';
+import '../api/vision_recorded.dart';
 import '../core/brand.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -11,16 +14,57 @@ import '../widgets/common.dart';
 import '../widgets/device_camera_view.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/video_view.dart';
+import '../widgets/vision_overlay.dart';
+
+/// The cameras the Video tab shows: the deployment's, or while
+/// [AppSettings.videoDemo] is on, the brand's demo cameras
+/// ([Brand.demoCameras]), else the built-in [demoCameras]. For [view], only
+/// those an admin lets it see (Settings → Views).
+List<Camera> videoCameras(AppSettings s, Brand brand, {Role view = Role.admin}) {
+  final prefs = s.prefsFor(view);
+  final branded = brand.demoCamerasOn(kIsWeb ? Uri.base : null);
+  final all = !s.videoDemo ? s.cameras : (branded.isEmpty ? demoCameras : branded);
+  return [
+    for (final c in all)
+      if (prefs.showsCamera(c.id)) c,
+  ];
+}
+
+/// The id among [cameras] of the camera an alert names: that camera, or the
+/// demo camera that plays its clip (`demo-<id>`, [Brand.demoCamerasOn]).
+/// Null when the tab doesn't have it.
+String? alertCamera(String? id, List<Camera> cameras) {
+  if (id == null) return null;
+  final ids = {for (final c in cameras) c.id};
+  return ids.contains(id) ? id : (ids.contains('demo-$id') ? 'demo-$id' : null);
+}
 
 /// Live camera feeds from the edge device (MJPEG streams, JPEG snapshots or
 /// video files) or from the device the dashboard runs on (`device:back`,
-/// `device:front`): one camera at a time, or all of them in a grid. Admins can
-/// swap in demo cameras to show it off without cameras: the brand's
-/// ([Brand.demoCameras]), else the built-in [demoCameras].
+/// `device:front`): all of them in a grid ([AppSettings.videoGrid]), or one
+/// camera at a time. Admins can swap in demo cameras to show it off without
+/// cameras ([videoCameras]).
+///
+/// When the project has a vision overlay (`.p4n4.json` `dashboard.vision`),
+/// each camera it knows shows what the vision model sees: on a video file it
+/// has measured, the recorded boxes and behaviours in step with the clip,
+/// whose clock is [recorded]'s; on any camera, the [live] stream's. A
+/// behaviour that asks for an alert flags the camera. The toasts come from
+/// [recorded] and [live] themselves (HomeShell), so they come up on every
+/// tab, whether or not the camera is on screen.
 class VideoTab extends StatefulWidget {
-  const VideoTab({super.key, required this.active});
+  const VideoTab({super.key, required this.active, this.live, this.recorded, this.focus});
 
   final bool active;
+
+  /// The project's live detections, if it streams any.
+  final LiveVision? live;
+
+  /// The measured clips' clocks, which their videos keep in step with.
+  final RecordedVision? recorded;
+
+  /// A camera to show on its own (an alert's toast was tapped); taken and cleared.
+  final ValueNotifier<String?>? focus;
 
   @override
   State<VideoTab> createState() => _VideoTabState();
@@ -34,10 +78,46 @@ class _VideoTabState extends State<VideoTab> {
   /// between the single view and the grid instead of reconnecting.
   final _views = <String, GlobalKey>{};
   String? _selectedId;
-  bool _grid = false;
+
+  /// The grid or one camera, as switched here (null: as [AppSettings.videoGrid]
+  /// says), until the setting changes from [_gridSetting], the value last seen.
+  bool? _grid;
+  bool? _gridSetting;
   bool _paused = false;
 
   GlobalKey _key(Camera c) => _views.putIfAbsent(c.id, GlobalKey.new);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus?.addListener(_takeFocus);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takeFocus());
+  }
+
+  @override
+  void didUpdateWidget(VideoTab old) {
+    super.didUpdateWidget(old);
+    if (old.focus != widget.focus) {
+      old.focus?.removeListener(_takeFocus);
+      widget.focus?.addListener(_takeFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focus?.removeListener(_takeFocus);
+    super.dispose();
+  }
+
+  void _takeFocus() {
+    final id = widget.focus?.value;
+    if (id == null || !mounted) return;
+    widget.focus!.value = null;
+    setState(() {
+      _selectedId = id;
+      _grid = false;
+    });
+  }
 
   Future<void> _edit(AppSettings s, [Camera? camera]) async {
     final cameras = s.cameras;
@@ -84,15 +164,25 @@ class _VideoTabState extends State<VideoTab> {
     final session = SessionScope.of(context);
     final demo = s.videoDemo;
     final brand = BrandScope.of(context);
-    final branded = brand.demoCamerasOn(kIsWeb ? Uri.base : null);
-    final cameras = !demo ? s.cameras : (branded.isEmpty ? demoCameras : branded);
-    final credits = branded.isEmpty ? l.videoDemoCredits : brand.demoCreditsFor(l.localeName);
+    final cameras = videoCameras(s, brand, view: session.role ?? Role.normie);
+    final credits = brand.demoCamerasOn(kIsWeb ? Uri.base : null).isEmpty
+        ? l.videoDemoCredits
+        : brand.demoCreditsFor(l.localeName);
     // Only admins and power users see URLs or change cameras; demo cameras
     // aren't the deployment's to change.
     final technical = session.isTechnical;
     final editable = technical && !demo;
-    final selected = cameras.where((c) => c.id == _selectedId).firstOrNull ?? cameras.firstOrNull;
-    final grid = _grid && cameras.length > 1;
+    // Picked here, else an admin's or power user's default camera on this
+    // device (Settings → Appearance), else the first.
+    final selected =
+        cameras.where((c) => c.id == _selectedId).firstOrNull ??
+        (technical ? cameras.where((c) => c.id == s.defaultCamera).firstOrNull : null) ??
+        cameras.firstOrNull;
+    if (_gridSetting != s.videoGrid) {
+      _gridSetting = s.videoGrid;
+      _grid = null;
+    }
+    final grid = (_grid ?? s.videoGrid) && cameras.length > 1;
     final shown = grid ? cameras : [?selected];
 
     return Column(
@@ -211,19 +301,59 @@ class _VideoTabState extends State<VideoTab> {
     return (devices.where((c) => c.id == _selectedId).firstOrNull ?? devices.firstOrNull)?.id;
   }
 
-  Widget _view(Camera c, {String? liveDevice}) => switch ((c.device, c.uri)) {
-    (final lens?, _) => DeviceCameraView(
-      key: _key(c),
-      lens: lens,
-      active: widget.active && !_paused && (liveDevice ?? c.id) == c.id,
-      onShow: () => setState(() => _selectedId = c.id),
-    ),
-    (_, final uri?) when c.isVideo => VideoView(key: _key(c), uri: uri, active: widget.active && !_paused),
-    (_, final uri?) => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
-    (null, null) => Center(
-      child: Text(l.cameraInvalidUrl(c.name), style: p4.body(color: p4.err)),
-    ),
-  };
+  Widget _view(Camera c, {String? liveDevice, bool inGrid = false}) {
+    final s = SettingsScope.of(context);
+    // An admin can turn the overlay off for a view (Settings → Views).
+    final bundle = s.prefsFor(SessionScope.of(context).role ?? Role.normie).overlay ? s.vision : null;
+    final vc = bundle?.camera(c.id);
+    final recording = c.isVideo ? vc?.recording : null;
+    final live = widget.live;
+    Widget overlay(VisionScene scene, Size? frame) => VisionOverlay(
+      scene: scene,
+      bundle: bundle!,
+      zones: vc?.zones ?? const [],
+      frame: frame,
+      detailed: !inGrid,
+      bottomInset: inGrid ? 30 : 0,
+    );
+
+    final view = switch ((c.device, c.uri)) {
+      (final lens?, _) => DeviceCameraView(
+        key: _key(c),
+        lens: lens,
+        active: widget.active && !_paused && (liveDevice ?? c.id) == c.id,
+        onShow: () => setState(() => _selectedId = c.id),
+      ),
+      (_, final uri?) when c.isVideo => VideoView(
+        key: _key(c),
+        uri: uri,
+        active: widget.active && !_paused,
+        // The clip's own measurements, by the second of playback, which
+        // follows the clock its alerts come from.
+        overlay: recording == null
+            ? null
+            : (context, playback) => overlay(recording.sceneAt(playback.seconds), playback.size ?? recording.frame),
+        syncTo: recording == null ? null : () => widget.recorded?.secondsOf(c.id),
+      ),
+      (_, final uri?) => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
+      (null, null) => Center(
+        child: Text(l.cameraInvalidUrl(c.name), style: p4.body(color: p4.err)),
+      ),
+    };
+    // Live detections go over any camera the stream reports on; the live
+    // stream raises its own alerts (HomeShell), on every tab.
+    if (recording != null || live == null || bundle == null || c.device != null) return view;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        view,
+        ValueListenableBuilder(
+          valueListenable: live.scene(c.id),
+          builder: (context, scene, _) => scene.isEmpty ? const SizedBox.shrink() : overlay(scene, scene.frame),
+        ),
+      ],
+    );
+  }
 
   /// Every camera at 16:9, as many columns as fit at ≥320px each.
   Widget _gridView(List<Camera> cameras) => LayoutBuilder(
@@ -240,7 +370,7 @@ class _VideoTabState extends State<VideoTab> {
             Stack(
               fit: StackFit.expand,
               children: [
-                _view(c, liveDevice: liveDevice),
+                _view(c, liveDevice: liveDevice, inGrid: true),
                 Positioned(
                   left: 0,
                   right: 0,

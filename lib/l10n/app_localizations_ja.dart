@@ -662,9 +662,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get stackAi => 'AI スタック';
 
   @override
-  String get stackEdge => 'エッジスタック';
-
-  @override
   String get stackApi => 'API ゲートウェイ';
 
   @override
@@ -791,7 +788,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get factUptime => '稼働時間';
 
   @override
-  String get sparkStart => '2 分前';
+  String sparkStart(int minutes) {
+    return '$minutes 分前';
+  }
 
   @override
   String get sparkNow => '現在';
@@ -1061,6 +1060,92 @@ class AppLocalizationsJa extends AppLocalizations {
   String get videoDemoSwitch => 'デモカメラ';
 
   @override
+  String get videoGridDefault => 'すべてのカメラを表示して開く';
+
+  @override
+  String get alertSound => 'アラート音';
+
+  @override
+  String get alertDismiss => 'アラートを閉じる';
+
+  @override
+  String get visionPerson => '人物';
+
+  @override
+  String visionPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count人');
+    return '$_temp0';
+  }
+
+  @override
+  String get sectionChats => 'チャット';
+
+  @override
+  String get chatsNote => 'プロジェクトのボットにリンクしたチャットは、アラートを発生と同時に受け取り、プロジェクトについてボットに質問できます。リンクしたグループでは全員が使えます。';
+
+  @override
+  String get chatsLink => 'チャットをリンク';
+
+  @override
+  String chatsLinkHow(String bot) {
+    return 'ボットを使うスマートフォンでリンクを開くか、このコマンドを $bot に送ってください。グループの場合は、先にボットをグループに追加してから、そこでコマンドを送ってください。';
+  }
+
+  @override
+  String get chatsTheBot => 'ボット';
+
+  @override
+  String chatsCodeExpires(String time) {
+    return '1回だけ、$timeまで有効です。';
+  }
+
+  @override
+  String get chatsCopyLink => 'リンクをコピー';
+
+  @override
+  String get chatsCopyCommand => 'コマンドをコピー';
+
+  @override
+  String get chatsNone => 'リンクしたチャットはまだありません。';
+
+  @override
+  String chatsLinkedBy(String date, String who) {
+    return '$dateに$whoがリンク';
+  }
+
+  @override
+  String chatsLinkedOn(String date) {
+    return '$dateにリンク';
+  }
+
+  @override
+  String chatsMuted(String codes) {
+    return 'ミュート中: $codes';
+  }
+
+  @override
+  String get chatsUnlink => 'リンク解除';
+
+  @override
+  String chatsUnlinkTitle(String name) {
+    return '$nameのリンクを解除しますか？';
+  }
+
+  @override
+  String get chatsUnlinkBody => 'アラートが届かなくなり、ボットも応答しなくなります。チャットにも通知されます。';
+
+  @override
+  String chatsLoadFailed(String error) {
+    return 'チャットを読み込めませんでした: $error';
+  }
+
+  @override
+  String get chatsMock => 'モックモード: ボットはメッセージを送信せずにログに記録します。';
+
+  @override
+  String get chatsOff => 'オフ: ボットにトークンがありません。';
+
+  @override
   String get useDemoCameras => 'デモカメラを使う';
 
   @override
@@ -1253,4 +1338,237 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get feedStatusDismissed => '却下';
+
+  @override
+  String get changePassword => 'パスワードを変更';
+
+  @override
+  String get changePasswordSubtitle => 'ほかのデバイスではサインアウトされます';
+
+  @override
+  String get changePasswordTitle => '新しいパスワードを設定';
+
+  @override
+  String get changePasswordBody => '続ける前に、ご自身のパスワードを設定するよう管理者から求められています。';
+
+  @override
+  String get fieldCurrentPassword => '現在のパスワード';
+
+  @override
+  String get fieldNewPassword => '新しいパスワード';
+
+  @override
+  String get fieldRepeatPassword => '新しいパスワード (確認)';
+
+  @override
+  String get passwordsDontMatch => 'パスワードが一致しません';
+
+  @override
+  String get passwordCurrentWrong => '現在のパスワードが正しくありません';
+
+  @override
+  String get passwordChanged => 'パスワードを変更しました';
+
+  @override
+  String get signOutUserTooltip => 'すべての場所でサインアウト';
+
+  @override
+  String signOutUserTitle(String user) {
+    return '$user をすべての場所でサインアウトしますか?';
+  }
+
+  @override
+  String get signOutUserBody => 'すべてのデバイスで再度サインインが必要になります。パスワードは変わりません。';
+
+  @override
+  String get signOutSelfBody => 'このデバイスとほかのデバイスで再度サインインが必要になります。パスワードは変わりません。';
+
+  @override
+  String userLastSignIn(String when) {
+    return '最終サインイン: $when';
+  }
+
+  @override
+  String get userNeverSignedIn => 'サインイン履歴なし';
+
+  @override
+  String get userMustChangePassword => '新しいパスワードの設定が必要';
+
+  @override
+  String get mustChangeAtFirstSignIn => '初回サインイン時に自分のパスワードを設定させる';
+
+  @override
+  String get mustChangeAtNextSignIn => '次回サインイン時に新しいパスワードを設定させる';
+
+  @override
+  String get sectionAudit => '監査ログ';
+
+  @override
+  String get auditNote => 'このデプロイで誰が何を変更したか (新しい順)';
+
+  @override
+  String auditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 件の変更');
+    return '$_temp0 (新しい順)';
+  }
+
+  @override
+  String get auditEmpty => 'まだ変更はありません';
+
+  @override
+  String auditLoadFailed(String error) {
+    return '監査ログを読み込めませんでした: $error';
+  }
+
+  @override
+  String get auditLoadMore => 'さらに読み込む';
+
+  @override
+  String get sectionBanner => 'バナー';
+
+  @override
+  String get bannerNone => 'バナーなし';
+
+  @override
+  String get bannerShowing => '解除するまですべてのデバイスに表示中';
+
+  @override
+  String bannerShowingUntil(String when) {
+    return '$when まですべてのデバイスに表示中';
+  }
+
+  @override
+  String get bannerText => 'メッセージ';
+
+  @override
+  String get bannerHint => '本日 15〜16 時はメンテナンスです';
+
+  @override
+  String get bannerInfo => 'お知らせ';
+
+  @override
+  String get bannerWarning => '警告';
+
+  @override
+  String get bannerUntilCleared => '解除するまで';
+
+  @override
+  String bannerForHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(hours, locale: localeName, other: '$hours 時間');
+    return '$_temp0';
+  }
+
+  @override
+  String get bannerClear => '解除';
+
+  @override
+  String get bannerShow => '表示';
+
+  @override
+  String get viewStartTab => '最初に開くタブ';
+
+  @override
+  String get viewHomeCards => 'ホームに表示';
+
+  @override
+  String get homeCardStatus => '状態';
+
+  @override
+  String get homeCardDevice => 'デバイスの測定値';
+
+  @override
+  String get homeCardPage => 'プロジェクトページ';
+
+  @override
+  String get viewGrafanaPage => 'Grafana ページ';
+
+  @override
+  String get viewGrafanaPageHelp => '空欄: デプロイのページ';
+
+  @override
+  String get viewCameras => 'カメラ';
+
+  @override
+  String get viewCameraOverlay => 'ビジョンオーバーレイ';
+
+  @override
+  String get viewAlerts => '表示するアラート';
+
+  @override
+  String get alertsAll => 'すべて';
+
+  @override
+  String get alertsReview => '確認が必要なもののみ';
+
+  @override
+  String get alertsOff => 'なし';
+
+  @override
+  String get viewAlertSound => '確認が必要なアラートで音を鳴らす';
+
+  @override
+  String get sectionDevice => 'このデバイス';
+
+  @override
+  String get deviceKiosk => 'キオスクモード';
+
+  @override
+  String get kioskModeHelp => 'このデバイスを閲覧者アカウントに固定します。サインアウトや設定はできず、使われていないと最初の状態に戻ります';
+
+  @override
+  String get kioskNeedsAccounts => 'p4n4-api アカウントでのサインインが必要です';
+
+  @override
+  String get kioskIdleReset => '操作がないときに最初に戻す';
+
+  @override
+  String get idleSignOut => '操作がないときに管理者とパワーユーザーをサインアウト';
+
+  @override
+  String get idleNever => 'しない';
+
+  @override
+  String idleAfterMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分後');
+    return '$_temp0';
+  }
+
+  @override
+  String get startKioskTitle => 'キオスクモードをオンにする';
+
+  @override
+  String get startKioskBody => '閲覧者アカウントでこのデバイスにサインインします。ここではサインアウトや設定の変更ができず、使われていないと最初の状態に戻ります。';
+
+  @override
+  String get kioskTurnOn => 'オンにする';
+
+  @override
+  String get leaveKiosk => 'キオスクモードを終了';
+
+  @override
+  String get leaveKioskBody => '管理者アカウントでサインインしてください。このデバイスはその管理者でサインインしたままになります。';
+
+  @override
+  String get kioskNeedsViewer => '閲覧者アカウントではありません。';
+
+  @override
+  String get kioskNeedsAdmin => '管理者アカウントではありません。';
+
+  @override
+  String get startTabDefault => 'デフォルト';
+
+  @override
+  String get chartHistory => 'グラフの履歴';
+
+  @override
+  String minutesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分');
+    return '$_temp0';
+  }
+
+  @override
+  String get defaultCamera => 'デフォルトのカメラ';
+
+  @override
+  String get defaultCameraFirst => '最初のカメラ';
 }

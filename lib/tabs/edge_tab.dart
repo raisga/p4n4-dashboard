@@ -12,7 +12,10 @@ import '../widgets/common.dart';
 import '../widgets/sparkline.dart';
 
 const _interval = Duration(seconds: 2);
-const _capacity = 60; // two minutes of history
+
+/// Readings per minute of chart history (one every [_interval]); how many
+/// minutes is a setting (Settings → Appearance).
+const _perMinute = 30;
 
 /// Live system metrics for the edge device.
 class EdgeTab extends StatefulWidget {
@@ -85,13 +88,14 @@ class _EdgeTabState extends State<EdgeTab> {
     try {
       final m = settings.edgeDemo ? _demo.next() : await fetchEdgeMetrics(settings.edgeMetricsUri);
       if (!mounted || key != _sourceKey) return;
+      final capacity = settings.edgeHistoryMinutes * _perMinute;
       setState(() {
         _error = null;
         _latest = m;
-        _push(_cpu, m.cpu);
-        _push(_mem, m.mem);
-        if (m.tempC != null) _push(_temp, m.tempC!);
-        if (m.inferenceMs != null) _push(_inf, m.inferenceMs!);
+        _push(_cpu, m.cpu, capacity);
+        _push(_mem, m.mem, capacity);
+        if (m.tempC != null) _push(_temp, m.tempC!, capacity);
+        if (m.inferenceMs != null) _push(_inf, m.inferenceMs!, capacity);
       });
     } catch (e) {
       if (mounted && key == _sourceKey) setState(() => _error = e);
@@ -100,9 +104,11 @@ class _EdgeTabState extends State<EdgeTab> {
     }
   }
 
-  static void _push(List<double> l, double v) {
+  static void _push(List<double> l, double v, int capacity) {
     l.add(v);
-    if (l.length > _capacity) l.removeAt(0);
+    while (l.length > capacity) {
+      l.removeAt(0);
+    }
   }
 
   @override
@@ -267,6 +273,8 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
+    final minutes = SettingsScope.of(context).edgeHistoryMinutes;
+    final capacity = minutes * _perMinute;
     return Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,11 +309,18 @@ class _MetricTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Sparkline(values: history, format: format, maxY: maxY, color: color, capacity: _capacity),
+          Sparkline(
+            // A shorter window applies at once, before the next reading trims the list.
+            values: history.length > capacity ? history.sublist(history.length - capacity) : history,
+            format: format,
+            maxY: maxY,
+            color: color,
+            capacity: capacity,
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
-              Text(context.l10n.sparkStart, style: p4.body(size: 11, color: p4.muted)),
+              Text(context.l10n.sparkStart(minutes), style: p4.body(size: 11, color: p4.muted)),
               const Spacer(),
               Text(context.l10n.sparkNow, style: p4.body(size: 11, color: p4.muted)),
             ],

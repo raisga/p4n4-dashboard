@@ -44,8 +44,7 @@ final stacks = [
     ServiceDef('Ollama', 'Local LLM Inference', 11434, Icons.psychology_outlined),
     ServiceDef('Letta', 'Stateful AI Agents', 8283, Icons.smart_toy_outlined),
     ServiceDef('n8n', 'Workflow Automation', 5678, Icons.hub_outlined),
-  ]),
-  StackDef('Edge Stack', 'edge', (c) => c.accent, [
+    // The edge inference runner: the ai stack's ei-runner profile (it was the edge stack)
     ServiceDef('EI Runner', 'Edge Impulse Inference', 8080, Icons.memory),
   ]),
   StackDef('API Gateway', 'api', (c) => c.text, [

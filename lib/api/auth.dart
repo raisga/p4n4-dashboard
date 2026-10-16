@@ -12,13 +12,20 @@ import 'package:http/http.dart' as http;
 
 /// The result of signing in or refreshing.
 class ApiTokens {
-  const ApiTokens({required this.access, required this.refresh, required this.username, required this.role});
+  const ApiTokens({
+    required this.access,
+    required this.refresh,
+    required this.username,
+    required this.role,
+    this.passwordChangeRequired = false,
+  });
 
   factory ApiTokens.fromJson(Map<String, dynamic> j) => ApiTokens(
     access: j['access_token'] as String,
     refresh: j['refresh_token'] as String,
     username: j['username'] as String,
     role: j['role'] as String,
+    passwordChangeRequired: j['password_change_required'] == true,
   );
 
   final String access;
@@ -27,6 +34,10 @@ class ApiTokens {
 
   /// p4n4-api role: `admin`, `operator` or `normie`.
   final String role;
+
+  /// An admin wants a new password first: until then the API turns down
+  /// everything but changing it (`403 password_change_required`).
+  final bool passwordChangeRequired;
 }
 
 /// A sign-in that failed for a reason worth showing (bad password, expired
@@ -71,6 +82,37 @@ Future<ApiTokens> signIn(Uri api, String username, String password) =>
 
 Future<ApiTokens> refreshTokens(Uri api, String refreshToken) =>
     _tokens(api.resolve('api/v1/auth/refresh'), {'refresh_token': refreshToken});
+
+/// Changes the signed-in user's own password, with [AuthClient] adding their
+/// token. Every other sign-in of theirs ends; this one gets the new pair.
+/// Throws [AuthException] when the current password is wrong (403), the new
+/// one is refused (422, with the API's message) or after too many tries.
+Future<ApiTokens> changePassword(Uri api, String current, String next) async {
+  final url = api.resolve('api/v1/auth/password');
+  final res = await http
+      .post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'current_password': current, 'new_password': next}),
+      )
+      .timeout(_timeout);
+  return switch (res.statusCode) {
+    200 => ApiTokens.fromJson(jsonDecode(res.body) as Map<String, dynamic>),
+    403 => throw const AuthException('Current password is incorrect.', statusCode: 403),
+    422 => throw AuthException(_errorMessage(res.body) ?? 'Choose another password.', statusCode: 422),
+    429 => throw const AuthException('Too many attempts. Wait a minute and try again.', statusCode: 429),
+    401 => throw const AuthException('Your session has expired. Sign in again.', statusCode: 401),
+    final code => throw http.ClientException('HTTP $code', url),
+  };
+}
+
+String? _errorMessage(String body) {
+  try {
+    return ((jsonDecode(body) as Map)['error'] as Map)['message'] as String?;
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Revokes the sign-in behind [refreshToken]. Best effort: signing out locally
 /// shouldn't depend on reaching the API.
@@ -138,8 +180,9 @@ class AuthClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final url = request.url;
-    // The auth endpoints carry their own credentials and must not loop on 401.
-    if (url.path.contains('/api/v1/auth/')) return _inner.send(request);
+    // The auth endpoints carry their own credentials and must not loop on 401;
+    // changing your password is the one that needs the access token.
+    if (url.path.contains('/api/v1/auth/') && !url.path.endsWith('/auth/password')) return _inner.send(request);
     final token = _credentials.accessTokenFor(url);
     if (token != null) _authorize(request, token);
     final res = await _inner.send(request);

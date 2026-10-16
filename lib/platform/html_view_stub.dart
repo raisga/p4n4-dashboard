@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'video_clock.dart';
+
 /// Web only; see `html_view_web.dart`.
 class HtmlIFrame extends StatelessWidget {
   const HtmlIFrame({super.key, required this.uri});
@@ -24,12 +26,13 @@ class HtmlImage extends StatelessWidget {
 
 /// Web only; see `html_view_web.dart`.
 class HtmlVideo extends StatelessWidget {
-  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError});
+  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError, this.onClock});
 
   final Uri uri;
   final bool playing;
   final VoidCallback? onPlaying;
   final VoidCallback? onError;
+  final ValueChanged<VideoClock>? onClock;
 
   @override
   Widget build(BuildContext context) => throw UnsupportedError('HtmlVideo is web-only');

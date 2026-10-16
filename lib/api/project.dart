@@ -13,8 +13,9 @@ import 'status_monitor.dart';
 ///
 /// The manifest's optional `dashboard` block tunes the dashboard per project:
 /// `grafana_path` is the Grafana page to open, `tabs` lists the tabs the
-/// project can serve (the others are hidden while connected), and `cameras`
-/// lists the streams the Video tab shows (see [ProjectCamera]).
+/// project can serve (the others are hidden while connected), `cameras`
+/// lists the streams the Video tab shows (see [ProjectCamera]), and `chats`
+/// says it has messaging chats for admins to manage.
 class ProjectInfo {
   const ProjectInfo({
     required this.name,
@@ -24,11 +25,13 @@ class ProjectInfo {
     this.grafanaPath,
     this.tabs,
     this.cameras = const [],
+    this.hasChats = false,
   });
 
   final String name;
 
-  /// Stack layers the project runs (`iot`, `ai`, `edge`).
+  /// Stack layers the project runs (`iot`, `ai`, `extras`, `dashboard`; `edge` in
+  /// projects from before it merged into `ai`).
   final List<String> layers;
   final String? template;
   final String? templateVersion;
@@ -40,10 +43,16 @@ class ProjectInfo {
   /// The project's cameras, in display order; empty when it lists none.
   final List<ProjectCamera> cameras;
 
+  /// Whether it has messaging chats (`dashboard.chats`, e.g. a Telegram bot)
+  /// that admins link and unlink in Settings → Chats.
+  final bool hasChats;
+
   /// Whether the project runs the catalog stack with [suffix]. p4n4-api
   /// (`api`) isn't a layer, so it always counts, and a manifest without
-  /// layers doesn't hide anything.
-  bool hasStack(String suffix) => suffix == 'api' || layers.isEmpty || layers.contains(suffix);
+  /// layers doesn't hide anything. A legacy `edge` layer runs the inference
+  /// runner, which the catalog lists under the AI stack.
+  bool hasStack(String suffix) =>
+      suffix == 'api' || layers.isEmpty || layers.contains(suffix) || (suffix == 'ai' && layers.contains('edge'));
 
   /// Settings defaults the project supplies, ahead of the brand's (see [AppSettings.project]).
   Map<String, Object> get defaults => {'grafanaPath': ?grafanaPath};
@@ -67,6 +76,7 @@ class ProjectInfo {
         if (dashboard['cameras'] case final List list)
           for (final c in list.whereType<Map>()) ?ProjectCamera.fromJson(c.cast<String, dynamic>()),
       ],
+      hasChats: dashboard['chats'] is Map,
     );
   }
 }
@@ -133,9 +143,15 @@ Future<String?> fetchProjectHome(Uri apiBase, {String? lang}) async {
 /// reads it whenever the API URL or host changes, hands it to [apply] (null
 /// while switching), and retries every [retry] while the API can't be
 /// reached. A failed read is also retried on the next settings change, which
-/// includes signing in.
+/// includes signing in. With [every], a successful read is repeated that often.
 class ApiWatcher<T> {
-  ApiWatcher(this.settings, {required this.fetch, required this.apply, this.retry = const Duration(seconds: 30)}) {
+  ApiWatcher(
+    this.settings, {
+    required this.fetch,
+    required this.apply,
+    this.retry = const Duration(seconds: 30),
+    this.every,
+  }) {
     settings.addListener(_check);
     _check();
   }
@@ -144,15 +160,19 @@ class ApiWatcher<T> {
   final Future<T> Function(Uri api) fetch;
   final void Function(T? value) apply;
   final Duration retry;
+  final Duration? every;
 
   StatusTarget? _target;
   Timer? _timer;
+
+  /// Whether [_timer] is a retry after a failure, rather than [every]'s next read.
+  bool _retrying = false;
 
   void _check() {
     final target = settings.statusTarget;
     if (target == _target) {
       // Waiting to retry (e.g. 401 before signing in): try now.
-      if (_timer?.isActive ?? false) {
+      if (_retrying && (_timer?.isActive ?? false)) {
         _timer!.cancel();
         _load(target);
       }
@@ -167,9 +187,14 @@ class ApiWatcher<T> {
   Future<void> _load(StatusTarget target) async {
     try {
       final value = await fetch(target.api);
-      if (_target == target) apply(value);
+      if (_target != target) return;
+      apply(value);
+      _retrying = false;
+      if (every case final every?) _timer = Timer(every, () => _load(target));
     } catch (_) {
-      if (_target == target) _timer = Timer(retry, () => _load(target));
+      if (_target != target) return;
+      _retrying = true;
+      _timer = Timer(retry, () => _load(target));
     }
   }
 

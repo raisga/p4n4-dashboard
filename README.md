@@ -5,10 +5,10 @@ Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs in the brow
 | Tab | What it does | Talks to |
 |-----|--------------|----------|
 | **Services** | Launcher for every p4n4 service, with live status | `p4n4-api` `GET /api/v1/stacks`, or a direct HTTP probe of each port when the API is down |
-| **Edge** | CPU, memory, SoC temperature and inference latency, with 2 minutes of history | Configurable metrics URL (see [below](#edge-metrics-contract)); a demo mode is built in |
+| **Edge** | CPU, memory, SoC temperature and inference latency, with 2 minutes of history (10 or 30 in Settings → Appearance) | Configurable metrics URL (see [below](#edge-metrics-contract)); a demo mode is built in |
 | **Assistant** | Chat with a local model or a stateful agent | p4n4-api `/api/v1/agents/chat` (Ollama, streaming) or `/api/v1/agents/{id}/chat` (Letta); admins and power users choose the model for everyone |
 | **Grafana** | Embedded Grafana, in kiosk mode by default and in the app's light or dark theme (an `<iframe>` on web) | `http://<host>:3000` |
-| **Video** | Live camera feeds from the edge device: pick one, or see them all in a grid. Admins can switch to demo cameras (openly licensed sample clips) to show it off without any | Any MJPEG stream (`multipart/x-mixed-replace`), JPEG snapshot URL, or video file (`.mp4`, `.webm`, `.mov`, `.m3u8`) |
+| **Video** | Live camera feeds from the edge device: all of them in a grid, or pick one (Settings → Appearance → Video says which it opens on). Admins can switch to demo cameras (openly licensed sample clips) to show it off without any | Any MJPEG stream (`multipart/x-mixed-replace`), JPEG snapshot URL, or video file (`.mp4`, `.webm`, `.mov`, `.m3u8`) |
 
 ## Admin, power and normie views
 
@@ -21,7 +21,11 @@ On launch you sign in to the connected deployment's p4n4-api with a username and
 | Clients | Client deployments, each a connection profile (name, host, optional API URL), with live status from each one's API, or port probes as a fallback. **Connect** switches the dashboard, with all its connection settings, to that deployment | — | — |
 | Services | Launcher, plus a stack-controls menu (start/restart/stop) | Launcher; no stack controls | Only if enabled; no stack controls |
 | Tabs' config and details | Hosts in the app bar, URLs and raw errors; add/edit/remove cameras, Grafana URL, agent backend, edge and camera demo toggles | Same as admin, without the demo toggles | Hidden (camera names, not URLs); errors are shown in plain language |
-| Settings | Everything, plus **Views** (the tab order, each view's tabs, and a preview of it), **Users** (p4n4-api accounts and their views) and **Diagnostics** (sign-in, token and service checks, a settings dump with secrets hidden) | Appearance, connection (switch to another saved deployment, or edit this one), edge metrics, agent, Grafana, video, account and about | Appearance, account and about only |
+| Settings | Everything, plus **Views** (the tab order; each view's tabs, start tab, Home cards, Grafana page, cameras and alerts; and a preview of it), **Users** (p4n4-api accounts, their views and last sign-in; reset a password, require a new one, sign out everywhere), **Banner** (a message above every view on every device), **Audit log** (who changed what), **This device** (kiosk mode, idle reset and idle sign-out) and **Diagnostics** (sign-in, token and service checks, a settings dump with secrets hidden) | Appearance, connection (switch to another saved deployment, or edit this one), edge metrics, agent, Grafana, video, account and about | Appearance, account and about only |
+
+Besides its tabs, an admin sets what else the power and normie views show: the tab each opens on, Home's cards, its own Grafana page (normies always get kiosk mode), its cameras and their vision overlay, and which alerts pop up and chime. Like the tabs, these are kept on p4n4-api (`/api/v1/dashboard/view-settings`) and reach every device within a minute. Admins always get the defaults.
+
+For a wall tablet, an admin turns on **kiosk mode** in Settings → This device and signs the tablet in with a viewer account: no Sign out, theme toggle, tour or settings beyond Accessibility, and a lock button that takes an admin's sign-in to leave. After a few idle minutes it starts over (start tab, conversation cleared, text size back). Admins and power users can be signed out when idle on any device. These are per device; see "Kiosk mode and idle devices" in the [dashboard reference](https://github.com/raisga/p4n4-docs/blob/main/reference/dashboard.md#kiosk-mode-and-idle-devices).
 
 Admins can **preview** the power or normie view from Settings → Views: the dashboard switches to that view under a banner with **Back to admin**. The preview is only on that device and ends on sign-out, restart or switching deployment; it doesn't change the account.
 
@@ -33,7 +37,7 @@ Brand tabs come in one order for every view, after Home: **Agent → Grafana →
 
 On phones the bottom bar holds at most five destinations; any extras (e.g. admin **Services** and **Clients** in the default order) open from app-bar buttons.
 
-Settings (the ⚙ button) are grouped into categories: a list beside the open one on wide screens, a list of pages on phones, with a search field over both. Everyone gets **Account**, **Appearance** (theme), **Accessibility** (text size, high contrast, reduce motion), **Language & region** (language, temperature unit, 12/24-hour time) and **About**; power users also **Connection** and **Endpoints**; admins also **Views**, **Users** and **Diagnostics**. Connection settings (host, API, metrics, Grafana and cameras, which are managed on the Video tab) belong to the connected deployment and persist between launches. Theme, language, accessibility and region settings are app-wide; accessibility settings add to the device's own (they never turn off what the device turned on), and *Auto* follows the device's region (°F in the US and a few other countries) and 24-hour setting, else the language's custom. Numbers use the language's decimal style; the tab order and each view's tabs belong to the deployment and are kept by its p4n4-api. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
+Settings (the ⚙ button) are grouped into categories: a list beside the open one on wide screens, a list of pages on phones, with a search field over both. Everyone gets **Account**, **Appearance** (theme; for admins and power users also the tab this device opens on, the Device tab's chart history and the default camera), **Accessibility** (text size, high contrast, reduce motion), **Language & region** (language, temperature unit, 12/24-hour time) and **About**; power users also **Connection** and **Endpoints**; admins also **Views**, **Users**, **Banner**, **Audit log**, **This device** and **Diagnostics**. Accounts from p4n4-api can change their password under **Account**; one an admin asked to choose a new password gets only that form after signing in. Connection settings (host, API, metrics, Grafana and cameras, which are managed on the Video tab) belong to the connected deployment and persist between launches. Theme, language, accessibility and region settings are app-wide; accessibility settings add to the device's own (they never turn off what the device turned on), and *Auto* follows the device's region (°F in the US and a few other countries) and 24-hour setting, else the language's custom. Numbers use the language's decimal style; the tab order and each view's tabs belong to the deployment and are kept by its p4n4-api. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
 
 ## Languages
 
@@ -56,6 +60,8 @@ On connect, the dashboard reads the deployment's `.p4n4.json` through p4n4-api (
 - `dashboard.grafana_path`: the Grafana tab's page, used ahead of the brand default and unless the deployment sets its own.
 - `dashboard.home`: a Markdown file, relative to the project, shown at the bottom of the Home tab, below the status and device readings (default `HOME.md`). A translation beside it, named for the app's language (`HOME.es.md`), comes first. The dashboard reads it through `GET /api/v1/project/home?lang=<code>` on connect, on changing language, on refresh and when Home is opened again; a missing or empty file shows nothing. Links open in the browser, except two kinds: `tab:` links such as `[Activity](tab:feed)` open that tab (`services`, `edge`, `agent`, `grafana`, `video`, `feed`), and `ask:` links such as `[Is any unit on warning?](ask:)` open the Assistant and ask it the link's text. Either shows as plain text when the view doesn't have the tab, or the Assistant. Images need absolute URLs.
 - `dashboard.cameras`: the Video tab's cameras until the deployment saves its own, ahead of a brand `videoUrl`. Each is `{id, name}` plus an absolute `url`, or a `port` and `path` on the connected host (e.g. go2rtc's `{"port": 1984, "path": "/api/stream.mjpeg?src=floor"}`). The [`mqtt-influx-grafana-ollama-go2rtc`](https://github.com/raisga/p4n4-templates/tree/main/projects/mqtt-influx-grafana-ollama-go2rtc) template uses it, as the [road traffic use case](https://github.com/raisga/p4n4-templates/blob/main/docs/use-cases/road-traffic.md) shows.
+- `dashboard.vision`: what the Video tab draws over the cameras; see [Vision overlay](#vision-overlay).
+- `dashboard.chats`: the messaging chats (e.g. a Telegram bot's) that get the project's alerts, which admins link and unlink in Settings → Chats; see [Chats contract](#chats-contract).
 
 Without the API, every brand tab and stack is shown, as before. Status, project info and edge metrics use the signed-in account's token. The [greenhouse use case](https://github.com/raisga/p4n4-templates/blob/main/docs/use-cases/greenhouse-telemetry.md) shows it end to end with the `mqtt-influx-grafana` template and the `verdant` brand.
 
@@ -157,7 +163,7 @@ Only the applied brand is bundled, so one client's build never contains another'
 | AI | Ollama | http://localhost:11434 |
 | AI | Letta | http://localhost:8283 |
 | AI | n8n | http://localhost:5678 |
-| Edge | EI Runner | http://localhost:8080 |
+| AI | EI Runner (`ei-runner` profile) | http://localhost:8080 |
 | Gateway | p4n4-api | http://localhost:8000 |
 | Gateway | Swagger UI | http://localhost:8000/swagger-ui |
 
@@ -169,8 +175,7 @@ The dashboard assumes all stacks are running. Start them in dependency order:
 p4n4 up --all
 # or manually:
 cd p4n4-iot   && docker compose up -d
-cd p4n4-ai    && docker compose up -d
-cd p4n4-edge  && docker compose up -d
+cd p4n4-ai    && docker compose up -d   # COMPOSE_PROFILES=ollama,ei-runner for the EI Runner
 cd p4n4-api   && docker compose up -d
 ```
 
@@ -227,6 +232,72 @@ The upstream answers `GET <url>?limit=50&before=<next_before>` with:
 
 Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended` and `dismissed` are shown translated, other values as they are. An action posts `POST <url>/<id>/action` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
 
+## Chats contract
+
+A project can have a bot (e.g. on Telegram) that sends its alerts to the chats an admin linked, and answers them. Admins manage those chats in Settings → Chats, which shows when the project's `.p4n4.json` names its chats service in `dashboard.chats`, the same way as the [feed](#feed-contract):
+
+```json
+"dashboard": {
+  "chats": { "url": "http://localhost:8096/api/v1/chats", "token": { "layer": "ai", "env": "CHANNELS_ADMIN_TOKEN" } }
+}
+```
+
+The page goes through p4n4-api (`/api/v1/chats`, admins only, the token kept server-side), which relays to the upstream:
+
+- `GET <url>` lists the channels and the linked chats:
+
+  ```json
+  {
+    "channels": [{ "id": "telegram", "name": "Telegram", "state": "live", "bot": "@store_bot", "url": "https://t.me/store_bot" }],
+    "chats": [{ "id": "telegram:-1001", "channel": "telegram", "name": "Floor staff", "lang": "es",
+                "linked_at": "2026-10-15T12:00:00+00:00", "linked_by": "root", "muted": ["A2"] }]
+  }
+  ```
+
+  A channel's `state` is `live`, `mock` (the bot logs its messages instead of sending them) or `off`; the page says so for the last two.
+- `POST <url>/codes` with `{"by": "<username>"}` makes a one-time code: `{"code", "expires_at", "command": "/start <code>", "links": [{"channel", "url"}]}`. The page shows the command and the links (a `t.me/<bot>?start=<code>` link sends the command by itself), and reads the list every few seconds until the new chat shows up or the code expires.
+- `DELETE <url>/<id>` unlinks a chat; the page asks first.
+
+Only `id` (and a chat's `channel`) are required. p4n4-api answers `404 no_chats` when the project has none, `503 chats_unavailable` with the upstream's reason when it can't manage chats (e.g. it has no token set), and records codes and unlinks in the audit log.
+
+## Vision overlay
+
+A project can show what its vision model sees on the Video tab: a box on each person (with the track id and the detector's confidence when one camera fills the tab), what the behaviour model says someone is doing, and the zone. When that behaviour asks for an alert, the camera says so: the person's box and the camera's border pulse in the alert's colour (a risk, `review`, in the theme's red; an opportunity, `info`, in its accent), with the alert's code and name on top. The same alert pops up as a toast on every tab, a risk with a chime (Settings → Video → Alert sound turns it off). Tapping a toast opens that camera on its own. New pending alerts in the [feed](#feed-contract) (the edge's inference, as its uplink posts it) toast the same way, whichever tab is open, checked every 5 s; tapping one opens the camera it names when the Cameras tab has it (or a demo camera playing that camera's clip, `demo-<id>`), else the Feed.
+
+`.p4n4.json` names a JSON file in the project, which p4n4-api serves at `GET /api/v1/project/vision` (`lib/api/vision.dart`):
+
+```json
+"dashboard": {
+  "vision": { "file": "vision/boutique.json", "live": { "port": 8000, "path": "/stream" } }
+}
+```
+
+```json
+{
+  "version": 1,
+  "behaviors": { "tries_on": { "es": "Se la prueba", "en": "Tries it on" } },
+  "zones": { "b-fitting": { "es": "Probadores", "en": "Fitting rooms" } },
+  "alerts": [
+    { "code": "A3", "tone": "info", "behaviors": ["tries_on"], "zones": ["b-fitting"],
+      "title": { "en": "Fitting room assistance" }, "suggestion": { "en": "Offer another size." } }
+  ],
+  "cameras": {
+    "cam-04": {
+      "zones": ["b-fitting"],
+      "recording": {
+        "duration": 15.0, "width": 480, "height": 270,
+        "boxes": [[3.6, [[2, 0.35, 0.12, 0.67, 0.98, 0.91]]]],
+        "behaviors": [[3.5, 4.67, 2, "tries_on", 1.0]]
+      }
+    }
+  }
+}
+```
+
+- **Recorded**: a camera whose id has a `recording` and that plays a video file (a demo camera, or an MP4 in `dashboard.cameras`) gets its boxes and behaviours by the second of playback, so they follow the people in the clip. Its behaviours also run on a clock of their own from sign-in on, for anyone whose view has the Video tab: their alerts toast on every tab, whether or not that camera is on screen (or the tab paused), and the video jumps back in step with the clock when it plays. `boxes` are `[t, [[track, x1, y1, x2, y2, confidence], …]]`, normalised to the frame; a box is interpolated between samples and held over gaps up to 0.4 s. `behaviors` are `[start, end, track, behaviour, confidence]` in seconds. An MJPEG stream has no playback position, so a recording isn't drawn over one.
+- **Live**: with `live` (a `ws(s)://` `url`, or a `port` and `path` on the connected host), the dashboard follows that WebSocket from sign-in on and draws over any camera it reports, MJPEG included. It expects two kinds of message: `{"type": "detection", "camera_id", "frame_width", "frame_height", "objects": [{"track_id", "confidence", "bbox": [x1, y1, x2, y2]}]}` in pixels (boxes without the frame size are not drawn), and `{"type": "verdict", "camera_id", "event_id", "track_id", "zone": {"id"}, "behavior": {"class", "confidence"}, "window": {"dwell_ms"}}`. Boxes go after 1.5 s without news and a verdict after its dwell (8 s at least). It reconnects on its own, backing off to 30 s. The browser connects straight to it, as it does to the cameras.
+- **Alerts**: the first rule whose `behaviors` has the behaviour, and whose `zones` (if any) include the verdict's zone or, for a recording, one of the camera's `zones`, wins. Labels are by language code, falling back to English, then Spanish. The same alert on the same camera toasts once a minute (a demo clip loops every few seconds), and its flag on the camera shows every time.
+
 ## Layout
 
 ```
@@ -243,12 +314,13 @@ lib/
 ├── core/
 │   ├── brand.dart         # white-label config (assets/brand/brand.json)
 │   ├── theme.dart         # light/dark palettes (P4Colors ThemeExtension) + fonts
-│   └── settings.dart      # persisted connection settings (SettingsScope)
+│   ├── settings.dart      # persisted connection settings (SettingsScope)
+│   └── alerts.dart        # alert toasts (AlertCenter), new feed alerts
 ├── l10n/                  # app_<code>.arb strings, generated AppLocalizations, context.l10n
-├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, project, assistant (via p4n4-api), stack actions
-├── platform/              # web vs native: <iframe>/<img> views, port probes (conditional imports)
+├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, project, assistant (via p4n4-api), stack actions, vision overlay (recorded and live), chats
+├── platform/              # web vs native: <iframe>/<img>/<video> views, port probes, WebSocket, chime (conditional imports)
 ├── tabs/                  # one file per tab
-├── pages/                 # settings (categories, search), sign-in, admin sections
+├── pages/                 # settings (categories, search), sign-in, admin sections (users, chats, diagnostics)
 └── widgets/               # shared UI, sparkline, MJPEG viewer, the normie view's tour
 test/                      # unit, widget and brand tests
 android/ ios/ linux/ macos/ windows/   # native platform projects

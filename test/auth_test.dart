@@ -15,6 +15,7 @@ import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:p4n4_dashboard/l10n/app_localizations.dart';
 import 'package:p4n4_dashboard/main.dart';
 import 'package:p4n4_dashboard/pages/login_page.dart';
+import 'package:p4n4_dashboard/pages/password_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
@@ -24,7 +25,7 @@ final _api = Uri.parse('http://pi:8000/');
 http.Response _json(Object body, [int status = 200]) =>
     http.Response(jsonEncode(body), status, headers: {'content-type': 'application/json'});
 
-Map<String, Object> _tokens(String n, {String role = 'admin', String user = 'ana'}) => {
+Map<String, Object> _tokens(String n, {String role = 'admin', String user = 'ana', bool mustChange = false}) => {
   'access_token': 'access-$n',
   'refresh_token': 'refresh-$n',
   'token_type': 'bearer',
@@ -32,6 +33,7 @@ Map<String, Object> _tokens(String n, {String role = 'admin', String user = 'ana
   'refresh_expires_in': 604800,
   'username': user,
   'role': role,
+  'password_change_required': mustChange,
 };
 
 Future<(AppSettings, MemorySecretStore)> _settings([Map<String, Object> prefs = const {}]) async {
@@ -223,6 +225,52 @@ void main() {
       expect(session.role, Role.power);
     });
 
+    test('a new password an admin asks for is changed, and the sign-in goes on', () async {
+      final (settings, store) = await _settings();
+      final session = Session(settings);
+      final sent = <(String, Object?)>[];
+      await http.runWithClient(
+        () async {
+          await session.signInWithPassword('tablet', 'set by admin');
+          expect(session.passwordChangeRequired, isTrue);
+          await session.changePassword('set by admin', 'my own password');
+        },
+        () => MockClient((r) async {
+          sent.add((r.url.path, jsonDecode(r.body)));
+          return r.url.path.endsWith('/token')
+              ? _json(_tokens('1', role: 'normie', user: 'tablet', mustChange: true))
+              : _json(_tokens('2', role: 'normie', user: 'tablet'));
+        }),
+      );
+      expect(sent.last.$1, '/api/v1/auth/password');
+      expect(sent.last.$2, {'current_password': 'set by admin', 'new_password': 'my own password'});
+      expect(session.passwordChangeRequired, isFalse);
+      expect(session.role, Role.normie);
+      expect(store.values.values, contains('refresh-2'));
+      expect(session.accessTokenFor(Uri.parse('http://pi:8000/api/v1/stacks')), 'access-2');
+    });
+
+    test('a refused password change says why', () async {
+      final (settings, _) = await _settings();
+      final session = Session(settings);
+      Future<AuthException> refused(http.Response res) async {
+        try {
+          await http.runWithClient(() => session.changePassword('a', 'b'), () => MockClient((_) async => res));
+        } on AuthException catch (e) {
+          return e;
+        }
+        throw StateError('not refused');
+      }
+
+      expect((await refused(_json({}, 403))).statusCode, 403, reason: 'wrong current password');
+      final short = await refused(
+        _json({
+          'error': {'code': 'validation_error', 'message': 'Password must be at least 10 characters.'},
+        }, 422),
+      );
+      expect(short.message, 'Password must be at least 10 characters.');
+    });
+
     test('signing out forgets the tokens and revokes the sign-in', () async {
       final (settings, store) = await _settings();
       final session = Session(settings);
@@ -277,6 +325,13 @@ void main() {
       expect(seen.single.headers['Authorization'], 'Bearer access-1');
       await c.get(Uri.parse('http://pi:11434/api/tags'));
       expect(seen.last.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('of the auth calls, only changing a password carries the token', () async {
+      final c = client();
+      await c.post(Uri.parse('http://pi:8000/api/v1/auth/refresh'));
+      await c.post(Uri.parse('http://pi:8000/api/v1/auth/password'));
+      expect(seen.map((r) => r.headers['Authorization']), [null, 'Bearer access-1']);
     });
 
     test('behind the dashboard proxy the token goes in X-Upstream-Authorization', () async {
@@ -341,6 +396,58 @@ void main() {
       () => MockClient((r) async {
         final body = jsonDecode(r.body) as Map;
         return body['password'] == 'right' ? _json(_tokens('1')) : _json({'detail': 'Invalid'}, 401);
+      }),
+    );
+  });
+
+  testWidgets('an account that owes a new password gets only the password form until it is changed', (tester) async {
+    await http.runWithClient(
+      () async {
+        SharedPreferences.setMockInitialValues({'tourSeen': true});
+        final brand = loadBrand('p4n4');
+        final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
+        final session = Session(settings, probe: (_) async => AuthMode.required);
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          BrandScope(
+            brand: brand,
+            child: SettingsScope(
+              settings: settings,
+              child: SessionScope(session: session, child: const DashboardApp()),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+        await tester.enterText(find.widgetWithText(TextField, 'Username'), 'tablet');
+        await tester.enterText(find.widgetWithText(TextField, 'Password'), 'set by admin');
+        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(ChangePasswordPage), findsOneWidget);
+        expect(find.byType(HomeShell), findsNothing);
+
+        final change = find.widgetWithText(FilledButton, 'Change password');
+        await tester.enterText(find.widgetWithText(TextField, 'Current password'), 'set by admin');
+        await tester.enterText(find.widgetWithText(TextField, 'New password'), 'my own password');
+        await tester.enterText(find.widgetWithText(TextField, 'Repeat new password'), 'my own passwort');
+        await tester.pump();
+        expect(find.text("The passwords don't match"), findsOneWidget);
+        expect(tester.widget<FilledButton>(change).onPressed, isNull);
+
+        await tester.enterText(find.widgetWithText(TextField, 'Repeat new password'), 'my own password');
+        await tester.pump();
+        await tester.tap(change);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(HomeShell), findsOneWidget);
+      },
+      () => MockClient((r) async {
+        if (r.url.path.endsWith('/auth/token')) return _json(_tokens('1', role: 'normie', mustChange: true));
+        if (r.url.path.endsWith('/auth/password')) return _json(_tokens('2', role: 'normie'));
+        return http.Response('', 404);
       }),
     );
   });

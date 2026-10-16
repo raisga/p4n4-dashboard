@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/view_settings.dart';
 import '../core/brand.dart';
 import '../core/format.dart';
 import '../core/session.dart';
@@ -10,12 +11,16 @@ import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import 'admin_sections.dart';
+import 'chats_section.dart';
+import 'kiosk_dialogs.dart';
+import 'password_page.dart';
 
 /// Settings' categories, in the order they're listed.
 ///
 /// Everyone gets the personal ones (this device's preferences, nothing that
 /// changes the system) and About. Power users also get the connection and
-/// endpoint settings; admins also views, users and diagnostics.
+/// endpoint settings; admins also views, users, the banner, the project's
+/// chats (when it has any), the audit log and diagnostics.
 enum SettingsCategory {
   account,
   appearance,
@@ -25,6 +30,10 @@ enum SettingsCategory {
   endpoints,
   views,
   users,
+  banner,
+  chats,
+  audit,
+  device,
   diagnostics,
   about,
 }
@@ -70,14 +79,19 @@ List<_Category> _categories(BuildContext context) {
     if (brand.tabs.contains(DashTab.grafana)) l.sectionGrafana,
     if (brand.tabs.contains(DashTab.video)) l.sectionVideo,
   ];
-  return [
+  final all = [
     _Category(
       SettingsCategory.account,
       _Heading.personal,
       Icons.person_outline,
       l.sectionAccount,
       summary: _accountView(l, session, brand),
-      keywords: [l.signOut, ?session.username, if (session.signedInRole == Role.normie) l.takeTour],
+      keywords: [
+        l.signOut,
+        ?session.username,
+        if (session.mode == SignInMode.api) l.changePassword,
+        if (session.signedInRole == Role.normie) l.takeTour,
+      ],
       build: (_) => const _AccountPage(),
     ),
     _Category(
@@ -86,7 +100,18 @@ List<_Category> _categories(BuildContext context) {
       Icons.palette_outlined,
       l.sectionAppearance,
       summary: _themeName(l, s.themeMode),
-      keywords: [l.themeHeading, l.themeSystem, l.themeLight, l.themeDark],
+      keywords: [
+        l.themeHeading,
+        l.themeSystem,
+        l.themeLight,
+        l.themeDark,
+        if (brand.tabs.contains(DashTab.video)) ...[l.sectionVideo, l.videoGridDefault],
+        if (session.isTechnical) ...[
+          l.viewStartTab,
+          if (brand.tabs.contains(DashTab.edge)) l.chartHistory,
+          if (brand.tabs.contains(DashTab.video)) l.defaultCamera,
+        ],
+      ],
       build: (_) => const _AppearancePage(),
     ),
     _Category(
@@ -166,10 +191,56 @@ List<_Category> _categories(BuildContext context) {
         Icons.group_outlined,
         l.sectionUsers,
         summary: '',
-        keywords: const [],
+        keywords: [l.signOutUserTooltip, l.resetPasswordTooltip],
         build: (_) => const _Group(
           children: [Padding(padding: EdgeInsets.all(20), child: UsersSection())],
         ),
+      ),
+      _Category(
+        SettingsCategory.banner,
+        _Heading.admin,
+        Icons.campaign_outlined,
+        l.sectionBanner,
+        summary: switch (s.banner) {
+          final b? when b.showsAt(DateTime.now()) => b.text,
+          _ => l.bannerNone,
+        },
+        keywords: [l.bannerText, l.bannerInfo, l.bannerWarning],
+        build: (_) => const _Group(
+          children: [Padding(padding: EdgeInsets.all(20), child: BannerSection())],
+        ),
+      ),
+      if (s.project?.hasChats ?? false)
+        _Category(
+          SettingsCategory.chats,
+          _Heading.admin,
+          Icons.forum_outlined,
+          l.sectionChats,
+          summary: '',
+          keywords: [l.chatsLink, 'Telegram'],
+          build: (_) => const _Group(
+            children: [Padding(padding: EdgeInsets.all(20), child: ChatsSection())],
+          ),
+        ),
+      _Category(
+        SettingsCategory.audit,
+        _Heading.admin,
+        Icons.history,
+        l.sectionAudit,
+        summary: '',
+        keywords: const [],
+        build: (_) => const _Group(
+          children: [Padding(padding: EdgeInsets.all(20), child: AuditSection())],
+        ),
+      ),
+      _Category(
+        SettingsCategory.device,
+        _Heading.admin,
+        Icons.tablet_outlined,
+        l.sectionDevice,
+        summary: s.kiosk ? l.deviceKiosk : '',
+        keywords: [l.deviceKiosk, l.kioskIdleReset, l.idleSignOut],
+        build: (_) => const _DevicePage(),
       ),
       _Category(
         SettingsCategory.diagnostics,
@@ -193,6 +264,13 @@ List<_Category> _categories(BuildContext context) {
       build: (_) => const _AboutPage(),
     ),
   ];
+  // A kiosk's visitors may need bigger text, nothing else (it's put back when idle).
+  return session.kioskLocked
+      ? [
+          for (final c in all)
+            if (c.id == SettingsCategory.accessibility) c,
+        ]
+      : all;
 }
 
 String _groupName(AppLocalizations l, _Heading g) => switch (g) {
@@ -787,6 +865,15 @@ class _AccountPage extends StatelessWidget {
             ],
           ),
         ),
+        // Only p4n4-api accounts have a password to change.
+        if (session.mode == SignInMode.api)
+          _Tile(
+            icon: Icons.password,
+            title: l.changePassword,
+            subtitle: l.changePasswordSubtitle,
+            trailing: Icon(Icons.chevron_right, color: p4.muted),
+            onTap: () => showChangePasswordDialog(context),
+          ),
       ],
     );
     // The tour is the normie view's (see HomeShell).
@@ -824,7 +911,7 @@ class _AppearancePage extends StatelessWidget {
     final l = context.l10n;
     final s = SettingsScope.of(context);
     final brand = BrandScope.of(context);
-    return _Group(
+    final theme = _Group(
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
@@ -852,6 +939,84 @@ class _AppearancePage extends StatelessWidget {
             },
           ),
         ),
+      ],
+    );
+    final session = SessionScope.of(context);
+    final p4 = context.p4;
+    // An admin's or power user's own defaults on this device; normies get the view's.
+    final own = session.isTechnical;
+    Widget dropdown<T>(String key, T value, Map<T, String> items, ValueChanged<T> onChanged) => DropdownButton<T>(
+      key: ValueKey(key),
+      value: items.containsKey(value) ? value : items.keys.first,
+      isExpanded: true,
+      underline: const SizedBox.shrink(),
+      style: p4.display(size: 14, color: p4.text, weight: FontWeight.w500, spacing: 0),
+      dropdownColor: p4.bg2,
+      items: [
+        for (final MapEntry(:key, :value) in items.entries)
+          DropdownMenuItem(
+            value: key,
+            child: Text(value, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (v) => v == null ? null : onChanged(v),
+    );
+    final role = session.role ?? Role.normie;
+    final cameras = s.cameras;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        theme,
+        if (own)
+          _Group(
+            children: [
+              _Tile(
+                icon: Icons.start,
+                title: l.viewStartTab,
+                below: dropdown<String>('myStartTab', s.myStartTab, {
+                  '': l.startTabDefault,
+                  'home': l.navHome,
+                  for (final t in s.tabsFor(role).where(brand.tabs.contains).where(s.projectAllows))
+                    t.name: l.tabName(t),
+                }, (name) => s.myStartTab = name),
+              ),
+            ],
+          ),
+        if (own && brand.tabs.contains(DashTab.edge))
+          _Group(
+            title: l.sectionEdgeMetrics,
+            children: [
+              _Tile(
+                icon: Icons.show_chart,
+                title: l.chartHistory,
+                below: dropdown<int>('edgeHistoryMinutes', s.edgeHistoryMinutes, {
+                  for (final m in AppSettings.edgeHistoryOptions) m: l.minutesCount(m),
+                }, (m) => s.edgeHistoryMinutes = m),
+              ),
+            ],
+          ),
+        // How this device opens the Video tab: anyone's to choose, unlike its cameras.
+        if (brand.tabs.contains(DashTab.video))
+          _Group(
+            title: l.sectionVideo,
+            children: [
+              _SwitchTile(
+                title: l.videoGridDefault,
+                icon: Icons.grid_view,
+                value: s.videoGrid,
+                onChanged: (v) => s.videoGrid = v,
+              ),
+              if (own && cameras.isNotEmpty)
+                _Tile(
+                  icon: Icons.videocam_outlined,
+                  title: l.defaultCamera,
+                  below: dropdown<String>('defaultCamera', s.defaultCamera, {
+                    '': l.defaultCameraFirst,
+                    for (final c in cameras) c.id: c.name,
+                  }, (id) => s.defaultCamera = id),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -1420,6 +1585,14 @@ class _EndpointsPage extends StatelessWidget {
               for (final c in s.cameras) _CameraRow(c.name, c.url),
               if (s.cameras.isEmpty) _Tile(title: l.noCameras),
               if (admin) _SwitchTile(title: l.videoDemoSwitch, value: s.videoDemo, onChanged: (v) => s.videoDemo = v),
+              // This device's speakers, for alerts that ask to check something.
+              if (s.vision != null || brand.tabs.contains(DashTab.feed))
+                _SwitchTile(
+                  title: l.alertSound,
+                  icon: Icons.notifications_active_outlined,
+                  value: s.alertSound,
+                  onChanged: (v) => s.alertSound = v,
+                ),
             ],
           ),
       ],
@@ -1604,6 +1777,7 @@ class _ViewsPage extends StatelessWidget {
                   ),
                 ],
               ),
+              _ViewPrefsEditor(view),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Align(
@@ -1621,6 +1795,276 @@ class _ViewsPage extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// This device as a shared screen: kiosk mode, and what an idle spell does.
+/// Kept on the device: another device of the same deployment isn't a kiosk.
+class _DevicePage extends StatelessWidget {
+  const _DevicePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final p4 = context.p4;
+    final s = SettingsScope.of(context);
+    final session = SessionScope.of(context);
+    // Leaving kiosk mode takes an admin's p4n4-api sign-in: without accounts it couldn't be left.
+    final accounts = session.mode == SignInMode.api;
+    Widget minutes(String key, int value, List<int> options, ValueChanged<int> onChanged) => DropdownButton<int>(
+      key: ValueKey(key),
+      value: options.contains(value) ? value : null,
+      isExpanded: true,
+      underline: const SizedBox.shrink(),
+      style: p4.display(size: 14, color: p4.text, weight: FontWeight.w500, spacing: 0),
+      dropdownColor: p4.bg2,
+      items: [
+        for (final m in options)
+          DropdownMenuItem(
+            value: m,
+            child: Text(m == 0 ? l.idleNever : l.idleAfterMinutes(m), overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (m) => m == null ? null : onChanged(m),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Group(
+          children: [
+            _Tile(
+              icon: Icons.lock_outline,
+              title: l.deviceKiosk,
+              subtitle: accounts || s.kiosk ? l.kioskModeHelp : l.kioskNeedsAccounts,
+              trailing: Switch(
+                value: s.kiosk,
+                // Turning it off here is an admin (or power user) signed in on a kiosk.
+                onChanged: s.kiosk ? (_) => s.kiosk = false : (accounts ? (_) => showStartKioskDialog(context) : null),
+              ),
+            ),
+            _Tile(
+              title: l.kioskIdleReset,
+              below: minutes('kioskIdleReset', s.kioskIdleReset, const [0, 1, 2, 5, 10, 15, 30], (m) {
+                s.kioskIdleReset = m;
+              }),
+            ),
+          ],
+        ),
+        _Group(
+          children: [
+            _Tile(
+              icon: Icons.timer_outlined,
+              title: l.idleSignOut,
+              below: minutes('idleSignOut', s.idleSignOut, const [0, 5, 15, 30, 60], (m) => s.idleSignOut = m),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// What else [view] shows besides its tabs: where it opens, Home's cards, its
+/// Grafana page, its cameras and which alerts pop up. Kept by the
+/// deployment's p4n4-api, like the tabs, so it applies on every device.
+class _ViewPrefsEditor extends StatelessWidget {
+  const _ViewPrefsEditor(this.view);
+
+  final Role view;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final p4 = context.p4;
+    final s = SettingsScope.of(context);
+    final brand = BrandScope.of(context);
+    final prefs = s.prefsFor(view);
+    // Read at change time, like the tab chips: two changes can land before a rebuild.
+    void save(ViewPrefs Function(ViewPrefs current) change) =>
+        _saveView(context, () => s.setPrefsFor(view, change(s.prefsFor(view))));
+    final style = p4.display(size: 14, color: p4.text, weight: FontWeight.w500, spacing: 0);
+    Widget dropdown<T>(T value, Map<T, String> items, ValueChanged<T> onChanged) => DropdownButton<T>(
+      key: ValueKey('${view.name}-$T'),
+      value: value,
+      isExpanded: true,
+      underline: const SizedBox.shrink(),
+      style: style,
+      dropdownColor: p4.bg2,
+      items: [
+        for (final MapEntry(:key, :value) in items.entries)
+          DropdownMenuItem(
+            value: key,
+            child: Text(value, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (v) => v == null ? null : onChanged(v),
+    );
+    Widget label(String text) => Text(
+      text,
+      style: p4.display(size: 15, color: p4.text, weight: FontWeight.w600, spacing: 0),
+    );
+
+    final tabs = s.tabsFor(view).where(brand.tabs.contains);
+    final start = tabs.any((t) => t.name == prefs.startTab) ? prefs.startTab! : 'home';
+    final cards = [
+      (HomeCard.status, l.homeCardStatus),
+      if (brand.tabs.contains(DashTab.edge)) (HomeCard.device, l.homeCardDevice),
+      (HomeCard.page, l.homeCardPage),
+    ];
+    final video = brand.tabs.contains(DashTab.video);
+    final cameras = s.cameras;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Tile(
+          title: l.viewStartTab,
+          below: dropdown<String>(start, {
+            'home': l.navHome,
+            for (final t in tabs) t.name: l.tabName(t),
+          }, (name) => save((p) => p.copyWith(startTab: name == 'home' ? null : name))),
+        ),
+        _Padded(
+          children: [
+            label(l.viewHomeCards),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (card, name) in cards)
+                  FilterChip(
+                    key: ValueKey('${view.name}-card-${card.name}'),
+                    label: Text(name),
+                    selected: prefs.showsCard(card),
+                    onSelected: (on) => save((p) {
+                      final shown = {
+                        for (final c in HomeCard.values)
+                          if (c == card ? on : p.showsCard(c)) c,
+                      };
+                      return p.copyWith(homeCards: shown.length == HomeCard.values.length ? null : shown);
+                    }),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        if (brand.tabs.contains(DashTab.grafana))
+          _Padded(
+            children: [
+              _GrafanaPathField(
+                key: ValueKey('${view.name}-grafana'),
+                value: prefs.grafanaPath,
+                deploymentPath: s.grafanaPath,
+                onSave: (path) => save((p) => p.copyWith(grafanaPath: path)),
+              ),
+            ],
+          ),
+        if (video && cameras.isNotEmpty)
+          _Padded(
+            children: [
+              label(l.viewCameras),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in cameras)
+                    FilterChip(
+                      key: ValueKey('${view.name}-camera-${c.id}'),
+                      label: Text(c.name),
+                      selected: prefs.showsCamera(c.id),
+                      onSelected: (on) => save((p) {
+                        final shown = [
+                          for (final o in s.cameras)
+                            if (o.id == c.id ? on : p.showsCamera(o.id)) o.id,
+                        ];
+                        return p.copyWith(cameras: shown.length == s.cameras.length ? null : shown);
+                      }),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        if (video)
+          _SwitchTile(
+            title: l.viewCameraOverlay,
+            value: prefs.overlay,
+            onChanged: (on) => save((p) => p.copyWith(cameraOverlay: on ? null : false)),
+          ),
+        _Tile(
+          title: l.viewAlerts,
+          below: dropdown<AlertLevel>(prefs.alertLevel, {
+            AlertLevel.all: l.alertsAll,
+            AlertLevel.review: l.alertsReview,
+            AlertLevel.off: l.alertsOff,
+          }, (level) => save((p) => p.copyWith(alerts: level == AlertLevel.all ? null : level))),
+        ),
+        _SwitchTile(
+          title: l.viewAlertSound,
+          value: prefs.chime,
+          onChanged: (on) => save((p) => p.copyWith(alertSound: on ? null : false)),
+        ),
+      ],
+    );
+  }
+}
+
+/// A view's own Grafana page; empty means the deployment's. Saved when
+/// submitted or left, if it changed.
+class _GrafanaPathField extends StatefulWidget {
+  const _GrafanaPathField({super.key, required this.value, required this.deploymentPath, required this.onSave});
+
+  final String? value;
+  final String deploymentPath;
+  final ValueChanged<String?> onSave;
+
+  @override
+  State<_GrafanaPathField> createState() => _GrafanaPathFieldState();
+}
+
+class _GrafanaPathFieldState extends State<_GrafanaPathField> {
+  late final _text = TextEditingController(text: widget.value ?? '');
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _save();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_GrafanaPathField old) {
+    super.didUpdateWidget(old);
+    // Saved elsewhere, or put back after a failed save: show it unless it's being edited.
+    if (widget.value != old.value && !_focus.hasFocus) _text.text = widget.value ?? '';
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final path = _text.text.trim();
+    final next = path.isEmpty ? null : (path.startsWith('/') ? path : '/$path');
+    if (next != widget.value) widget.onSave(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return TextField(
+      controller: _text,
+      focusNode: _focus,
+      onSubmitted: (_) => _save(),
+      decoration: InputDecoration(
+        labelText: l.viewGrafanaPage,
+        hintText: widget.deploymentPath,
+        helperText: l.viewGrafanaPageHelp,
+      ),
     );
   }
 }

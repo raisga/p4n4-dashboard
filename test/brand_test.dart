@@ -9,6 +9,7 @@ import 'package:p4n4_dashboard/core/brand.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
+import 'package:p4n4_dashboard/widgets/common.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
@@ -95,6 +96,99 @@ void main() {
     expect(brand.displayFont, 'Plus Jakarta Sans');
     expect(brand.tabs, DashTab.defaults);
     expect(brand.logo, isNull);
+    expect(brand.logoFor(dark: true), isNull);
+  });
+
+  test('one logo serves both modes', () {
+    final brand = Brand.fromJson(_minimal({'logo': 'logo.png'}));
+    expect(brand.logoFor(dark: false), 'assets/brand/logo.png');
+    expect(brand.logoFor(dark: true), 'assets/brand/logo.png');
+  });
+
+  test('a logo per mode', () {
+    final brand = Brand.fromJson(
+      _minimal({
+        'logo': {'light': 'logo-light.png', 'dark': 'logo.png'},
+      }),
+    );
+    expect(brand.logoFor(dark: false), 'assets/brand/logo-light.png');
+    expect(brand.logoFor(dark: true), 'assets/brand/logo.png');
+  });
+
+  testWidgets('the wordmark shows the logo for the current mode', (tester) async {
+    final brand = Brand.fromJson(
+      _minimal({
+        'logo': {'light': 'logo-light.png', 'dark': 'logo.png'},
+      }),
+    );
+    for (final (colors, asset) in [(P4Colors.light, 'logo-light.png'), (P4Colors.dark, 'logo.png')]) {
+      await tester.pumpWidget(
+        DefaultAssetBundle(
+          bundle: _PixelBundle(),
+          child: BrandScope(
+            brand: brand,
+            child: MaterialApp(theme: buildTheme(colors), home: const Wordmark()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(); // the theme animates from the previous mode
+      final image = tester.widget<Image>(find.byType(Image)).image as AssetImage;
+      expect(image.assetName, 'assets/brand/$asset');
+    }
+  });
+
+  test('the vision overlay\'s look: the dashboard\'s, or the brand\'s', () {
+    final plain = Brand.fromJson(_minimal());
+    expect(plain.vision.people, isNull);
+    expect(plain.vision.objects, isEmpty);
+    expect([plain.vision.showObjects, plain.vision.showTags, plain.vision.showKey], [true, true, true]);
+
+    final styled = Brand.fromJson(
+      _minimal({
+        'video': {
+          'overlay': {
+            'people': '#FFFFFF',
+            'objects': {'tops': '#7FD8BE'},
+            'showTags': false,
+          },
+        },
+      }),
+    );
+    expect(styled.vision.people, const Color(0xFFFFFFFF));
+    expect(styled.vision.objects, {'tops': const Color(0xFF7FD8BE)});
+    expect([styled.vision.showObjects, styled.vision.showTags, styled.vision.showKey], [true, false, true]);
+
+    for (final bad in <Object>[
+      'cyan',
+      {'people': 'cyan'},
+      {'people': 7},
+      {'objects': '#FFFFFF'},
+      {
+        'objects': {'tops': 3},
+      },
+      {'showKey': 'no'},
+    ]) {
+      expect(
+        () => Brand.fromJson(
+          _minimal({
+            'video': {'overlay': bad},
+          }),
+        ),
+        throwsFormatException,
+        reason: '$bad',
+      );
+    }
+  });
+
+  test('a logo object needs both modes', () {
+    expect(
+      () => Brand.fromJson(
+        _minimal({
+          'logo': {'dark': 'logo.png'},
+        }),
+      ),
+      throwsFormatException,
+    );
   });
 
   test('tabs keep the default order', () {
@@ -241,4 +335,16 @@ void main() {
     final settings = await AppSettings.load(defaults: {'edgeDemo': 'yes'}, secrets: MemorySecretStore());
     expect(() => settings.edgeDemo, throwsFormatException);
   });
+}
+
+/// Serves a 1×1 transparent PNG for every asset but the manifest, since only
+/// the applied brand's files are in the test asset bundle.
+class _PixelBundle extends CachingAssetBundle {
+  static final _png = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  );
+
+  @override
+  Future<ByteData> load(String key) async =>
+      key.startsWith('AssetManifest') ? rootBundle.load(key) : ByteData.sublistView(_png);
 }

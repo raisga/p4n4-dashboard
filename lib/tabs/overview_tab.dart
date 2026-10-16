@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api/edge_metrics.dart';
 import '../api/project.dart';
 import '../api/services.dart';
+import '../api/view_settings.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
 import '../core/format.dart';
@@ -115,9 +116,16 @@ class _OverviewTabState extends State<OverviewTab> {
     super.dispose();
   }
 
-  /// Edge readings, when both the brand and the connected project have the Edge tab.
+  /// The cards an admin left on for this view (Settings → Views).
+  bool _shows(HomeCard card) =>
+      SettingsScope.of(context).prefsFor(SessionScope.of(context).role ?? Role.normie).showsCard(card);
+
+  /// Edge readings, when both the brand and the connected project have the
+  /// Edge tab, and the view shows them.
   bool get _showsDevice =>
-      BrandScope.of(context).tabs.contains(DashTab.edge) && SettingsScope.of(context).projectAllows(DashTab.edge);
+      BrandScope.of(context).tabs.contains(DashTab.edge) &&
+      SettingsScope.of(context).projectAllows(DashTab.edge) &&
+      _shows(HomeCard.device);
 
   Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics(), _fetchHome()).wait;
 
@@ -168,10 +176,9 @@ class _OverviewTabState extends State<OverviewTab> {
           subtitle: checkedAt == null ? null : l.summaryUpdated(context.formats.clock(checkedAt)),
           trailing: RefreshButton(busy: _loading, onPressed: _refresh),
         ),
-        const SizedBox(height: 24),
-        _summary(),
+        if (_shows(HomeCard.status)) ...[const SizedBox(height: 24), _summary()],
         if (_showsDevice) ...[const SizedBox(height: 16), _device()],
-        if (_home case final home?) ...[
+        if (_home case final home? when _shows(HomeCard.page)) ...[
           const SizedBox(height: 16),
           MarkdownPanel(
             home,

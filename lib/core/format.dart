@@ -62,6 +62,9 @@ class Formats {
     (null, false) => DateFormat.jm(locale),
     (null, true) => DateFormat.jms(locale),
   }.format(t);
+
+  /// [t]'s date and time of day, e.g. `Oct 15, 2026 2:05 PM`.
+  String dateTime(DateTime t) => '${DateFormat.yMMMd(locale).format(t)} ${clock(t)}';
 }
 
 extension FormatsContext on BuildContext {

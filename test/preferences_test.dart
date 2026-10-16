@@ -20,6 +20,19 @@ Future<AppSettings> _load(Map<String, Object> prefs, {Map<String, Object> defaul
 }
 
 void main() {
+  group('the Video tab\'s view', () {
+    test('opens on every camera unless the brand or the user says otherwise; app-wide', () async {
+      final s = await _load({});
+      expect(s.videoGrid, isTrue);
+      expect((await _load({}, defaults: {'videoGrid': false})).videoGrid, isFalse);
+      s.videoGrid = false;
+      final site = Deployment(id: s.newDeploymentId(), name: 'Site', values: {'host': '10.0.0.2'});
+      await s.saveDeployment(site);
+      await s.connect(site.id);
+      expect(s.videoGrid, isFalse);
+    });
+  });
+
   group('accessibility and region settings', () {
     test('start from the defaults and are remembered', () async {
       final s = await _load({});

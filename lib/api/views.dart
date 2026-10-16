@@ -28,6 +28,13 @@ class DashboardViews {
 
   Map<String, Object?> toJson() => {'tab_order': tabOrder, 'power_tabs': powerTabs, 'normie_tabs': normieTabs};
 
+  // Re-read every minute: the same views again don't rebuild the app.
+  @override
+  bool operator ==(Object other) => other is DashboardViews && jsonEncode(other.toJson()) == jsonEncode(toJson());
+
+  @override
+  int get hashCode => jsonEncode(toJson()).hashCode;
+
   static List<String>? _names(Object? v) => v is List ? [...v.whereType<String>()] : null;
 }
 
@@ -85,10 +92,15 @@ Future<DashboardViews> loadViews(AppSettings settings, Uri api) async {
   }
 }
 
-/// Keeps [AppSettings.views] in step with the connected deployment.
+/// Keeps [AppSettings.views] in step with the connected deployment, asking
+/// again every [every] so an admin's change reaches a wall tablet nobody touches.
 class ViewsWatcher extends ApiWatcher<DashboardViews> {
-  ViewsWatcher(super.settings, {Future<DashboardViews> Function(Uri api)? fetch, super.retry})
-    : super(fetch: fetch ?? ((api) => loadViews(settings, api)), apply: (v) => settings.views = v);
+  ViewsWatcher(
+    super.settings, {
+    Future<DashboardViews> Function(Uri api)? fetch,
+    super.retry,
+    super.every = const Duration(minutes: 1),
+  }) : super(fetch: fetch ?? ((api) => loadViews(settings, api)), apply: (v) => settings.views = v);
 }
 
 Map<String, dynamic> _body(http.Response res) {

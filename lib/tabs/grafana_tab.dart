@@ -6,6 +6,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../demo/demo.dart';
+import '../demo/demo_charts.dart';
 import '../l10n/l10n.dart';
 import '../platform/html_view.dart';
 import '../widgets/common.dart';
@@ -66,12 +68,18 @@ class _GrafanaTabState extends State<GrafanaTab> {
       ..loadRequest(uri);
   }
 
-  Uri get _uri => themedGrafanaUri(SettingsScope.of(context).grafanaUri, Theme.of(context).brightness);
+  /// The view's own page, if an admin set one (Settings → Views).
+  Uri get _uri => themedGrafanaUri(
+    SettingsScope.of(context).grafanaUriFor(SessionScope.of(context).role ?? Role.normie),
+    Theme.of(context).brightness,
+  );
 
   Future<void> _openExternal(Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
 
   @override
   Widget build(BuildContext context) {
+    // The demo build has no Grafana: it draws the project's charts itself.
+    if (demoMode) return const DemoChartsTab();
     final uri = _uri;
     final technical = SessionScope.of(context).isTechnical;
     final l = context.l10n;

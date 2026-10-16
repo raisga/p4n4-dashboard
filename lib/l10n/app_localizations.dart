@@ -1251,12 +1251,6 @@ abstract class AppLocalizations {
   /// **'AI stack'**
   String get stackAi;
 
-  /// No description provided for @stackEdge.
-  ///
-  /// In en, this message translates to:
-  /// **'Edge stack'**
-  String get stackEdge;
-
   /// No description provided for @stackApi.
   ///
   /// In en, this message translates to:
@@ -1500,8 +1494,8 @@ abstract class AppLocalizations {
   /// Left end of a two-minute sparkline
   ///
   /// In en, this message translates to:
-  /// **'2 min ago'**
-  String get sparkStart;
+  /// **'{minutes} min ago'**
+  String sparkStart(int minutes);
 
   /// Right end of a sparkline
   ///
@@ -1989,6 +1983,144 @@ abstract class AppLocalizations {
   /// **'Demo cameras'**
   String get videoDemoSwitch;
 
+  /// Settings → Appearance → Video: whether the Video tab opens on every camera in a grid rather than one
+  ///
+  /// In en, this message translates to:
+  /// **'Open on all cameras'**
+  String get videoGridDefault;
+
+  /// No description provided for @alertSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert sound'**
+  String get alertSound;
+
+  /// No description provided for @alertDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss alert'**
+  String get alertDismiss;
+
+  /// A person, in the key to the colours of the vision overlay's boxes
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get visionPerson;
+
+  /// No description provided for @visionPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No one in view} =1{1 person} other{{count} people}}'**
+  String visionPeople(int count);
+
+  /// No description provided for @sectionChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Chats'**
+  String get sectionChats;
+
+  /// No description provided for @chatsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Chats linked to the project\'s bot get its alerts as they happen, and can ask it about the project. In a linked group, everyone can.'**
+  String get chatsNote;
+
+  /// No description provided for @chatsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link a chat'**
+  String get chatsLink;
+
+  /// No description provided for @chatsLinkHow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the link on the phone that will use the bot, or send this command to {bot}. For a group, add the bot to the group first, then send the command there.'**
+  String chatsLinkHow(String bot);
+
+  /// No description provided for @chatsTheBot.
+  ///
+  /// In en, this message translates to:
+  /// **'the bot'**
+  String get chatsTheBot;
+
+  /// No description provided for @chatsCodeExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Works once, until {time}.'**
+  String chatsCodeExpires(String time);
+
+  /// No description provided for @chatsCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get chatsCopyLink;
+
+  /// No description provided for @chatsCopyCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy command'**
+  String get chatsCopyCommand;
+
+  /// No description provided for @chatsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No chats linked yet.'**
+  String get chatsNone;
+
+  /// No description provided for @chatsLinkedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked {date} by {who}'**
+  String chatsLinkedBy(String date, String who);
+
+  /// No description provided for @chatsLinkedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked {date}'**
+  String chatsLinkedOn(String date);
+
+  /// No description provided for @chatsMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted: {codes}'**
+  String chatsMuted(String codes);
+
+  /// No description provided for @chatsUnlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink'**
+  String get chatsUnlink;
+
+  /// No description provided for @chatsUnlinkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink {name}?'**
+  String chatsUnlinkTitle(String name);
+
+  /// No description provided for @chatsUnlinkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It stops getting alerts, and the bot stops answering it. The chat is told.'**
+  String get chatsUnlinkBody;
+
+  /// No description provided for @chatsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the chats: {error}'**
+  String chatsLoadFailed(String error);
+
+  /// No description provided for @chatsMock.
+  ///
+  /// In en, this message translates to:
+  /// **'Mock mode: the bot logs its messages instead of sending them.'**
+  String get chatsMock;
+
+  /// No description provided for @chatsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: the bot has no token.'**
+  String get chatsOff;
+
   /// No description provided for @useDemoCameras.
   ///
   /// In en, this message translates to:
@@ -2342,6 +2474,432 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismissed'**
   String get feedStatusDismissed;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @changePasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signs you out on your other devices'**
+  String get changePasswordSubtitle;
+
+  /// No description provided for @changePasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new password'**
+  String get changePasswordTitle;
+
+  /// No description provided for @changePasswordBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An admin asks you to choose your own password before you continue.'**
+  String get changePasswordBody;
+
+  /// No description provided for @fieldCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get fieldCurrentPassword;
+
+  /// No description provided for @fieldNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get fieldNewPassword;
+
+  /// No description provided for @fieldRepeatPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat new password'**
+  String get fieldRepeatPassword;
+
+  /// No description provided for @passwordsDontMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords don\'t match'**
+  String get passwordsDontMatch;
+
+  /// No description provided for @passwordCurrentWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The current password is wrong'**
+  String get passwordCurrentWrong;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed'**
+  String get passwordChanged;
+
+  /// No description provided for @signOutUserTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out everywhere'**
+  String get signOutUserTooltip;
+
+  /// No description provided for @signOutUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign {user} out everywhere?'**
+  String signOutUserTitle(String user);
+
+  /// No description provided for @signOutUserBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They\'ll have to sign in again on every device. Their password stays the same.'**
+  String get signOutUserBody;
+
+  /// No description provided for @signOutSelfBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll have to sign in again here and on your other devices. Your password stays the same.'**
+  String get signOutSelfBody;
+
+  /// No description provided for @userLastSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Last signed in {when}'**
+  String userLastSignIn(String when);
+
+  /// No description provided for @userNeverSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Never signed in'**
+  String get userNeverSignedIn;
+
+  /// No description provided for @userMustChangePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Must choose a new password'**
+  String get userMustChangePassword;
+
+  /// No description provided for @mustChangeAtFirstSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose their own password at first sign-in'**
+  String get mustChangeAtFirstSignIn;
+
+  /// No description provided for @mustChangeAtNextSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new password at next sign-in'**
+  String get mustChangeAtNextSignIn;
+
+  /// No description provided for @sectionAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit log'**
+  String get sectionAudit;
+
+  /// No description provided for @auditNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Who changed what on this deployment, newest first'**
+  String get auditNote;
+
+  /// No description provided for @auditCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 change} other{{count} changes}}, newest first'**
+  String auditCount(int count);
+
+  /// No description provided for @auditEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed yet'**
+  String get auditEmpty;
+
+  /// No description provided for @auditLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the audit log: {error}'**
+  String auditLoadFailed(String error);
+
+  /// No description provided for @auditLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get auditLoadMore;
+
+  /// No description provided for @sectionBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Banner'**
+  String get sectionBanner;
+
+  /// No description provided for @bannerNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No banner'**
+  String get bannerNone;
+
+  /// No description provided for @bannerShowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing on every device until you clear it'**
+  String get bannerShowing;
+
+  /// No description provided for @bannerShowingUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing on every device until {when}'**
+  String bannerShowingUntil(String when);
+
+  /// No description provided for @bannerText.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get bannerText;
+
+  /// No description provided for @bannerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance today 3–4 pm'**
+  String get bannerHint;
+
+  /// No description provided for @bannerInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get bannerInfo;
+
+  /// No description provided for @bannerWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get bannerWarning;
+
+  /// No description provided for @bannerUntilCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Until cleared'**
+  String get bannerUntilCleared;
+
+  /// No description provided for @bannerForHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{For 1 hour} other{For {hours} hours}}'**
+  String bannerForHours(int hours);
+
+  /// No description provided for @bannerClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get bannerClear;
+
+  /// No description provided for @bannerShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get bannerShow;
+
+  /// No description provided for @viewStartTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens on'**
+  String get viewStartTab;
+
+  /// No description provided for @viewHomeCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Home shows'**
+  String get viewHomeCards;
+
+  /// No description provided for @homeCardStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get homeCardStatus;
+
+  /// No description provided for @homeCardDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device readings'**
+  String get homeCardDevice;
+
+  /// No description provided for @homeCardPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Project page'**
+  String get homeCardPage;
+
+  /// No description provided for @viewGrafanaPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Grafana page'**
+  String get viewGrafanaPage;
+
+  /// No description provided for @viewGrafanaPageHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty: the deployment\'s page'**
+  String get viewGrafanaPageHelp;
+
+  /// No description provided for @viewCameras.
+  ///
+  /// In en, this message translates to:
+  /// **'Cameras'**
+  String get viewCameras;
+
+  /// No description provided for @viewCameraOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Vision overlay'**
+  String get viewCameraOverlay;
+
+  /// No description provided for @viewAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts that pop up'**
+  String get viewAlerts;
+
+  /// No description provided for @alertsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get alertsAll;
+
+  /// No description provided for @alertsReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Only those to review'**
+  String get alertsReview;
+
+  /// No description provided for @alertsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get alertsOff;
+
+  /// No description provided for @viewAlertSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Chime for alerts to review'**
+  String get viewAlertSound;
+
+  /// No description provided for @sectionDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get sectionDevice;
+
+  /// No description provided for @deviceKiosk.
+  ///
+  /// In en, this message translates to:
+  /// **'Kiosk mode'**
+  String get deviceKiosk;
+
+  /// No description provided for @kioskModeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Locks this device to a viewer account: no sign-out or settings, and it starts over when nobody uses it'**
+  String get kioskModeHelp;
+
+  /// No description provided for @kioskNeedsAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs sign-in with p4n4-api accounts'**
+  String get kioskNeedsAccounts;
+
+  /// No description provided for @kioskIdleReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over when idle'**
+  String get kioskIdleReset;
+
+  /// No description provided for @idleSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign admins and power users out when idle'**
+  String get idleSignOut;
+
+  /// No description provided for @idleNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get idleNever;
+
+  /// No description provided for @idleAfterMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{After 1 minute} other{After {count} minutes}}'**
+  String idleAfterMinutes(int count);
+
+  /// No description provided for @startKioskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on kiosk mode'**
+  String get startKioskTitle;
+
+  /// No description provided for @startKioskBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign this device in with a viewer account. People here can\'t sign out or change settings, and it starts over when nobody uses it.'**
+  String get startKioskBody;
+
+  /// No description provided for @kioskTurnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get kioskTurnOn;
+
+  /// No description provided for @leaveKiosk.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave kiosk mode'**
+  String get leaveKiosk;
+
+  /// No description provided for @leaveKioskBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with an admin account. This device then stays signed in as that admin.'**
+  String get leaveKioskBody;
+
+  /// No description provided for @kioskNeedsViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s not a viewer account.'**
+  String get kioskNeedsViewer;
+
+  /// No description provided for @kioskNeedsAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s not an admin account.'**
+  String get kioskNeedsAdmin;
+
+  /// No description provided for @startTabDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get startTabDefault;
+
+  /// No description provided for @chartHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart history'**
+  String get chartHistory;
+
+  /// No description provided for @minutesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String minutesCount(int count);
+
+  /// No description provided for @defaultCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Default camera'**
+  String get defaultCamera;
+
+  /// No description provided for @defaultCameraFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'The first one'**
+  String get defaultCameraFirst;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

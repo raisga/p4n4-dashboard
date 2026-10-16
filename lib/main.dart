@@ -6,17 +6,28 @@ import 'package:flutter_intro/flutter_intro.dart' show Intro;
 import 'package:http/http.dart' as http;
 
 import 'api/auth.dart';
+import 'api/banner.dart';
+import 'api/feed.dart';
 import 'api/project.dart';
 import 'api/status_monitor.dart';
+import 'api/view_settings.dart';
 import 'api/views.dart';
+import 'api/vision.dart';
+import 'api/vision_live.dart';
+import 'api/vision_recorded.dart';
+import 'core/alerts.dart';
 import 'core/brand.dart';
 import 'core/chat_history.dart';
 import 'core/runtime_config.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
 import 'core/theme.dart';
+import 'demo/demo.dart';
+import 'demo/demo_client.dart';
 import 'l10n/l10n.dart';
+import 'pages/kiosk_dialogs.dart';
 import 'pages/login_page.dart';
+import 'pages/password_page.dart';
 import 'platform/http_client.dart';
 import 'pages/settings_page.dart';
 import 'tabs/agent_tab.dart';
@@ -27,34 +38,48 @@ import 'tabs/grafana_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/services_tab.dart';
 import 'tabs/video_tab.dart';
+import 'widgets/alert_toasts.dart';
 import 'widgets/common.dart';
+import 'widgets/idle.dart';
 import 'widgets/tour.dart';
 
 Future<void> main() async {
   final credentials = _SessionCredentials();
+  final demoApi = demoMode ? DemoApi(newHttpClient()) : null;
   // Every request goes through AuthClient, which adds the signed-in user's
   // token to the connected deployment's p4n4-api calls (lib/api/auth.dart).
-  await http.runWithClient(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    final brand = await Brand.load()
-      ..registerFontLicenses();
-    // Lowest priority first: brand < config.json (web) < what the user saved.
-    final runtime = kIsWeb ? await loadRuntimeDefaults(Uri.base) : const <String, Object>{};
-    final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime});
-    final session = credentials.session = await Session.load(settings);
-    // Both live as long as the app.
-    ProjectWatcher(settings);
-    ViewsWatcher(settings);
-    runApp(
-      BrandScope(
-        brand: brand,
-        child: SettingsScope(
-          settings: settings,
-          child: SessionScope(session: session, child: const DashboardApp()),
+  await http.runWithClient(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      final brand = await Brand.load()
+        ..registerFontLicenses();
+      // Lowest priority first: brand < config.json (web) < what the user saved.
+      final runtime = kIsWeb ? await loadRuntimeDefaults(Uri.base) : const <String, Object>{};
+      final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime});
+      final session = credentials.session = await Session.load(settings);
+      // Both live as long as the app.
+      ProjectWatcher(settings);
+      ViewsWatcher(settings);
+      ViewSettingsWatcher(settings);
+      BannerWatcher(settings);
+      VisionWatcher(settings);
+      runApp(
+        BrandScope(
+          brand: brand,
+          child: SettingsScope(
+            settings: settings,
+            child: SessionScope(session: session, child: const DashboardApp()),
+          ),
         ),
-      ),
-    );
-  }, () => AuthClient(newHttpClient(), credentials, viaProxy: (url) => kIsWeb && viaPageProxy(url)));
+      );
+    },
+    // The demo build plays p4n4-api itself (lib/demo/).
+    () => AuthClient(
+      demoApi == null ? newHttpClient() : DemoClient(newHttpClient(), demoApi),
+      credentials,
+      viaProxy: (url) => kIsWeb && viaPageProxy(url),
+    ),
+  );
 }
 
 /// The session once it's loaded: requests made before that (config.json, the
@@ -80,6 +105,38 @@ class _DashboardAppState extends State<DashboardApp> {
   /// Above the navigator, so pushed screens (e.g. Clients on phones) share it.
   final _status = StatusMonitor();
 
+  /// To close whatever is open over the shell (Settings, a dialog) when idle.
+  final _navigator = GlobalKey<NavigatorState>();
+
+  /// Bumped by each kiosk reset: a new shell starts on its first tab, with
+  /// nothing scrolled, typed or open.
+  var _resets = 0;
+
+  /// What an idle spell does on this device: signs an admin or power user
+  /// out (Settings → This device), or takes a kiosk back to where it starts.
+  (Duration?, VoidCallback?) _idle(AppSettings settings, Session session) {
+    Duration? minutes(int m) => m > 0 ? Duration(minutes: m) : null;
+    return switch (session.signedInRole) {
+      Role.admin || Role.power => (minutes(settings.idleSignOut), () => _signOutIdle(session)),
+      Role.normie when session.kioskLocked => (minutes(settings.kioskIdleReset), () => _resetKiosk(settings, session)),
+      _ => (null, null),
+    };
+  }
+
+  void _signOutIdle(Session session) {
+    _navigator.currentState?.popUntil((r) => r.isFirst);
+    unawaited(session.signOut());
+  }
+
+  /// The next person finds the kiosk as the admin left it: on its start tab,
+  /// without the last conversation, with the kiosk's own text size.
+  void _resetKiosk(AppSettings settings, Session session) {
+    _navigator.currentState?.popUntil((r) => r.isFirst);
+    settings.restoreKioskAccessibility();
+    unawaited(settings.setChatOf(settings.deployment, session.username ?? Role.normie.name, const []));
+    setState(() => _resets++);
+  }
+
   @override
   void dispose() {
     _status.dispose();
@@ -89,14 +146,17 @@ class _DashboardAppState extends State<DashboardApp> {
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
-    final role = SessionScope.of(context).role;
+    final session = SessionScope.of(context);
+    final role = session.role;
     final settings = SettingsScope.of(context);
     // Settings → Accessibility adds to the device's own settings, never takes away from them.
     final device = MediaQuery.of(context);
     final reduceMotion = settings.reduceMotion || device.disableAnimations;
     final highContrast = settings.highContrast || device.highContrast;
     ThemeData theme(P4Colors c) => buildTheme(highContrast ? c.contrasted : c, reduceMotion: reduceMotion);
+    final (idleAfter, onIdle) = _idle(settings, session);
     final app = MaterialApp(
+      navigatorKey: _navigator,
       title: brand.appName,
       debugShowCheckedModeBanner: false,
       theme: theme(brand.light),
@@ -107,8 +167,12 @@ class _DashboardAppState extends State<DashboardApp> {
       locale: settings.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appLocales,
-      // Keyed by role so switching views starts from a fresh shell.
-      home: role == null ? const LoginPage() : HomeShell(key: ValueKey(role)),
+      // Keyed by role so switching views starts from a fresh shell; a kiosk reset does too.
+      home: switch (role) {
+        null => const LoginPage(),
+        _ when session.passwordChangeRequired => const ChangePasswordPage(),
+        final role => HomeShell(key: ValueKey((role, _resets))),
+      },
     );
     // MaterialApp takes these from the MediaQuery above it (see MediaQuery.fromView's platformData).
     return StatusScope(
@@ -119,7 +183,11 @@ class _DashboardAppState extends State<DashboardApp> {
           disableAnimations: reduceMotion,
           highContrast: highContrast,
         ),
-        child: TourHost(child: app),
+        child: IdleWatcher(
+          timeout: idleAfter,
+          onIdle: onIdle,
+          child: TourHost(child: app),
+        ),
       ),
     );
   }
@@ -230,6 +298,34 @@ class _HomeShellState extends State<HomeShell> {
   ChatHistory? _chat;
   String? _chatId;
 
+  /// Alerts shown as toasts over every tab: from the cameras (the vision
+  /// overlay) and from the feed.
+  late final _alerts = AlertCenter(
+    // This device's chime setting, and the view's (Settings → Views).
+    sound: () => SettingsScope.of(context).alertSound && _prefs.chime,
+    accept: (n) => switch (_prefs.alertLevel) {
+      AlertLevel.all => true,
+      AlertLevel.review => n.tone == VisionTone.review,
+      AlertLevel.off => false,
+    },
+  );
+
+  /// What an admin set for this view (Settings → Views).
+  ViewPrefs get _prefs => SettingsScope.of(context).prefsFor(SessionScope.of(context).role ?? Role.normie);
+
+  /// A camera for the Video tab to show, when an alert's toast is tapped.
+  final _videoFocus = ValueNotifier<String?>(null);
+
+  /// The project's live detections, while it streams any.
+  LiveVision? _live;
+
+  /// The measured demo clips' behaviours, on their own clocks; their videos
+  /// keep in step with them when the Video tab shows them.
+  RecordedVision? _recorded;
+
+  /// New feed alerts, while this view has the Feed tab.
+  FeedAlertWatcher? _feedAlerts;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -243,6 +339,61 @@ class _HomeShellState extends State<HomeShell> {
       _chat = ChatHistory(settings, settings.deployment, who);
       _chatId = id;
     }
+    _followAlerts(settings, session);
+  }
+
+  /// Keeps the live stream and the feed watcher in step with the deployment.
+  void _followAlerts(AppSettings settings, Session session) {
+    final vision = settings.vision;
+    final liveUri = vision?.live?.on(settings.host);
+    if (liveUri != _live?.uri) {
+      _live?.dispose();
+      _live = liveUri == null
+          ? null
+          : LiveVision(liveUri, onVerdict: (camera, behavior) => _visionAlert(settings, camera, behavior));
+    }
+    final role = session.role;
+    final brand = BrandScope.of(context);
+    final screens = role == null ? const <Screen>[] : screensFor(role, brand, settings);
+    // Alerts from the clips' recordings, for whoever can open their cameras.
+    (_recorded ??= RecordedVision(
+      onVerdict: (camera, behavior) => _visionAlert(settings, camera.id, behavior, name: camera.name, from: 'clip'),
+    )).follow(screens.contains(Screen.video) ? videoCameras(settings, brand, view: role!) : const [], vision);
+    final api = screens.contains(Screen.feed) ? settings.apiUri : null;
+    if (api != _feedAlerts?.api.api) {
+      _feedAlerts?.dispose();
+      _feedAlerts = api == null ? null : FeedAlertWatcher(FeedApi(api), _alerts);
+    }
+  }
+
+  /// A verdict that asks for an alert raises it, whichever tab is open: one
+  /// from the live stream, or [from] a measured clip, on camera [name].
+  void _visionAlert(
+    AppSettings settings,
+    String camera,
+    VisionBehavior behavior, {
+    String? name,
+    String from = 'live',
+  }) {
+    final bundle = settings.vision;
+    if (bundle == null || !mounted) return;
+    final zones = behavior.zone != null ? [behavior.zone!] : bundle.camera(camera)?.zones ?? const <String>[];
+    final rule = bundle.alertFor(behavior.behavior, zones);
+    if (rule == null) return;
+    final lang = context.l10n.localeName;
+    name ??= settings.cameras.where((c) => c.id == camera).firstOrNull?.name ?? camera;
+    _alerts.raise(
+      AlertNotice(
+        id: '$from:$camera:${behavior.key ?? DateTime.now().microsecondsSinceEpoch}',
+        title: rule.titleIn(lang),
+        tone: rule.tone,
+        code: rule.code,
+        where: '$name · ${bundle.behaviorLabel(behavior.behavior, lang)}',
+        detail: rule.suggestionIn(lang),
+        camera: camera,
+      ),
+      key: '$camera|${rule.code}',
+    );
   }
 
   @override
@@ -251,6 +402,11 @@ class _HomeShellState extends State<HomeShell> {
     if (_tourGroup != null && _intro.status.isOpen) _intro.dispose();
     _ask.dispose();
     _chat?.dispose();
+    _live?.dispose();
+    _recorded?.dispose();
+    _feedAlerts?.dispose();
+    _alerts.dispose();
+    _videoFocus.dispose();
     super.dispose();
   }
 
@@ -289,7 +445,7 @@ class _HomeShellState extends State<HomeShell> {
     Screen.edge => EdgeTab(active: active),
     Screen.agent => AgentTab(history: _chat!, ask: _ask),
     Screen.grafana => const GrafanaTab(),
-    Screen.video => VideoTab(active: active),
+    Screen.video => VideoTab(active: active, live: _live, recorded: _recorded, focus: _videoFocus),
     Screen.feed => FeedTab(active: active),
   };
 
@@ -302,7 +458,10 @@ class _HomeShellState extends State<HomeShell> {
     final role = session.role!;
     final all = screensFor(role, brand, settings);
     final wide = MediaQuery.sizeOf(context).width >= 800;
-    final current = all.contains(_selected) ? _selected! : Screen.home;
+    final current = all.contains(_selected)
+        ? _selected!
+        // Admins and power users can pick their own (Settings → Appearance).
+        : _start([if (role.technical) settings.myStartTab, ?settings.prefsFor(role).startTab], all);
     // A phone bottom bar fits five destinations; the rest open from the app
     // bar, the open one taking the bar's last place.
     final screens = wide || all.length <= 5 ? all : [...all.take(4), all.indexOf(current) >= 4 ? current : all[4]];
@@ -310,6 +469,22 @@ class _HomeShellState extends State<HomeShell> {
     final index = screens.indexOf(current);
     void select(int i) => setState(() => _selected = screens[i]);
     void open(Screen s) => setState(() => _selected = s);
+    // An alert's toast opens its camera, else the feed it came from.
+    // A feed alert names the edge's camera, which the Cameras tab may not
+    // have (the Jetson's `cam-salon-01`): then it opens the feed.
+    void openAlert(AlertNotice n) {
+      final camera = all.contains(Screen.video)
+          ? alertCamera(n.camera, videoCameras(settings, brand, view: role))
+          : null;
+      if (camera != null) {
+        _videoFocus.value = camera;
+        open(Screen.video);
+      } else if (n.fromFeed && all.contains(Screen.feed)) {
+        open(Screen.feed);
+      } else if (n.camera != null && all.contains(Screen.video)) {
+        open(Screen.video);
+      }
+    }
 
     // Navigation needs at least two destinations; a single-screen view gets none.
     final nav = screens.length > 1;
@@ -317,7 +492,9 @@ class _HomeShellState extends State<HomeShell> {
     // Normies get a tour of the shell the first time they sign in on a device
     // (not admins previewing their view). Its steps depend on [nav], so each
     // layout is a group of its own.
-    final tour = session.signedInRole == Role.normie;
+    final tour = session.signedInRole == Role.normie && !session.kioskLocked;
+    // A kiosk keeps its theme and its sign-in: only an admin leaves it.
+    final kiosk = session.kioskLocked;
     final tourSteps = [
       TourStep.welcome,
       if (nav) TourStep.navigation,
@@ -334,10 +511,20 @@ class _HomeShellState extends State<HomeShell> {
     Widget target(TourStep step, Widget child) =>
         tour ? TourTarget(group: tourGroup, step: step, steps: tourSteps, child: child) : child;
     // IndexedStack keeps every tab alive, the bar's or not; polling tabs pause via `active`.
-    final body = IndexedStack(
+    final tabs = IndexedStack(
       key: _tabs,
       index: all.indexOf(current),
       children: [for (final s in all) KeyedSubtree(key: ValueKey(s), child: _page(s, s == current, all, open))],
+    );
+    final body = AlertScope(
+      center: _alerts,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          tabs,
+          AlertToasts(center: _alerts, onOpen: openAlert),
+        ],
+      ),
     );
 
     return Scaffold(
@@ -356,7 +543,14 @@ class _HomeShellState extends State<HomeShell> {
               icon: Icon(_dests[s]!.icon, color: p4.muted),
               onPressed: () => open(s),
             ),
-          target(TourStep.theme, _ThemeToggle(settings)),
+          if (kiosk)
+            IconButton(
+              tooltip: l.leaveKiosk,
+              icon: Icon(Icons.lock_outline, color: p4.muted),
+              onPressed: () => showLeaveKioskDialog(context),
+            )
+          else
+            target(TourStep.theme, _ThemeToggle(settings)),
           target(
             TourStep.settings,
             IconButton(
@@ -365,19 +559,21 @@ class _HomeShellState extends State<HomeShell> {
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage())),
             ),
           ),
-          target(
-            TourStep.signOut,
-            IconButton(
-              tooltip: l.signOutTooltip,
-              icon: Icon(Icons.logout, color: p4.muted),
-              onPressed: session.signOut,
+          if (!kiosk)
+            target(
+              TourStep.signOut,
+              IconButton(
+                tooltip: l.signOutTooltip,
+                icon: Icon(Icons.logout, color: p4.muted),
+                onPressed: session.signOut,
+              ),
             ),
-          ),
           const SizedBox(width: 8),
         ],
       ),
-      body: _withPreviewBanner(
+      body: _withBanners(
         session,
+        settings.banner,
         wide && nav
             ? Row(
                 children: [
@@ -421,16 +617,61 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// While an admin previews another view, a banner above it says so and leads back.
-Widget _withPreviewBanner(Session session, Widget body) => switch (session.preview) {
-  null => body,
-  final view => Column(
+/// The first of [names] (tab names, most wanted first) that this view has; else Home.
+Screen _start(List<String> names, List<Screen> all) =>
+    names.map((n) => Screen.values.asNameMap()[n]).nonNulls.where(all.contains).firstOrNull ?? Screen.home;
+
+/// Above the tabs: the deployment's banner, if an admin put one up, and while
+/// an admin previews another view, a banner that says so and leads back.
+Widget _withBanners(Session session, DashboardBanner? banner, Widget body) {
+  final message = banner != null && banner.showsAt(DateTime.now()) ? banner : null;
+  final preview = session.preview;
+  if (message == null && preview == null) return body;
+  return Column(
     children: [
-      _PreviewBanner(view, onExit: () => session.preview = null),
+      if (message != null) _DeploymentBanner(message),
+      if (preview != null) _PreviewBanner(preview, onExit: () => session.preview = null),
       Expanded(child: body),
     ],
-  ),
-};
+  );
+}
+
+/// An admin's message to everyone on this deployment (Settings → Banner).
+class _DeploymentBanner extends StatelessWidget {
+  const _DeploymentBanner(this.banner);
+
+  final DashboardBanner banner;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    final (color, icon) = switch (banner.tone) {
+      BannerTone.info => (p4.blue, Icons.campaign_outlined),
+      BannerTone.warning => (p4.warn, Icons.warning_amber_rounded),
+    };
+    return Semantics(
+      liveRegion: true,
+      child: Material(
+        color: color.withValues(alpha: 0.15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  banner.text,
+                  style: p4.body(size: 15, color: p4.text, weight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _PreviewBanner extends StatelessWidget {
   const _PreviewBanner(this.view, {required this.onExit});

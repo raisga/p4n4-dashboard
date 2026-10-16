@@ -127,7 +127,8 @@ class RefreshButton extends StatelessWidget {
   }
 }
 
-/// Brand logo, or the text wordmark with its muted suffix.
+/// Brand logo (the one for the current light or dark mode), or the text
+/// wordmark with its muted suffix.
 class Wordmark extends StatelessWidget {
   const Wordmark({super.key, this.size = 20});
 
@@ -137,7 +138,9 @@ class Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     final p4 = context.p4;
     final brand = BrandScope.of(context);
-    if (brand.logo != null) return Image.asset(brand.logo!, height: size * 1.4, semanticLabel: brand.appName);
+    if (brand.logoFor(dark: p4.isDark) case final logo?) {
+      return Image.asset(logo, height: size * 1.4, semanticLabel: brand.appName);
+    }
     return Text.rich(
       TextSpan(
         style: p4.mono(size: size, color: p4.accent, weight: FontWeight.w700, spacing: -0.05),

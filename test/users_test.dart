@@ -85,4 +85,50 @@ void main() {
     expect(await error(_json({}, 403)), 'Only admins can manage users.');
     expect(await error(http.Response('', 204)), 'no error');
   });
+
+  test('reads last sign-in and whether a new password is owed', () async {
+    final users = await _withApi(
+      () => listUsers(_api),
+      (_) => _json([
+        {
+          'username': 'tablet',
+          'role': 'normie',
+          'created_at': '2026-01-01T00:00:00+00:00',
+          'last_login_at': '2026-10-15T08:30:00+00:00',
+          'must_change_password': true,
+        },
+        // From an API before either field
+        {'username': 'old', 'role': 'admin', 'created_at': '2026-01-01T00:00:00+00:00'},
+      ]),
+    );
+    expect(users.first.lastLoginAt!.isAtSameMomentAs(DateTime.utc(2026, 10, 15, 8, 30)), isTrue);
+    expect(users.first.lastLoginAt!.isUtc, isFalse, reason: 'shown in local time');
+    expect(users.first.mustChangePassword, isTrue);
+    expect((users.last.lastLoginAt, users.last.mustChangePassword), (null, false));
+  });
+
+  test('asks for a new password, and signs a user out everywhere', () async {
+    final sent = <(String, String, String)>[];
+    http.Response handler(http.Request r) {
+      sent.add((r.method, r.url.path, r.body));
+      if (r.url.path.endsWith('/sign-out')) return http.Response('', 204);
+      return _json({'username': 'bo', 'role': 'normie', 'created_at': 'x'}, r.method == 'POST' ? 201 : 200);
+    }
+
+    await _withApi(
+      () => createUser(_api, username: 'bo', password: 'long enough pw', view: Role.normie, mustChangePassword: true),
+      handler,
+    );
+    await _withApi(() => updateUser(_api, 'bo', password: 'another long pw', mustChangePassword: false), handler);
+    await _withApi(() => signOutUser(_api, 'bo'), handler);
+    expect(sent, [
+      (
+        'POST',
+        '/api/v1/users',
+        '{"username":"bo","password":"long enough pw","role":"normie","must_change_password":true}',
+      ),
+      ('PATCH', '/api/v1/users/bo', '{"password":"another long pw","must_change_password":false}'),
+      ('POST', '/api/v1/users/bo/sign-out', ''),
+    ]);
+  });
 }

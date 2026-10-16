@@ -665,9 +665,6 @@ class AppLocalizationsIt extends AppLocalizations {
   String get stackAi => 'Stack IA';
 
   @override
-  String get stackEdge => 'Stack Edge';
-
-  @override
   String get stackApi => 'Gateway API';
 
   @override
@@ -795,7 +792,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get factUptime => 'In funzione da';
 
   @override
-  String get sparkStart => '2 min fa';
+  String sparkStart(int minutes) {
+    return '$minutes min fa';
+  }
 
   @override
   String get sparkNow => 'Ora';
@@ -1069,6 +1068,99 @@ class AppLocalizationsIt extends AppLocalizations {
   String get videoDemoSwitch => 'Telecamere demo';
 
   @override
+  String get videoGridDefault => 'Apri su tutte le telecamere';
+
+  @override
+  String get alertSound => 'Suono degli avvisi';
+
+  @override
+  String get alertDismiss => 'Chiudi avviso';
+
+  @override
+  String get visionPerson => 'Persona';
+
+  @override
+  String visionPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count persone',
+      one: '1 persona',
+      zero: 'Nessuno in vista',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sectionChats => 'Chat';
+
+  @override
+  String get chatsNote =>
+      'Le chat collegate al bot del progetto ricevono i suoi avvisi non appena arrivano e possono fargli domande sul progetto. In un gruppo collegato, possono tutti.';
+
+  @override
+  String get chatsLink => 'Collega una chat';
+
+  @override
+  String chatsLinkHow(String bot) {
+    return 'Apri il link sul telefono che userà il bot, oppure invia questo comando a $bot. Per un gruppo, aggiungi prima il bot al gruppo, poi invia lì il comando.';
+  }
+
+  @override
+  String get chatsTheBot => 'il bot';
+
+  @override
+  String chatsCodeExpires(String time) {
+    return 'Valido una volta, fino alle $time.';
+  }
+
+  @override
+  String get chatsCopyLink => 'Copia link';
+
+  @override
+  String get chatsCopyCommand => 'Copia comando';
+
+  @override
+  String get chatsNone => 'Nessuna chat collegata.';
+
+  @override
+  String chatsLinkedBy(String date, String who) {
+    return 'Collegata il $date da $who';
+  }
+
+  @override
+  String chatsLinkedOn(String date) {
+    return 'Collegata il $date';
+  }
+
+  @override
+  String chatsMuted(String codes) {
+    return 'Silenziati: $codes';
+  }
+
+  @override
+  String get chatsUnlink => 'Scollega';
+
+  @override
+  String chatsUnlinkTitle(String name) {
+    return 'Scollegare $name?';
+  }
+
+  @override
+  String get chatsUnlinkBody => 'Non riceve più avvisi e il bot smette di risponderle. La chat viene avvisata.';
+
+  @override
+  String chatsLoadFailed(String error) {
+    return 'Impossibile caricare le chat: $error';
+  }
+
+  @override
+  String get chatsMock => 'Modalità simulata: il bot registra i messaggi invece di inviarli.';
+
+  @override
+  String get chatsOff => 'Spento: il bot non ha un token.';
+
+  @override
   String get useDemoCameras => 'Usa telecamere demo';
 
   @override
@@ -1269,4 +1361,241 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get feedStatusDismissed => 'Ignorato';
+
+  @override
+  String get changePassword => 'Cambia password';
+
+  @override
+  String get changePasswordSubtitle => 'Ti disconnette dagli altri dispositivi';
+
+  @override
+  String get changePasswordTitle => 'Scegli una nuova password';
+
+  @override
+  String get changePasswordBody => 'Un amministratore ti chiede di scegliere la tua password prima di continuare.';
+
+  @override
+  String get fieldCurrentPassword => 'Password attuale';
+
+  @override
+  String get fieldNewPassword => 'Nuova password';
+
+  @override
+  String get fieldRepeatPassword => 'Ripeti la nuova password';
+
+  @override
+  String get passwordsDontMatch => 'Le password non coincidono';
+
+  @override
+  String get passwordCurrentWrong => 'La password attuale è sbagliata';
+
+  @override
+  String get passwordChanged => 'Password cambiata';
+
+  @override
+  String get signOutUserTooltip => 'Disconnetti ovunque';
+
+  @override
+  String signOutUserTitle(String user) {
+    return 'Disconnettere $user ovunque?';
+  }
+
+  @override
+  String get signOutUserBody => 'Dovrà accedere di nuovo su ogni dispositivo. La sua password resta la stessa.';
+
+  @override
+  String get signOutSelfBody =>
+      'Dovrai accedere di nuovo qui e sugli altri dispositivi. La tua password resta la stessa.';
+
+  @override
+  String userLastSignIn(String when) {
+    return 'Ultimo accesso: $when';
+  }
+
+  @override
+  String get userNeverSignedIn => 'Mai effettuato l\'accesso';
+
+  @override
+  String get userMustChangePassword => 'Deve scegliere una nuova password';
+
+  @override
+  String get mustChangeAtFirstSignIn => 'Scegliere la propria password al primo accesso';
+
+  @override
+  String get mustChangeAtNextSignIn => 'Scegliere una nuova password al prossimo accesso';
+
+  @override
+  String get sectionAudit => 'Registro di controllo';
+
+  @override
+  String get auditNote => 'Chi ha cambiato cosa in questo deployment, dal più recente';
+
+  @override
+  String auditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count modifiche', one: '1 modifica');
+    return '$_temp0, dalla più recente';
+  }
+
+  @override
+  String get auditEmpty => 'Non è ancora cambiato nulla';
+
+  @override
+  String auditLoadFailed(String error) {
+    return 'Impossibile caricare il registro di controllo: $error';
+  }
+
+  @override
+  String get auditLoadMore => 'Carica altro';
+
+  @override
+  String get sectionBanner => 'Banner';
+
+  @override
+  String get bannerNone => 'Nessun banner';
+
+  @override
+  String get bannerShowing => 'Visibile su tutti i dispositivi finché non lo rimuovi';
+
+  @override
+  String bannerShowingUntil(String when) {
+    return 'Visibile su tutti i dispositivi fino al $when';
+  }
+
+  @override
+  String get bannerText => 'Messaggio';
+
+  @override
+  String get bannerHint => 'Manutenzione oggi dalle 15 alle 16';
+
+  @override
+  String get bannerInfo => 'Info';
+
+  @override
+  String get bannerWarning => 'Avviso';
+
+  @override
+  String get bannerUntilCleared => 'Fino alla rimozione';
+
+  @override
+  String bannerForHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(hours, locale: localeName, other: 'Per $hours ore', one: 'Per 1 ora');
+    return '$_temp0';
+  }
+
+  @override
+  String get bannerClear => 'Rimuovi';
+
+  @override
+  String get bannerShow => 'Mostra';
+
+  @override
+  String get viewStartTab => 'Si apre su';
+
+  @override
+  String get viewHomeCards => 'La home mostra';
+
+  @override
+  String get homeCardStatus => 'Stato';
+
+  @override
+  String get homeCardDevice => 'Letture del dispositivo';
+
+  @override
+  String get homeCardPage => 'Pagina del progetto';
+
+  @override
+  String get viewGrafanaPage => 'Pagina Grafana';
+
+  @override
+  String get viewGrafanaPageHelp => 'Vuoto: la pagina del deployment';
+
+  @override
+  String get viewCameras => 'Telecamere';
+
+  @override
+  String get viewCameraOverlay => 'Sovrapposizione visione';
+
+  @override
+  String get viewAlerts => 'Avvisi mostrati';
+
+  @override
+  String get alertsAll => 'Tutti';
+
+  @override
+  String get alertsReview => 'Solo quelli da verificare';
+
+  @override
+  String get alertsOff => 'Nessuno';
+
+  @override
+  String get viewAlertSound => 'Suono per gli avvisi da verificare';
+
+  @override
+  String get sectionDevice => 'Questo dispositivo';
+
+  @override
+  String get deviceKiosk => 'Modalità kiosk';
+
+  @override
+  String get kioskModeHelp =>
+      'Blocca questo dispositivo su un account visualizzatore: niente disconnessione né impostazioni, e riparte da capo quando nessuno lo usa';
+
+  @override
+  String get kioskNeedsAccounts => 'Richiede l\'accesso con account p4n4-api';
+
+  @override
+  String get kioskIdleReset => 'Ripartire da capo se inattivo';
+
+  @override
+  String get idleSignOut => 'Disconnetti amministratori e utenti esperti se inattivi';
+
+  @override
+  String get idleNever => 'Mai';
+
+  @override
+  String idleAfterMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: 'Dopo $count minuti', one: 'Dopo 1 minuto');
+    return '$_temp0';
+  }
+
+  @override
+  String get startKioskTitle => 'Attiva la modalità kiosk';
+
+  @override
+  String get startKioskBody =>
+      'Accedi su questo dispositivo con un account visualizzatore. Qui non si potrà uscire né cambiare impostazioni, e riparte da capo quando nessuno lo usa.';
+
+  @override
+  String get kioskTurnOn => 'Attiva';
+
+  @override
+  String get leaveKiosk => 'Esci dalla modalità kiosk';
+
+  @override
+  String get leaveKioskBody =>
+      'Accedi con un account amministratore. Il dispositivo resterà connesso con quell\'amministratore.';
+
+  @override
+  String get kioskNeedsViewer => 'Non è un account visualizzatore.';
+
+  @override
+  String get kioskNeedsAdmin => 'Non è un account amministratore.';
+
+  @override
+  String get startTabDefault => 'Predefinita';
+
+  @override
+  String get chartHistory => 'Cronologia dei grafici';
+
+  @override
+  String minutesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count minuti', one: '1 minuto');
+    return '$_temp0';
+  }
+
+  @override
+  String get defaultCamera => 'Telecamera predefinita';
+
+  @override
+  String get defaultCameraFirst => 'La prima';
 }

@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:p4n4_dashboard/api/agent_client.dart' show AgentBackend;
 import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
+import 'package:p4n4_dashboard/api/banner.dart';
+import 'package:p4n4_dashboard/api/view_settings.dart';
 import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/fleet.dart';
 import 'package:p4n4_dashboard/api/project.dart';
@@ -240,10 +242,13 @@ void main() {
       'Cameras',
       'Views',
       'Users',
+      'Banner',
+      'Audit log',
       'Diagnostics',
     ]) {
       expect(find.text(section), findsNothing, reason: section);
     }
+    expect(find.text('Change password'), findsNothing, reason: 'picked at sign-in: no account');
     for (final category in ['Appearance', 'Accessibility', 'Language & region', 'About']) {
       expect(find.text(category), findsOneWidget, reason: category);
     }
@@ -274,7 +279,7 @@ void main() {
     expect(find.text('Kiosk mode'), findsNothing);
     // The assistant is chosen on its tab and kept by the API: no Ollama or Letta URLs here.
     expect(find.textContaining('Ollama'), findsNothing);
-    for (final section in ['Views', 'Users', 'Diagnostics']) {
+    for (final section in ['Views', 'Users', 'Banner', 'Audit log', 'Diagnostics']) {
       expect(find.text(section), findsNothing, reason: section);
     }
     expect(find.text('Power user · picked at sign-in'), findsOneWidget); // the Account tile's summary
@@ -480,16 +485,12 @@ void main() {
     Camera(id: 'b', name: 'Yard', url: 'http://cam-b/snap.jpg'),
   ];
 
-  testWidgets('video shows one camera or all of them in a grid', (tester) async {
+  testWidgets('video opens on all the cameras in a grid, or one, as the setting says', (tester) async {
     await pumpAt(tester, const Size(1280, 800), ThemeMode.light);
-    SettingsScope.of(tester.element(find.byType(HomeShell))).cameras = cameras;
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    settings.cameras = cameras;
     await tester.tap(nav('Cameras'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(MjpegView), findsOneWidget);
-    expect(find.text('http://cam-a/stream'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('All cameras'));
-    await tester.pump();
     expect(find.text('2 cameras'), findsOneWidget);
     expect(find.byType(MjpegView), findsNWidgets(2));
 
@@ -498,6 +499,16 @@ void main() {
     await tester.pump();
     expect(find.byType(MjpegView), findsOneWidget);
     expect(find.text('http://cam-b/snap.jpg'), findsOneWidget);
+    expect(find.byTooltip('All cameras'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('All cameras'));
+    await tester.pump();
+    expect(find.byType(MjpegView), findsNWidgets(2));
+
+    // Changing the setting applies at once, over what was switched here.
+    settings.videoGrid = false;
+    await tester.pump();
+    expect(find.byType(MjpegView), findsOneWidget);
     expect(find.byTooltip('All cameras'), findsOneWidget);
   });
 
@@ -546,7 +557,6 @@ void main() {
     ];
     await tester.tap(nav('Cameras'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(tester.widget<DeviceCameraView>(find.byType(DeviceCameraView)).lens, CameraLens.back);
     expect(find.byType(MjpegView), findsNothing);
     expect(find.textContaining('invalid URL'), findsNothing);
 
@@ -555,8 +565,6 @@ void main() {
       for (final v in tester.widgetList<DeviceCameraView>(find.byType(DeviceCameraView)))
         if (v.active) v.lens,
     ];
-    await tester.tap(find.byTooltip('All cameras'));
-    await tester.pump();
     expect(find.byType(DeviceCameraView), findsNWidgets(2));
     expect(live(), [CameraLens.back]);
     await tester.tap(find.widgetWithText(OutlinedButton, 'Show this one'));
@@ -575,13 +583,9 @@ void main() {
     await tester.pump();
     expect(settings.videoDemo, isTrue);
     expect(find.textContaining('Blender Foundation'), findsOneWidget);
-    expect(find.byType(VideoView), findsOneWidget);
     // Demo cameras aren't the deployment's to edit.
     expect(find.byTooltip('Add camera'), findsNothing);
     expect(find.byTooltip('Edit camera'), findsNothing);
-
-    await tester.tap(find.byTooltip('All cameras'));
-    await tester.pump();
     expect(find.text('${demoCameras.length} cameras'), findsOneWidget);
     expect(find.byType(VideoView), findsNWidgets(demoCameras.length));
     expect(find.byType(MjpegView), findsNothing);
@@ -619,8 +623,6 @@ void main() {
     await tester.pump();
     expect(find.text('Store footage'), findsOneWidget);
     expect(find.textContaining('Blender Foundation'), findsNothing);
-    await tester.tap(find.byTooltip('All cameras'));
-    await tester.pump();
     expect(find.text('2 cameras'), findsOneWidget);
     expect(find.byType(VideoView), findsNWidgets(2));
   });
@@ -631,7 +633,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.widgetWithText(OutlinedButton, 'Use demo cameras'));
     await tester.pump();
-    expect(find.byType(VideoView), findsOneWidget);
+    expect(find.byType(VideoView), findsNWidgets(demoCameras.length));
   });
 
   testWidgets('normies get no demo camera switch', (tester) async {
@@ -898,5 +900,198 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byTooltip('Stack actions'), findsNothing);
     expect(find.text('p4n4-api'), findsOneWidget);
+  });
+
+  testWidgets('the deployment banner shows above every view until it ends', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    settings.banner = const DashboardBanner(text: 'Maintenance 3–4 pm', tone: BannerTone.warning);
+    await tester.pump();
+    expect(find.text('Maintenance 3–4 pm'), findsOneWidget);
+
+    settings.banner = DashboardBanner(text: 'Over', until: DateTime.now().subtract(const Duration(minutes: 1)));
+    await tester.pump();
+    expect(find.text('Over'), findsNothing, reason: 'its time passed before the API was asked again');
+  });
+
+  testWidgets('admins put up a banner from Settings, and clear it', (tester) async {
+    final sent = <Object?>[];
+    await http.runWithClient(
+      () async {
+        await pumpAt(tester, const Size(1280, 2000), ThemeMode.light);
+        await openSettings(tester, 'Banner');
+        expect(find.text('No banner'), findsWidgets);
+        await tester.enterText(find.widgetWithText(TextField, 'Message'), ' Back at 4 ');
+        await tester.tap(find.text('Warning'));
+        await tester.pump();
+        await tester.tap(find.widgetWithText(FilledButton, 'Show'));
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('Showing on every device until you clear it'), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(TextButton, 'Clear'));
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('No banner'), findsWidgets);
+      },
+      () => MockClient((r) async {
+        if (r.url.path != '/api/v1/dashboard/banner' || r.method != 'PUT') return http.Response('', 404);
+        sent.add(jsonDecode(r.body));
+        return http.Response(r.body, 200);
+      }),
+    );
+    expect(sent, [
+      {'text': 'Back at 4', 'tone': 'warning', 'until': null},
+      {'text': '', 'tone': 'info', 'until': null},
+    ]);
+  });
+
+  testWidgets('admins read the audit log a page at a time', (tester) async {
+    final offsets = <String?>[];
+    Map<String, Object> entry(int id, String action) => {
+      'id': id,
+      'at': '2026-10-15T12:00:00+00:00',
+      'actor': 'root',
+      'action': action,
+      'target': 'joe',
+      'outcome': 'role normie',
+      'request_id': '-',
+    };
+    await http.runWithClient(
+      () async {
+        await pumpAt(tester, const Size(1280, 2000), ThemeMode.light);
+        await openSettings(tester, 'Audit log');
+        await tester.pump();
+        expect(find.text('2 changes, newest first'), findsOneWidget);
+        expect(find.textContaining('user.update'), findsOneWidget);
+        expect(find.text('role normie'), findsOneWidget);
+
+        await tester.tap(find.text('Load more'));
+        await tester.pump();
+        await tester.pump();
+        expect(find.textContaining('user.create'), findsOneWidget);
+        expect(find.text('Load more'), findsNothing);
+      },
+      () => MockClient((r) async {
+        if (r.url.path != '/api/v1/audit') return http.Response('', 404);
+        final offset = r.url.queryParameters['offset'];
+        offsets.add(offset);
+        return http.Response(
+          jsonEncode({
+            'items': [offset == '0' ? entry(2, 'user.update') : entry(1, 'user.create')],
+            'total': 2,
+            'limit': 50,
+            'offset': int.parse(offset!),
+          }),
+          200,
+        );
+      }),
+    );
+    expect(offsets, ['0', '1']);
+  });
+
+  testWidgets('admins see when each user last signed in, and sign one out everywhere', (tester) async {
+    final calls = <String>[];
+    await http.runWithClient(
+      () async {
+        await pumpAt(tester, const Size(1280, 2000), ThemeMode.light);
+        await openSettings(tester, 'Users');
+        await tester.pump();
+        expect(find.text('Never signed in'), findsOneWidget);
+        expect(find.textContaining('Last signed in'), findsOneWidget);
+        expect(find.text('Must choose a new password'), findsOneWidget);
+
+        await tester.tap(find.byTooltip('Sign out everywhere').last);
+        await tester.pump();
+        expect(find.text('Sign tablet out everywhere?'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
+        await tester.pump();
+        await tester.pump();
+      },
+      () => MockClient((r) async {
+        calls.add('${r.method} ${r.url.path}');
+        if (r.url.path.endsWith('/sign-out')) return http.Response('', 204);
+        if (r.url.path != '/api/v1/users') return http.Response('', 404);
+        return http.Response(
+          jsonEncode([
+            {'username': 'ana', 'role': 'admin', 'created_at': 'x', 'last_login_at': '2026-10-15T08:30:00+00:00'},
+            {'username': 'tablet', 'role': 'normie', 'created_at': 'x', 'must_change_password': true},
+          ]),
+          200,
+        );
+      }),
+    );
+    expect(calls.where((c) => c.contains('/users')), [
+      'GET /api/v1/users',
+      'POST /api/v1/users/tablet/sign-out',
+      'GET /api/v1/users',
+    ]);
+  });
+
+  testWidgets('a view opens on the tab an admin picked, with the Home cards they left on', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
+    expect(find.text('Your device'), findsOneWidget);
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    int selected() => tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex!;
+
+    settings.viewSettings = const DashboardViewSettings(
+      normie: ViewPrefs(startTab: 'grafana', homeCards: {HomeCard.page}),
+    );
+    await tester.pump();
+    expect(selected(), 2, reason: 'Home, Assistant, Charts: on Charts');
+
+    await tester.tap(nav('Home'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Your device'), findsNothing);
+    expect(find.text('Checking your system…'), findsNothing);
+
+    // A tab picked here wins over a start tab that changes later.
+    settings.viewSettings = const DashboardViewSettings(normie: ViewPrefs(startTab: 'video'));
+    await tester.pump();
+    expect(selected(), 0);
+    expect(find.text('Your device'), findsOneWidget);
+  });
+
+  testWidgets('a view sees only the cameras an admin picked', (tester) async {
+    await pumpAt(tester, const Size(1280, 800), ThemeMode.light, role: Role.normie);
+    final settings = SettingsScope.of(tester.element(find.byType(HomeShell)));
+    settings.cameras = cameras;
+    settings.viewSettings = const DashboardViewSettings(normie: ViewPrefs(cameras: ['b']));
+    await tester.tap(nav('Cameras'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Yard'), findsWidgets);
+    expect(find.text('Gate'), findsNothing);
+    expect(find.byType(MjpegView), findsOneWidget);
+  });
+
+  testWidgets('admins pick where a view opens and which alerts pop up, for every device', (tester) async {
+    final sent = <Map>[];
+    await http.runWithClient(
+      () async {
+        await pumpAt(tester, const Size(1280, 4000), ThemeMode.light);
+        await openSettings(tester, 'Views');
+        await tester.tap(find.byKey(const ValueKey('normie-String')));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.tap(find.text('Assistant').last);
+        await tester.pump(const Duration(milliseconds: 500));
+
+        await tester.tap(find.byKey(const ValueKey('normie-AlertLevel')));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.tap(find.text('None').last);
+        await tester.pump(const Duration(milliseconds: 500));
+
+        await tester.tap(find.byKey(const ValueKey('normie-card-status')));
+        await tester.pump();
+      },
+      () => MockClient((r) async {
+        if (r.url.path != '/api/v1/dashboard/view-settings' || r.method != 'PUT') return http.Response('', 404);
+        sent.add(jsonDecode(r.body) as Map);
+        return http.Response(r.body, 200);
+      }),
+    );
+    expect([for (final b in sent) (b['normie'] as Map)['start_tab']], ['agent', 'agent', 'agent']);
+    expect([for (final b in sent) (b['normie'] as Map)['alerts']], [null, 'off', 'off']);
+    expect((sent.last['normie'] as Map)['home_cards'], ['device', 'page']);
+    expect(sent.every((b) => (b['power'] as Map).values.every((v) => v == null)), isTrue, reason: 'power untouched');
   });
 }

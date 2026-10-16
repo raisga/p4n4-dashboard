@@ -60,6 +60,8 @@ class Brand {
     this.demoCameras = const [],
     this.demoCredits = const {},
     this.logo,
+    this.logoDark,
+    this.vision = VisionStyle.standard,
   });
 
   final String id;
@@ -130,8 +132,20 @@ class Brand {
   /// The credit line for the brand's demo footage in [language], if it has one.
   String? demoCreditsFor(String language) => demoCredits[language] ?? demoCredits['*'];
 
-  /// Asset path of an app-bar logo that replaces the text wordmark.
+  /// How the Video tab's vision overlay looks, from brand.json `video.overlay`.
+  final VisionStyle vision;
+
+  /// Asset path of an app-bar logo that replaces the text wordmark: the one
+  /// for light mode, and for both when the brand has no [logoDark].
   final String? logo;
+
+  /// Asset path of the logo for dark mode, from brand.json
+  /// `logo: {"light": …, "dark": …}`, so a logo drawn for one background
+  /// stays visible on the other. Null: [logo] in both.
+  final String? logoDark;
+
+  /// The logo for a [dark] or light background, if the brand has one.
+  String? logoFor({required bool dark}) => dark ? logoDark ?? logo : logo;
 
   static const assetDir = 'assets/brand';
 
@@ -164,7 +178,12 @@ class Brand {
     final unknown = tabNames.where((n) => !DashTab.values.any((t) => t.name == n));
     if (unknown.isNotEmpty) throw FormatException('Unknown tabs in brand.json: ${unknown.join(', ')}');
     if (tabs.isEmpty) throw const FormatException('brand.json must enable at least one tab');
-    final logo = j['logo'] as String?;
+    final (logo, logoDark) = switch (j['logo']) {
+      null => (null, null),
+      String file => (file, null),
+      {'light': final String light, 'dark': final String dark} => (light, dark),
+      _ => throw const FormatException('brand.json logo must be a file, or {"light": file, "dark": file}'),
+    };
     final video = switch (j['video']) {
       null => const <String, dynamic>{},
       Map m => m.cast<String, dynamic>(),
@@ -193,6 +212,8 @@ class Brand {
       demoCameras: _demoCameras(video['demoCameras']),
       demoCredits: _texts(video['demoCredits'], 'video.demoCredits'),
       logo: logo == null ? null : '$assetDir/$logo',
+      logoDark: logoDark == null ? null : '$assetDir/$logoDark',
+      vision: VisionStyle.fromJson(video['overlay']),
     );
   }
 
@@ -274,12 +295,78 @@ class Brand {
   }
 }
 
+/// How the Video tab's vision overlay looks (brand.json `video.overlay`), so
+/// each client's demo can have its own: the people's colour, each kind of
+/// object's (by its id in the project's vision file, e.g. a garment
+/// category), and which parts show. What a brand leaves out is the
+/// dashboard's own look (vision_overlay.dart).
+class VisionStyle {
+  const VisionStyle({
+    this.people,
+    this.objects = const {},
+    this.showObjects = true,
+    this.showTags = true,
+    this.showKey = true,
+  });
+
+  static const standard = VisionStyle();
+
+  factory VisionStyle.fromJson(Object? raw) {
+    if (raw == null) return standard;
+    if (raw is! Map) throw const FormatException('brand.json video.overlay must be an object');
+    bool flag(String key) => switch (raw[key]) {
+      null => true,
+      final bool b => b,
+      _ => throw FormatException('brand.json video.overlay.$key must be true or false'),
+    };
+    return VisionStyle(
+      people: switch (raw['people']) {
+        null => null,
+        final String hex => Brand.parseHex(hex),
+        _ => throw const FormatException('brand.json video.overlay.people must be a colour'),
+      },
+      objects: switch (raw['objects']) {
+        null => const {},
+        final Map m => {
+          for (final MapEntry(:key, :value) in m.entries)
+            '$key': switch (value) {
+              final String hex => Brand.parseHex(hex),
+              _ => throw FormatException('brand.json video.overlay.objects.$key must be a colour'),
+            },
+        },
+        _ => throw const FormatException('brand.json video.overlay.objects must be {kind: colour}'),
+      },
+      showObjects: flag('showObjects'),
+      showTags: flag('showTags'),
+      showKey: flag('showKey'),
+    );
+  }
+
+  /// People's boxes and tags, and the HUD's corners; null: the dashboard's cyan.
+  final Color? people;
+
+  /// Object kind id → its colour; a kind not here takes the dashboard's palette.
+  final Map<String, Color> objects;
+
+  /// Whether objects (garments, bags) are boxed at all, or only people.
+  final bool showObjects;
+
+  /// Whether a camera on its own names its boxes (track, confidence, kind).
+  final bool showTags;
+
+  /// Whether a camera on its own has a key to the colours.
+  final bool showKey;
+}
+
 class BrandScope extends InheritedWidget {
   const BrandScope({super.key, required this.brand, required super.child});
 
   final Brand brand;
 
   static Brand of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<BrandScope>()!.brand;
+
+  /// The brand, where there is one (widgets that also work without, as in tests).
+  static Brand? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<BrandScope>()?.brand;
 
   @override
   bool updateShouldNotify(BrandScope old) => brand != old.brand;

@@ -59,7 +59,9 @@ What `apply` doesn't change:
   "id": "acme",                         // the folder name once installed (brands/acme/)
   "appName": "Acme Edge Console",       // window / task-switcher title
   "wordmark": { "text": "acme", "suffix": ".edge" },   // app-bar text: accent + muted
-  "logo": "logo.png",                   // optional; replaces the wordmark (≈28px tall; ship 3× resolution)
+  "logo": "logo.png",                   // optional; replaces the wordmark (≈28px tall; ship 3× resolution).
+                                        // Or one per mode, when one logo can't read on both backgrounds:
+                                        // { "light": "logo-light.png", "dark": "logo.png" }
   "platform": "acme",                   // replaces "p4n4" in stack/service names: acme-iot, acme-api
   "tagline": "…",                       // shown under Settings → About
   "fonts": { "display": "Inter", "mono": "IBM Plex Mono" },   // any Google Fonts family; bundled from fonts/
@@ -79,7 +81,12 @@ What `apply` doesn't change:
   },
   "video": {                            // optional; the Video tab's demo cameras, in place of the built-in ones
     "demoCameras": [{ "id": "line-1", "name": "Line 1", "url": "demo/line-1.mp4" }],
-    "demoCredits": { "en": "Demo footage: …", "es": "Imágenes de demostración: …" }
+    "demoCredits": { "en": "Demo footage: …", "es": "Imágenes de demostración: …" },
+    "overlay": {                        // optional; the vision overlay's look, for this client's demo
+      "people": "#FFFFFF",              // people's boxes and the HUD's corners (default cyan #00E5FF)
+      "objects": { "tops": "#7FD8BE" }, // by object kind id in the project's vision file; others: the built-in palette
+      "showObjects": true, "showTags": true, "showKey": true   // object boxes, box names, the colour key
+    }
   },
   "tour": {                             // optional; replaces the normie view's tour text, step by step
     "welcome": { "en": "Welcome to Acme Edge!", "es": "¡Te damos la bienvenida a Acme Edge!" },
@@ -98,12 +105,13 @@ What `apply` doesn't change:
 Only `id`, `appName`, `wordmark.text` and `native` are required. A theme's `id` is lowercase letters, digits and dashes, and can't be `p4n4`. Every other field falls back to the p4n4 defaults.
 
 - **Colors.** Color tokens are the fields of `P4Colors` in `lib/core/theme.dart`: `bg`, `bg2`, `bg3`, `accent`, `accent2`, `onAccent`, `amber`, `blue`, `heading`, `text`, `muted`, `border`, `border2`, `ok`, `warn`, `err`. `check` and `apply` warn when a text color falls below WCAG AA contrast (4.5:1) against any surface in that mode. Light and dark are validated separately, so a teal that works on black may need a darker step on white.
-- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `themeMode` (`system` | `light` | `dark`), `locale` (any language the dashboard has, e.g. `en`, `es`, `fr`, `de`, `ja`; leave it out to follow the device's language), `textScale` (0.85–1.5, e.g. `1.25` for a wall-mounted screen), `highContrast`, `reduceMotion` (`true` | `false`), `temperatureUnit` (`auto` | `celsius` | `fahrenheit`), `timeFormat` (`auto` | `h12` | `h24`).
+- **Settings defaults.** Keys match `AppSettings`, e.g. `host`, `apiBase`, `edgeMetricsUrl`, `edgeDemo`, `grafanaPath`, `grafanaKiosk`, `videoUrl` (becomes the deployment's first camera, named "Camera"), `videoDemo` (`true`: the Video tab opens on the demo cameras, where the vision overlay is drawn; admins' film button switches to the deployment's), `themeMode` (`system` | `light` | `dark`), `locale` (any language the dashboard has, e.g. `en`, `es`, `fr`, `de`, `ja`; leave it out to follow the device's language), `textScale` (0.85–1.5, e.g. `1.25` for a wall-mounted screen), `highContrast`, `reduceMotion` (`true` | `false`), `temperatureUnit` (`auto` | `celsius` | `fahrenheit`), `timeFormat` (`auto` | `h12` | `h24`).
 - **Assistant.** `agentBackend` (`ollama` | `letta`) with `ollamaModel` or `lettaAgentId` names the brand's assistant. The assistant is a deployment-wide choice kept by p4n4-api (`/api/v1/agents/config`), so these are offered to it rather than applied: the first time an admin or power user signs in to a deployment where nobody has chosen one (with the Assistant tab in their view), the brand's is saved there, provided that model or agent is installed. After that the deployment's own choice stands, and changing these defaults doesn't touch it.
 - **Starter questions.** `assistant.suggestions` replaces the Assistant tab's three built-in questions (shown before a chat starts) with the brand's own, e.g. about a store rather than a device: a list for every language, or per language (a dashboard language code such as `en` or `ja`, or `*` as the fallback). A language without a list keeps the built-in questions. `check` rejects empty lists and unknown languages.
 - **Feed.** `feed` is opt-in: a brand without a `tabs` list gets the other five. The tab shows only when the connected project also serves a feed (`.p4n4.json` `dashboard.tabs` and `dashboard.feed`, see the dashboard README's feed contract), and only then does it join Settings → Views.
 - **Disabled tabs** also hide their section in Settings → Endpoints (and the category, if none is left).
 - **Demo cameras.** `video.demoCameras` replaces the four built-in demo cameras (admins' film button on the Video tab) with the brand's own footage: each an `id`, a `name` and a `url`, either an http(s) URL or a path such as `demo/line-1.mp4`. The web app resolves a path against its own page, and the container serves `/demo/` from `DASHBOARD_DEMO_DIR` (video files only), so the clips stay out of the image and out of git, and play with no other stack running. Native builds leave paths out, and fall back to the built-in cameras when nothing is left. `video.demoCredits` is the line under them (text, or per language); without it there's none. `check` rejects missing fields, repeated ids, other URL schemes and unknown languages.
+- **Vision overlay.** `video.overlay` gives a client's demo its own HUD over the cameras: `people`, the colour of people's boxes, their tags and the corners; `objects`, a colour per kind of object, keyed by the kind's id in the project's vision file (a store's garment categories, say: `outerwear`, `tops`, `dresses`, `bottoms`, `accessories`), any kind left out taking the built-in palette; and `showObjects`, `showTags` and `showKey` (all `true` by default) to box only people, leave boxes unnamed, or drop the key to the colours. The colours are drawn over video, so pick bright ones that read over a dark or a busy frame, and keep them apart from the alerts' (the theme's `err` red and its accent). `check` rejects unknown settings, malformed colours and two settings with the same colour.
 - **Tour.** The first time someone signs in to the normie view on a device, a short tour points out the shell: `welcome` (the wordmark), `navigation` (the rail or bottom bar, when the view has more than one screen), `theme`, `settings` and `signOut`. Each key in `tour` replaces that step's built-in text, either in every language (a string) or per language (a dashboard language code such as `en` or `ja`, or `*` as the fallback). Steps you leave out keep the built-in copy, translated. `check` rejects unknown steps and languages. The user can replay the tour from Settings → Account → **Take the tour**.
 - **Tab order.** `tabs` only picks tabs; they show in the default order (agent, grafana, video, edge, services) unless `defaults.tabOrder` sets another. Admins can still reorder them in Settings → Views; that's saved on each deployment's p4n4-api (`/api/v1/dashboard/views`) and wins over `defaults.tabOrder`, `powerTabs` and `normieTabs`, which apply until an admin changes them.
 
@@ -115,5 +123,5 @@ The same layout for a theme in a project and an installed brand:
 <theme>/                 # in a project, or brands/<id>/ once installed
 ├── brand.json   # required
 ├── icon.png     # optional, 1024×1024 launcher icon (not bundled at runtime)
-└── logo.png     # optional, referenced by "logo"; any other assets are bundled too
+└── logo.png     # optional, referenced by "logo" (and its light/dark variants); any other assets are bundled too
 ```

@@ -179,6 +179,46 @@ void _remove(String id) {
 
 /// Validates the brand in [dir]. An installed brand's id must match its
 /// folder; a theme elsewhere needs an id of its own (not the built-in one).
+/// Problems with brand.json `video.overlay`, the vision overlay's look
+/// (lib/core/brand.dart VisionStyle). Its colours are drawn over video, so
+/// there's no contrast to check, but no two may be the same: boxes of two
+/// kinds would read as one.
+List<String> _overlayErrors(Object? overlay) {
+  if (overlay == null) return const [];
+  if (overlay is! Map) return const ['video.overlay must be an object'];
+  const settings = ['people', 'objects', 'showObjects', 'showTags', 'showKey'];
+  final errors = [
+    for (final key in overlay.keys)
+      if (!settings.contains(key)) 'video.overlay.$key is not an overlay setting (valid: ${settings.join(', ')})',
+  ];
+  final seen = <String, String>{};
+  void colour(Object? value, String where) {
+    if (value is! String || !RegExp(r'^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$').hasMatch(value)) {
+      errors.add('$where must be a colour, #RRGGBB');
+    } else if (seen[value.toUpperCase()] case final other?) {
+      errors.add('$where is the same colour as $other');
+    } else {
+      seen[value.toUpperCase()] = where;
+    }
+  }
+
+  if (overlay['people'] != null) colour(overlay['people'], 'video.overlay.people');
+  switch (overlay['objects']) {
+    case null:
+      break;
+    case final Map objects:
+      for (final MapEntry(:key, :value) in objects.entries) {
+        colour(value, 'video.overlay.objects.$key');
+      }
+    default:
+      errors.add('video.overlay.objects must be an object of object kind → colour');
+  }
+  for (final key in ['showObjects', 'showTags', 'showKey']) {
+    if (overlay[key] != null && overlay[key] is! bool) errors.add('video.overlay.$key must be true or false');
+  }
+  return errors;
+}
+
 Map<String, dynamic> _validate(Directory dir) {
   final file = File('${dir.path}/brand.json');
   final where = _rel(file.path);
@@ -205,8 +245,20 @@ Map<String, dynamic> _validate(Directory dir) {
   final wordmark = j['wordmark'];
   wordmark is Map ? str(wordmark, 'text', 'wordmark') : errors.add('wordmark must be an object');
 
-  final logo = j['logo'];
-  if (logo != null && !File('${dir.path}/$logo').existsSync()) errors.add('logo "$logo" not found');
+  // One file for both modes, or one per mode (a white logo is invisible on the light theme)
+  final logos = switch (j['logo']) {
+    null => const <String, Object?>{},
+    final String file => {'logo': file},
+    {'light': final String light, 'dark': final String dark} && final Map m when m.length == 2 => {
+      'logo.light': light,
+      'logo.dark': dark,
+    },
+    _ => null,
+  };
+  if (logos == null) errors.add('logo must be a file, or {"light": file, "dark": file}');
+  for (final MapEntry(:key, :value) in (logos ?? const {}).entries) {
+    if (!File('${dir.path}/$value').existsSync()) errors.add('$key "$value" not found');
+  }
 
   // Without a list a brand gets every tab but the opt-in feed (lib/core/brand.dart DashTab.defaults)
   final tabs = (j['tabs'] as List?)?.cast<String>() ?? [..._tabs.where((t) => t != 'feed')];
@@ -279,6 +331,7 @@ Map<String, dynamic> _validate(Directory dir) {
   } else if (credits != null && (credits is! String || credits.trim().isEmpty)) {
     errors.add('video.demoCredits must be text, or an object of language code → text');
   }
+  errors.addAll(_overlayErrors(video?['overlay']));
 
   final native = j['native'];
   if (native is! Map) {

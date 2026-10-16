@@ -106,7 +106,6 @@ extension L10nLabels on AppLocalizations {
   String stackLabel(StackDef stack) => switch (stack.suffix) {
     'iot' => stackIot,
     'ai' => stackAi,
-    'edge' => stackEdge,
     'api' => stackApi,
     _ => stack.label,
   };

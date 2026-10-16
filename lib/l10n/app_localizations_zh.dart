@@ -662,9 +662,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stackAi => 'AI 堆栈';
 
   @override
-  String get stackEdge => '边缘堆栈';
-
-  @override
   String get stackApi => 'API 网关';
 
   @override
@@ -791,7 +788,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get factUptime => '已运行';
 
   @override
-  String get sparkStart => '2 分钟前';
+  String sparkStart(int minutes) {
+    return '$minutes 分钟前';
+  }
 
   @override
   String get sparkNow => '现在';
@@ -1060,6 +1059,92 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoDemoSwitch => '演示摄像头';
 
   @override
+  String get videoGridDefault => '打开时显示所有摄像头';
+
+  @override
+  String get alertSound => '警报提示音';
+
+  @override
+  String get alertDismiss => '关闭警报';
+
+  @override
+  String get visionPerson => '人';
+
+  @override
+  String visionPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 人');
+    return '$_temp0';
+  }
+
+  @override
+  String get sectionChats => '聊天';
+
+  @override
+  String get chatsNote => '关联到项目机器人的聊天会在警报发生时立即收到，并可以向机器人询问项目情况。在已关联的群组中，所有人都可以。';
+
+  @override
+  String get chatsLink => '关联聊天';
+
+  @override
+  String chatsLinkHow(String bot) {
+    return '在将使用机器人的手机上打开链接，或将此命令发送给 $bot。如果是群组，请先将机器人加入群组，再在群组中发送该命令。';
+  }
+
+  @override
+  String get chatsTheBot => '机器人';
+
+  @override
+  String chatsCodeExpires(String time) {
+    return '仅可使用一次，有效期至 $time。';
+  }
+
+  @override
+  String get chatsCopyLink => '复制链接';
+
+  @override
+  String get chatsCopyCommand => '复制命令';
+
+  @override
+  String get chatsNone => '尚未关联任何聊天。';
+
+  @override
+  String chatsLinkedBy(String date, String who) {
+    return '$date 由 $who 关联';
+  }
+
+  @override
+  String chatsLinkedOn(String date) {
+    return '$date 关联';
+  }
+
+  @override
+  String chatsMuted(String codes) {
+    return '已静音：$codes';
+  }
+
+  @override
+  String get chatsUnlink => '取消关联';
+
+  @override
+  String chatsUnlinkTitle(String name) {
+    return '取消关联 $name？';
+  }
+
+  @override
+  String get chatsUnlinkBody => '它将不再收到警报，机器人也不再回复它。该聊天会收到通知。';
+
+  @override
+  String chatsLoadFailed(String error) {
+    return '无法加载聊天：$error';
+  }
+
+  @override
+  String get chatsMock => '模拟模式：机器人只记录消息，不会发送。';
+
+  @override
+  String get chatsOff => '已关闭：机器人没有令牌。';
+
+  @override
   String get useDemoCameras => '使用演示摄像头';
 
   @override
@@ -1252,4 +1337,237 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get feedStatusDismissed => '已忽略';
+
+  @override
+  String get changePassword => '更改密码';
+
+  @override
+  String get changePasswordSubtitle => '会让你在其他设备上退出登录';
+
+  @override
+  String get changePasswordTitle => '设置新密码';
+
+  @override
+  String get changePasswordBody => '管理员要求你在继续之前设置自己的密码。';
+
+  @override
+  String get fieldCurrentPassword => '当前密码';
+
+  @override
+  String get fieldNewPassword => '新密码';
+
+  @override
+  String get fieldRepeatPassword => '再次输入新密码';
+
+  @override
+  String get passwordsDontMatch => '两次输入的密码不一致';
+
+  @override
+  String get passwordCurrentWrong => '当前密码不正确';
+
+  @override
+  String get passwordChanged => '密码已更改';
+
+  @override
+  String get signOutUserTooltip => '在所有设备上退出';
+
+  @override
+  String signOutUserTitle(String user) {
+    return '让 $user 在所有设备上退出登录？';
+  }
+
+  @override
+  String get signOutUserBody => '对方需要在每台设备上重新登录。密码保持不变。';
+
+  @override
+  String get signOutSelfBody => '你需要在这台设备和其他设备上重新登录。密码保持不变。';
+
+  @override
+  String userLastSignIn(String when) {
+    return '上次登录：$when';
+  }
+
+  @override
+  String get userNeverSignedIn => '从未登录';
+
+  @override
+  String get userMustChangePassword => '需要设置新密码';
+
+  @override
+  String get mustChangeAtFirstSignIn => '首次登录时设置自己的密码';
+
+  @override
+  String get mustChangeAtNextSignIn => '下次登录时设置新密码';
+
+  @override
+  String get sectionAudit => '审计日志';
+
+  @override
+  String get auditNote => '谁在此部署中更改了什么，最新的在前';
+
+  @override
+  String auditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 项更改');
+    return '$_temp0，最新的在前';
+  }
+
+  @override
+  String get auditEmpty => '尚无更改';
+
+  @override
+  String auditLoadFailed(String error) {
+    return '无法加载审计日志：$error';
+  }
+
+  @override
+  String get auditLoadMore => '加载更多';
+
+  @override
+  String get sectionBanner => '横幅';
+
+  @override
+  String get bannerNone => '无横幅';
+
+  @override
+  String get bannerShowing => '在所有设备上显示，直到你清除';
+
+  @override
+  String bannerShowingUntil(String when) {
+    return '在所有设备上显示至 $when';
+  }
+
+  @override
+  String get bannerText => '消息';
+
+  @override
+  String get bannerHint => '今天 15–16 点维护';
+
+  @override
+  String get bannerInfo => '通知';
+
+  @override
+  String get bannerWarning => '警告';
+
+  @override
+  String get bannerUntilCleared => '直到清除';
+
+  @override
+  String bannerForHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(hours, locale: localeName, other: '$hours 小时');
+    return '$_temp0';
+  }
+
+  @override
+  String get bannerClear => '清除';
+
+  @override
+  String get bannerShow => '显示';
+
+  @override
+  String get viewStartTab => '打开时显示';
+
+  @override
+  String get viewHomeCards => '主页显示';
+
+  @override
+  String get homeCardStatus => '状态';
+
+  @override
+  String get homeCardDevice => '设备读数';
+
+  @override
+  String get homeCardPage => '项目页面';
+
+  @override
+  String get viewGrafanaPage => 'Grafana 页面';
+
+  @override
+  String get viewGrafanaPageHelp => '留空：使用部署的页面';
+
+  @override
+  String get viewCameras => '摄像头';
+
+  @override
+  String get viewCameraOverlay => '视觉叠加层';
+
+  @override
+  String get viewAlerts => '弹出的警报';
+
+  @override
+  String get alertsAll => '全部';
+
+  @override
+  String get alertsReview => '仅需审核的';
+
+  @override
+  String get alertsOff => '无';
+
+  @override
+  String get viewAlertSound => '需审核的警报响铃';
+
+  @override
+  String get sectionDevice => '此设备';
+
+  @override
+  String get deviceKiosk => '自助终端模式';
+
+  @override
+  String get kioskModeHelp => '将此设备锁定到查看者账户：无法退出登录或更改设置，无人使用时会回到初始状态';
+
+  @override
+  String get kioskNeedsAccounts => '需要使用 p4n4-api 账户登录';
+
+  @override
+  String get kioskIdleReset => '闲置时回到初始状态';
+
+  @override
+  String get idleSignOut => '闲置时让管理员和高级用户退出登录';
+
+  @override
+  String get idleNever => '从不';
+
+  @override
+  String idleAfterMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分钟后');
+    return '$_temp0';
+  }
+
+  @override
+  String get startKioskTitle => '开启自助终端模式';
+
+  @override
+  String get startKioskBody => '用查看者账户登录此设备。在这里无法退出登录或更改设置，无人使用时会回到初始状态。';
+
+  @override
+  String get kioskTurnOn => '开启';
+
+  @override
+  String get leaveKiosk => '退出自助终端模式';
+
+  @override
+  String get leaveKioskBody => '请用管理员账户登录。此设备随后会保持该管理员的登录。';
+
+  @override
+  String get kioskNeedsViewer => '这不是查看者账户。';
+
+  @override
+  String get kioskNeedsAdmin => '这不是管理员账户。';
+
+  @override
+  String get startTabDefault => '默认';
+
+  @override
+  String get chartHistory => '图表历史';
+
+  @override
+  String minutesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分钟');
+    return '$_temp0';
+  }
+
+  @override
+  String get defaultCamera => '默认摄像头';
+
+  @override
+  String get defaultCameraFirst => '第一个';
 }

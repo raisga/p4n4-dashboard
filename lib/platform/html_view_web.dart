@@ -3,6 +3,8 @@ import 'dart:js_interop';
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
+import 'video_clock.dart';
+
 /// [uri] in a borderless `<iframe>` filling its box. Give it a new key to
 /// reload. The page must allow framing (Grafana: `GF_SECURITY_ALLOW_EMBEDDING`).
 class HtmlIFrame extends StatelessWidget {
@@ -77,7 +79,7 @@ class _HtmlImageState extends State<HtmlImage> {
 /// HLS where the browser plays it). Like an `<img>`, it needs no CORS headers.
 /// [playing] pauses and resumes it in place; give it a new key to reload.
 class HtmlVideo extends StatefulWidget {
-  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError});
+  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError, this.onClock});
 
   final Uri uri;
   final bool playing;
@@ -85,6 +87,9 @@ class HtmlVideo extends StatefulWidget {
   /// Each time playback starts or resumes.
   final VoidCallback? onPlaying;
   final VoidCallback? onError;
+
+  /// Once the `<video>` exists: reads where it is, for drawing over it.
+  final ValueChanged<VideoClock>? onClock;
 
   @override
   State<HtmlVideo> createState() => _HtmlVideoState();
@@ -133,6 +138,28 @@ class _HtmlVideoState extends State<HtmlVideo> {
         ..onplaying = ((web.Event _) => widget.onPlaying?.call()).toJS
         ..onerror = ((web.Event _) => widget.onError?.call()).toJS
         ..src = widget.uri.toString();
+      widget.onClock?.call(_ElementClock(video));
     },
   );
+}
+
+class _ElementClock implements VideoClock {
+  _ElementClock(this.video);
+
+  final web.HTMLVideoElement video;
+
+  @override
+  double get seconds => video.currentTime;
+
+  // NaN until the metadata has loaded, Infinity for a live stream.
+  @override
+  double? get duration => video.duration.isFinite && video.duration > 0 ? video.duration : null;
+
+  @override
+  void seek(double seconds) => video.currentTime = seconds;
+
+  @override
+  Size? get size => video.videoWidth > 0 && video.videoHeight > 0
+      ? Size(video.videoWidth.toDouble(), video.videoHeight.toDouble())
+      : null;
 }
