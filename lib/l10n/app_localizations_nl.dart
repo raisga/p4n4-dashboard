@@ -1599,4 +1599,406 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get defaultCameraFirst => 'De eerste';
+
+  @override
+  String logsTitle(String name) {
+    return 'Logs van $name';
+  }
+
+  @override
+  String logsFailed(String error) {
+    return 'Gestopt: $error';
+  }
+
+  @override
+  String get logsEnded => 'De logstroom is beëindigd';
+
+  @override
+  String get logsFollowing => 'Nieuwe regels worden gevolgd';
+
+  @override
+  String get copyTooltip => 'Kopiëren';
+
+  @override
+  String get copied => 'Gekopieerd';
+
+  @override
+  String get logsFilter => 'Filteren';
+
+  @override
+  String get logsEmpty => 'Nog geen logregels';
+
+  @override
+  String get logsNoMatch => 'Geen regels passen bij het filter';
+
+  @override
+  String get logsLatest => 'Naar de nieuwste regel';
+
+  @override
+  String get logsMenu => 'Logs';
+
+  @override
+  String get serviceConfirmRestartBody => 'Hij stopt even voor iedereen die hem gebruikt.';
+
+  @override
+  String serviceUptime(String time) {
+    return 'actief sinds $time';
+  }
+
+  @override
+  String get serviceUnhealthy => 'Niet gezond';
+
+  @override
+  String get serviceStarting => 'Start op';
+
+  @override
+  String serviceActions(String name) {
+    return 'Acties voor $name';
+  }
+
+  @override
+  String get sectionDevices => 'Apparaten';
+
+  @override
+  String devicesNote(String platform) {
+    return 'Apparaten die metingen naar $platform-api sturen, elk met een eigen sleutel.';
+  }
+
+  @override
+  String get devicesOnlyAdmins => 'Alleen beheerders kunnen apparaten wijzigen.';
+
+  @override
+  String devicesLoadFailed(String error) {
+    return 'Kan de apparaten niet laden: $error';
+  }
+
+  @override
+  String get devicesNone => 'Nog geen apparaten geregistreerd.';
+
+  @override
+  String get deviceDisabled => 'Uitgeschakeld';
+
+  @override
+  String deviceLastSeen(String time) {
+    return 'Laatst gezien $time';
+  }
+
+  @override
+  String get deviceNeverSeen => 'Nooit gezien';
+
+  @override
+  String deviceKey(String prefix) {
+    return 'Sleutel $prefix…';
+  }
+
+  @override
+  String get deviceDisable => 'Uitschakelen: het kan zich niet meer aanmelden';
+
+  @override
+  String get deviceEnable => 'Inschakelen';
+
+  @override
+  String get rotateKey => 'Nieuwe sleutel';
+
+  @override
+  String rotateKeyTitle(String name) {
+    return 'Nieuwe sleutel voor $name?';
+  }
+
+  @override
+  String get rotateKeyBody => 'De huidige sleutel werkt meteen niet meer. Zet de nieuwe op het apparaat.';
+
+  @override
+  String removeDeviceTitle(String name) {
+    return '$name verwijderen?';
+  }
+
+  @override
+  String get removeDeviceBody => 'De sleutel werkt meteen niet meer, en het kan geen metingen meer sturen.';
+
+  @override
+  String get removeDeviceTooltip => 'Apparaat verwijderen';
+
+  @override
+  String get showMore => 'Meer tonen';
+
+  @override
+  String get addDevice => 'Apparaat toevoegen';
+
+  @override
+  String get editDevice => 'Apparaat bewerken';
+
+  @override
+  String get deviceId => 'Apparaat-ID';
+
+  @override
+  String get deviceIdHelp => 'Letters, cijfers, punten, streepjes en underscores; later niet te wijzigen';
+
+  @override
+  String get deviceName => 'Naam';
+
+  @override
+  String get deviceDescription => 'Beschrijving';
+
+  @override
+  String deviceKeyTitle(String id) {
+    return 'Sleutel voor $id';
+  }
+
+  @override
+  String get deviceKeyBody => 'Kopieer hem nu naar het apparaat: hij wordt niet opnieuw getoond.';
+
+  @override
+  String get done => 'Klaar';
+
+  @override
+  String get contactSupport => 'Contact met support';
+
+  @override
+  String summaryDownFor(String time) {
+    return 'Al $time uitgevallen';
+  }
+
+  @override
+  String deviceUpdatedAt(String time) {
+    return 'Bijgewerkt om $time';
+  }
+
+  @override
+  String deviceStaleSince(String time) {
+    return 'Kan niet vernieuwen · metingen van $time';
+  }
+
+  @override
+  String get sectionThresholds => 'Drempels';
+
+  @override
+  String get thresholdServiceDown => 'Dienst uitgevallen';
+
+  @override
+  String get sensorsTitle => 'Sensoren';
+
+  @override
+  String get sensorsSubtitle => 'Live metingen van de apparaten. Tik op een meting voor de geschiedenis.';
+
+  @override
+  String sensorsUnavailable(String error) {
+    return 'Geen live metingen: $error';
+  }
+
+  @override
+  String get sensorsNoBroker => 'Nog niet verbonden met de MQTT-broker';
+
+  @override
+  String get sensorsWaiting => 'Wachten op metingen…';
+
+  @override
+  String sensorReadAt(String time) {
+    return 'Gemeten om $time';
+  }
+
+  @override
+  String get rangeHour => 'Uur';
+
+  @override
+  String get rangeDay => 'Dag';
+
+  @override
+  String get rangeWeek => 'Week';
+
+  @override
+  String sensorHistoryFailed(String error) {
+    return 'Kan de geschiedenis niet laden: $error';
+  }
+
+  @override
+  String get sensorHistoryEmpty => 'Geen metingen opgeslagen in deze periode';
+
+  @override
+  String sensorMin(String value) {
+    return 'Laagste $value';
+  }
+
+  @override
+  String sensorMax(String value) {
+    return 'Hoogste $value';
+  }
+
+  @override
+  String get modelTitle => 'Model';
+
+  @override
+  String get modelSubtitle => 'De inferentie-runner op het edge-apparaat';
+
+  @override
+  String get modelNoRunner => 'Geen inferentie-runner in deze implementatie, of hij antwoordt niet.';
+
+  @override
+  String modelFailed(String error) {
+    return 'Kan de runner niet bereiken: $error';
+  }
+
+  @override
+  String get modelInferences => 'Inferenties';
+
+  @override
+  String get modelLastLatency => 'Laatste latentie';
+
+  @override
+  String get modelLastAt => 'Laatste';
+
+  @override
+  String get modelRecent => 'Recente resultaten';
+
+  @override
+  String get classifyTitle => 'Probeer het';
+
+  @override
+  String get classifyValues => 'Invoerwaarden';
+
+  @override
+  String classifyExpects(int expected, int count) {
+    return '$count van $expected waarden';
+  }
+
+  @override
+  String get classify => 'Classificeren';
+
+  @override
+  String classifyAnomaly(String score) {
+    return 'anomalie $score';
+  }
+
+  @override
+  String get classifyNotNumbers => 'Voer getallen in, gescheiden door komma\'s of spaties.';
+
+  @override
+  String get commandTitle => 'Een opdracht sturen';
+
+  @override
+  String get commandSubtitle => 'Publiceert één MQTT-bericht, bijv. op het opdracht-topic van een apparaat';
+
+  @override
+  String get commandTopic => 'Topic';
+
+  @override
+  String get commandPayload => 'Bericht';
+
+  @override
+  String get commandPayloadHelp => 'Tekst of JSON';
+
+  @override
+  String get commandRetain => 'Bewaren (retain)';
+
+  @override
+  String commandSent(String topic, int bytes) {
+    return 'Verstuurd naar $topic ($bytes bytes)';
+  }
+
+  @override
+  String commandTopicNotAllowed(String topic) {
+    return 'Deze implementatie staat publiceren op $topic niet toe (P4N4_API_MQTT_PUBLISH_ALLOW en _DENY in p4n4-api).';
+  }
+
+  @override
+  String commandNoBroker(String error) {
+    return 'p4n4-api is niet verbonden met de broker: $error';
+  }
+
+  @override
+  String get commandNotAllowed => 'Alleen operators en beheerders kunnen opdrachten sturen.';
+
+  @override
+  String commandFailed(String error) {
+    return 'Niet verstuurd: $error';
+  }
+
+  @override
+  String thresholdsNote(String deployment) {
+    return 'Wanneer de metingen van $deployment als hoog of kritiek gelden, op dit apparaat.';
+  }
+
+  @override
+  String thresholdLevels(String high, String critical) {
+    return 'Hoog vanaf $high · kritiek vanaf $critical';
+  }
+
+  @override
+  String get thresholdServiceDownHelp => 'Een dienst die niet meer antwoordt is eerst een waarschuwing, daarna kritiek';
+
+  @override
+  String get thresholdsReset => 'Terug naar de standaardwaarden';
+
+  @override
+  String get fleetNoReadings => 'Geen apparaatmetingen';
+
+  @override
+  String get incidentUnreachable => 'Alles';
+
+  @override
+  String incidentOngoing(String service, String start, String length) {
+    return '$service uitgevallen sinds $start ($length)';
+  }
+
+  @override
+  String incidentEnded(String service, String start, String end) {
+    return '$service uitgevallen $start–$end';
+  }
+
+  @override
+  String get incidentHistory => 'Storingsgeschiedenis';
+
+  @override
+  String incidentHistoryOf(String name) {
+    return '$name: storingen';
+  }
+
+  @override
+  String get incidentNone => 'Geen storingen gezien vanaf dit apparaat.';
+
+  @override
+  String get incidentNote => 'Gezien vanaf dit apparaat terwijl het de status van deze implementatie toonde.';
+
+  @override
+  String serviceDownFor(String time) {
+    return 'Offline · $time';
+  }
+
+  @override
+  String get answerStyle => 'Antwoordstijl';
+
+  @override
+  String get styleStandard => 'Standaard';
+
+  @override
+  String get styleBrief => 'Kort';
+
+  @override
+  String get styleSteps => 'Stap voor stap';
+
+  @override
+  String get styleSimple => 'Eenvoudige woorden';
+
+  @override
+  String get styleCustom => 'Eigen instructies';
+
+  @override
+  String get styleCustomLabel => 'Hoe moet de assistent antwoorden?';
+
+  @override
+  String get styleCustomHelp => 'Meegestuurd met elke vraag vanaf dit apparaat';
+
+  @override
+  String get videoGridLight => 'Licht raster voor trage verbindingen';
+
+  @override
+  String get videoGridLightHelp => 'In het raster elke 2 seconden een nieuw beeld in plaats van live beweging';
+
+  @override
+  String cameraFrameEvery(int seconds) {
+    return 'elke $seconds s';
+  }
+
+  @override
+  String get clearList => 'Wissen';
 }

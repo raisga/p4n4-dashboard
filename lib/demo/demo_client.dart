@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
+import '../api/api_error.dart';
 import '../api/edge_metrics.dart';
 import 'demo.dart';
 import 'demo_agent.dart';
@@ -94,6 +95,24 @@ class DemoApi {
   final _stopped = <String>{};
   final _restartedAt = <String, DateTime>{};
   List<Map<String, dynamic>>? _chats;
+
+  /// The registered devices, by id.
+  late final _devices = <String, Map<String, Object?>>{
+    for (final (i, (id, name)) in const [
+      ('edge-01', 'Edge gateway'),
+      ('cam-entrance', 'Entrance camera'),
+      ('env-01', 'Environment sensor'),
+    ].indexed)
+      id: {
+        'id': id,
+        'name': name,
+        'description': '',
+        'enabled': true,
+        'key_prefix': 'p4n4_${_hex(8)}',
+        'created_at': DateTime.now().subtract(Duration(days: 30 - i)).toUtc().toIso8601String(),
+        'last_seen_at': DateTime.now().subtract(Duration(minutes: 1 + 7 * i)).toUtc().toIso8601String(),
+      },
+  };
 
   /// What was saved here: views, view settings, the banner, the assistant.
   final _saved = <String, Object?>{};
@@ -201,6 +220,99 @@ class DemoApi {
         if (!admin) return forbidden();
         final job = _jobs[id];
         return job == null ? _error(r, 404, 'not_found', 'No job $id.') : _json(_jobJson(job), r);
+
+      case ['stacks', final stack, 'services', final service, 'restart'] when post:
+        if (!admin) return forbidden();
+        final job = _jobs['job-${_jobs.length + 1}'] = _Job('job-${_jobs.length + 1}', stack, 'restart', [service]);
+        _record(me, 'stack.restart', '$stack/$service', '');
+        return _json(_jobJson(job), r);
+      case ['stacks', final stack, 'logs'] when get:
+        if (!admin) return forbidden();
+        return _logs(r, await store, stack, q['service']);
+
+      // ── devices, the runner, MQTT ──
+      case ['devices'] when get:
+        if (!operator) return forbidden();
+        final all = _devices.values.toList();
+        return _json({'items': all, 'total': all.length, 'limit': 50, 'offset': 0}, r);
+      case ['devices'] when post:
+        if (!admin) return forbidden();
+        final id = '${b['id'] ?? ''}'.trim().toLowerCase();
+        if (!RegExp(r'^[a-z0-9][a-z0-9_.-]{0,63}$').hasMatch(id)) {
+          return _error(r, 422, 'validation_error', 'Use letters, digits, dots, dashes and underscores.');
+        }
+        if (_devices.containsKey(id)) return _error(r, 409, 'device_exists', 'Device $id already exists.');
+        final key = 'p4n4_${_hex(8)}_${_hex(24)}';
+        _devices[id] = {
+          'id': id,
+          'name': '${b['name'] ?? ''}',
+          'description': '${b['description'] ?? ''}',
+          'enabled': true,
+          'key_prefix': key.substring(0, 13),
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'last_seen_at': null,
+        };
+        _record(me, 'device.create', id, '');
+        return _json({..._devices[id]!, 'api_key': key}, r, status: 201);
+      case ['devices', final id] when patch:
+        if (!admin) return forbidden();
+        final device = _devices[id];
+        if (device == null) return _error(r, 404, 'not_found', 'No device $id.');
+        for (final k in ['name', 'description', 'enabled']) {
+          if (b[k] != null) device[k] = b[k];
+        }
+        _record(me, 'device.update', id, '');
+        return _json(device, r);
+      case ['devices', final id, 'key'] when post:
+        if (!admin) return forbidden();
+        final device = _devices[id];
+        if (device == null) return _error(r, 404, 'not_found', 'No device $id.');
+        final key = 'p4n4_${_hex(8)}_${_hex(24)}';
+        device['key_prefix'] = key.substring(0, 13);
+        _record(me, 'device.rotate_key', id, '');
+        return _json({'id': id, 'key_prefix': device['key_prefix'], 'api_key': key}, r);
+      case ['devices', final id] when delete:
+        if (!admin) return forbidden();
+        if (_devices.remove(id) == null) return _error(r, 404, 'not_found', 'No device $id.');
+        _record(me, 'device.delete', id, '');
+        return _empty(r, 204);
+      case ['inference', 'runner'] when get:
+        return _json({
+          'backend': 'mock',
+          'model_file': null,
+          'model': <String, Object>{},
+          'labels': const ['idle', 'normal', 'anomaly'],
+          'expected_features': 3,
+          'inference_count': 1200 + DateTime.now().minute * 7,
+          'last_inference_at': DateTime.now().subtract(const Duration(seconds: 4)).toUtc().toIso8601String(),
+          'last_latency_ms': 9 + _random.nextDouble() * 6,
+          'mqtt_connected': true,
+          'influxdb_ok': true,
+        }, r);
+      case ['inference'] when post:
+        if (!operator) return forbidden();
+        final values = (b['values'] as List?) ?? const [];
+        if (values.length != 3) {
+          return _error(r, 422, 'wrong_feature_count', 'The mock model takes 3 values; got ${values.length}.');
+        }
+        return _json(_inference(), r);
+      case ['inference', 'results'] when get:
+        return _json({
+          'results': [
+            for (var i = 0; i < 8; i++)
+              {..._inference(at: DateTime.now().subtract(Duration(minutes: 3 + i * 11))), 'device': 'edge-01'},
+          ],
+          'truncated': false,
+        }, r);
+      case ['mqtt', 'publish'] when post:
+        if (!operator) return forbidden();
+        final topic = '${b['topic'] ?? ''}';
+        if (topic.startsWith('sensors/') || topic.startsWith('inference/')) {
+          return _error(r, 403, 'topic_not_allowed', "Publishing to '$topic' isn't allowed.");
+        }
+        final bytes = utf8.encode(b['payload'] is String ? b['payload'] as String : jsonEncode(b['payload'])).length;
+        _record(me, 'mqtt.publish', topic, 'qos ${b['qos'] ?? 0}, $bytes bytes');
+        return _json({'topic': topic, 'qos': b['qos'] ?? 0, 'retain': b['retain'] ?? false, 'bytes': bytes}, r);
 
       // ── the feed ──
       case ['feed'] when get:
@@ -470,6 +582,61 @@ class DemoApi {
     };
   }
 
+  String _hex(int n) => [for (var i = 0; i < n; i++) _random.nextInt(16).toRadixString(16)].join();
+
+  /// The mock model's verdict.
+  Map<String, Object?> _inference({DateTime? at}) {
+    final label = const ['idle', 'normal', 'normal', 'normal', 'anomaly'][_random.nextInt(5)];
+    return {
+      'device': 'dashboard',
+      'timestamp': (at ?? DateTime.now()).toUtc().toIso8601String(),
+      'label': label,
+      'confidence': 0.7 + _random.nextDouble() * 0.29,
+      'anomaly_score': label == 'anomaly' ? 0.6 + _random.nextDouble() * 0.3 : _random.nextDouble() * 0.2,
+      'latency_ms': 8 + _random.nextDouble() * 8,
+      'backend': 'mock',
+      'mode': 'mock',
+    };
+  }
+
+  /// [stack]'s logs as Compose prints them, as a server-sent event stream: a
+  /// backlog, then a line every few seconds until the page lets go.
+  Future<http.StreamedResponse> _logs(http.BaseRequest r, DemoStore s, String stack, String? service) async {
+    final services = [
+      for (final st in _allStacks(s))
+        if (st['name'] == stack)
+          for (final svc in st['services'] as List)
+            if (service == null || (svc as List)[0] == service) (svc as List)[0] as String,
+    ];
+    if (services.isEmpty) return _error(r, 404, 'not_found', 'No stack $stack.');
+    const messages = [
+      'GET /health 200',
+      'connection accepted',
+      'flushed 128 points',
+      'checkpoint complete',
+      'warn: slow request (812 ms)',
+      'client connected',
+      'publish received on devices/edge-01/status',
+    ];
+    String line(DateTime at) {
+      final svc = services[_random.nextInt(services.length)];
+      return '${svc.padRight(12)} | ${at.toUtc().toIso8601String()} ${messages[_random.nextInt(messages.length)]}';
+    }
+
+    Stream<List<int>> events() async* {
+      final now = DateTime.now();
+      for (var i = 40; i > 0; i--) {
+        yield utf8.encode('data: ${line(now.subtract(Duration(seconds: i * 9)))}\n\n');
+      }
+      while (true) {
+        await Future<void>.delayed(Duration(milliseconds: 1500 + _random.nextInt(3000)));
+        yield utf8.encode('data: ${line(DateTime.now())}\n\n');
+      }
+    }
+
+    return http.StreamedResponse(events(), 200, request: r, headers: const {'content-type': 'text/event-stream'});
+  }
+
   /// The edge device, a little busier while the store is open.
   Map<String, Object?> _edge() {
     final m = _metrics.next();
@@ -531,9 +698,12 @@ class DemoApi {
       status,
       contentLength: bytes.length,
       request: r,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: {'content-type': 'application/json; charset=utf-8', ..._echo(r)},
     );
   }
+
+  /// The request's ID back, as p4n4-api does (see api_error.dart).
+  static Map<String, String> _echo(http.BaseRequest r) => {requestIdHeader.toLowerCase(): ?r.headers[requestIdHeader]};
 
   http.StreamedResponse _error(http.BaseRequest r, int status, String code, String message) => _json(
     {

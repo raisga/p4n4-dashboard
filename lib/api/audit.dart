@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_error.dart';
+
 /// One entry in p4n4-api's audit log (`GET /api/v1/audit`, admins only):
 /// who changed what, and when. Actions and outcomes are the API's own words
 /// (`user.create`, `role normie`), shown as they are.
@@ -39,14 +41,8 @@ class AuditEntry {
 typedef AuditPage = ({List<AuditEntry> items, int total});
 
 /// A page the API turned down (only admins may read the log), or that never arrived.
-class AuditException implements Exception {
-  const AuditException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class AuditException extends ApiException {
+  const AuditException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 Future<AuditPage> fetchAudit(Uri api, {int limit = 50, int offset = 0}) async {
@@ -60,7 +56,9 @@ Future<AuditPage> fetchAudit(Uri api, {int limit = 50, int offset = 0}) async {
   } on http.ClientException catch (e) {
     throw AuditException(e.message);
   }
-  if (res.statusCode != 200) throw AuditException('HTTP ${res.statusCode}', statusCode: res.statusCode);
+  if (res.statusCode != 200) {
+    throw AuditException('HTTP ${res.statusCode}', statusCode: res.statusCode, requestId: requestIdOf(res));
+  }
   // UTF-8 whatever the content type says: outcomes quote people's text (a banner's).
   final body = (jsonDecode(utf8.decode(res.bodyBytes)) as Map).cast<String, dynamic>();
   return (

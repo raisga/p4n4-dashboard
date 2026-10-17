@@ -219,6 +219,21 @@ List<String> _overlayErrors(Object? overlay) {
   return errors;
 }
 
+/// A brand's `thresholds` default, as `Thresholds.fromJson` (lib/core/thresholds.dart) reads it.
+bool _thresholdsValid(Object? t) {
+  if (t is! Map) return false;
+  for (final MapEntry(:key, :value) in t.entries) {
+    final ok = switch (key) {
+      'cpu' || 'memory' || 'disk' || 'temperature' =>
+        value is List && value.length == 2 && value.every((v) => v is num) && (value[0] as num) <= (value[1] as num),
+      'serviceDownMinutes' => value is int && value >= 0,
+      _ => false,
+    };
+    if (!ok) return false;
+  }
+  return true;
+}
+
 Map<String, dynamic> _validate(Directory dir) {
   final file = File('${dir.path}/brand.json');
   final where = _rel(file.path);
@@ -302,6 +317,33 @@ Map<String, dynamic> _validate(Directory dir) {
     }
   } else if (suggestions != null && !questions(suggestions)) {
     errors.add('assistant.suggestions must be a list of questions, or an object of language code → list');
+  }
+
+  // A first-run language the app doesn't ship would quietly fall back to English.
+  final defaults = j['defaults'];
+  if (defaults != null && defaults is! Map) errors.add('defaults must be an object');
+  if ((defaults as Map?)?['locale'] case final locale? when locale is! String || !languages.contains(locale)) {
+    errors.add('defaults.locale "$locale" is not a dashboard language (valid: ${languages.join(', ')})');
+  }
+  if (defaults?['thresholds'] case final t? when !_thresholdsValid(t)) {
+    errors.add(
+      'defaults.thresholds must be {"cpu" | "memory" | "disk" | "temperature": [high, critical], '
+      '"serviceDownMinutes": minutes}, each high ≤ critical',
+    );
+  }
+
+  final support = j['support'];
+  if (support != null && support is! Map) errors.add('support must be an object');
+  for (final MapEntry(:key, :value) in ((support as Map?) ?? const {}).entries) {
+    if (!const ['email', 'phone', 'url'].contains(key)) {
+      errors.add('unknown support field "$key" (valid: email, phone, url)');
+    } else if (value is! String || value.trim().isEmpty) {
+      errors.add('support.$key must be a non-empty string');
+    } else if (key == 'url' && !RegExp(r'^https?://\S+$').hasMatch(value.trim())) {
+      errors.add('support.url must be an http(s) URL');
+    } else if (key == 'email' && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim())) {
+      errors.add('support.email "$value" is not an email address');
+    }
   }
 
   final video = j['video'];

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/settings.dart';
 import 'project.dart' show ApiWatcher;
+import 'api_error.dart';
 
 /// Which tabs each view shows and their order, from p4n4-api
 /// (`GET/PUT /api/v1/dashboard/views`): kept per deployment rather than per
@@ -39,14 +40,8 @@ class DashboardViews {
 }
 
 /// A change to the views the API turned down (only admins may), or that never arrived.
-class ViewsException implements Exception {
-  const ViewsException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class ViewsException extends ApiException {
+  const ViewsException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 const _timeout = Duration(seconds: 8);
@@ -109,5 +104,5 @@ Map<String, dynamic> _body(http.Response res) {
   try {
     message = ((jsonDecode(res.body) as Map)['error'] as Map)['message'] as String?;
   } catch (_) {}
-  throw ViewsException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode);
+  throw ViewsException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode, requestId: requestIdOf(res));
 }

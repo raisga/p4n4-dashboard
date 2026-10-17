@@ -5,10 +5,13 @@ import '../api/services.dart';
 import '../api/stack_control.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
+import '../core/format.dart';
+import '../core/incidents.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
+import '../pages/logs_page.dart';
 import '../widgets/common.dart';
 
 /// Service launcher with live Compose status from p4n4-api. Admins can also
@@ -127,7 +130,15 @@ class _ServicesTabState extends State<ServicesTab> {
           minWidth: 260,
           children: [
             for (final svc in services)
-              _ServiceCard(svc, stack.tone(p4), _healthOf(svc, report), settings, technical: technical),
+              _ServiceCard(
+                svc,
+                stack.tone(p4),
+                _healthOf(svc, report),
+                settings,
+                technical: technical,
+                detail: technical ? report?.detail[svc] : null,
+                onRestarted: _refresh,
+              ),
           ],
         ),
       ],
@@ -150,9 +161,10 @@ class _StackControls extends StatefulWidget {
 class _StackControlsState extends State<_StackControls> {
   bool _running = false;
 
-  Future<void> _run(StackAction action) async {
+  Future<void> _run(StackAction? action) async {
     final l = context.l10n;
     final name = l.stackLabel(widget.stack);
+    if (action == null) return openLogs(context, stack: widget.stack.suffix, title: name);
     final confirm = switch (action) {
       StackAction.up => null,
       StackAction.restart => (l.stackConfirmRestart(name), l.stackConfirmRestartBody, l.stackRestart),
@@ -200,7 +212,8 @@ class _StackControlsState extends State<_StackControls> {
         child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p4.accent)),
       );
     }
-    return PopupMenuButton<StackAction>(
+    // A null value is the logs.
+    return PopupMenuButton<StackAction?>(
       tooltip: l.stackControls,
       icon: Icon(Icons.more_horiz, color: p4.muted),
       onSelected: _run,
@@ -209,6 +222,7 @@ class _StackControlsState extends State<_StackControls> {
           (StackAction.up, Icons.play_arrow_outlined, l.stackStart),
           (StackAction.restart, Icons.restart_alt, l.stackRestart),
           (StackAction.down, Icons.stop_outlined, l.stackStop),
+          (null, Icons.notes, l.logsMenu),
         ])
           PopupMenuItem(
             value: action,
@@ -219,14 +233,34 @@ class _StackControlsState extends State<_StackControls> {
   }
 }
 
+/// Opens the logs of [stack], or of one [service] in it.
+Future<void> openLogs(BuildContext context, {required String stack, String? service, required String title}) =>
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LogsPage(stack: stack, service: service, title: title),
+      ),
+    );
+
 class _ServiceCard extends StatelessWidget {
-  const _ServiceCard(this.def, this.color, this.health, this.settings, {required this.technical});
+  const _ServiceCard(
+    this.def,
+    this.color,
+    this.health,
+    this.settings, {
+    required this.technical,
+    this.detail,
+    required this.onRestarted,
+  });
 
   final ServiceDef def;
   final Color color;
   final Health health;
   final AppSettings settings;
   final bool technical;
+
+  /// What p4n4-api says about its Compose service, for admins and power users.
+  final ComposeService? detail;
+  final Future<void> Function() onRestarted;
 
   Future<void> _open(BuildContext context) async {
     final uri = settings.url(def.port, def.path);
@@ -235,10 +269,67 @@ class _ServiceCard extends StatelessWidget {
     }
   }
 
+  /// Restarts just this service, after asking: it's gone for everyone meanwhile.
+  Future<void> _restart(BuildContext context, ComposeService svc, String name) async {
+    final l = context.l10n;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.stackConfirmRestart(name)),
+        content: Text(l.serviceConfirmRestartBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l.stackRestart)),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final api = settings.apiUri;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(content: Text(l.stackJobRunning(name))));
+    String result;
+    try {
+      final job = await waitForJob(api, await startServiceRestart(api, svc.stack, svc.name));
+      result = job.failed ? l.stackJobFailed(name, job.output.lastOrNull ?? job.status) : l.stackJobDone(name);
+    } catch (e) {
+      result = l.stackJobFailed(name, '$e');
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(result)));
+    await onRestarted();
+  }
+
+  /// Online or not; an outage seen from here also says for how long, amber
+  /// at first and red past the deployment's threshold (Settings → Thresholds).
+  Widget _status(BuildContext context, String name) {
+    final since = health == Health.down
+        ? IncidentScope.maybeOf(context)?.ongoing(settings.deployment, def.name)?.lengthAt(DateTime.now())
+        : null;
+    if (since == null) return StatusIndicator(health);
+    return StatusIndicator(
+      health,
+      label: context.l10n.serviceDownFor(context.formats.span(since)),
+      color: levelColor(context.p4, settings.thresholds.downLevel(since)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
     final l = context.l10n;
+    final f = context.formats;
+    final name = def.label(BrandScope.of(context).platform);
+    final svc = detail;
+    final admin = SessionScope.of(context).isAdmin;
+    // Version, then how long it has run, or Docker's word on why it stopped.
+    final facts = svc == null
+        ? null
+        : [
+            ?svc.version,
+            if (svc.uptime case final up?) l.serviceUptime(f.span(up)),
+            if (!svc.running) ?svc.status,
+          ].join(' · ');
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -262,13 +353,35 @@ class _ServiceCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      def.label(BrandScope.of(context).platform),
-                      overflow: TextOverflow.ellipsis,
-                      style: p4.display(size: 16),
-                    ),
+                    child: Text(name, overflow: TextOverflow.ellipsis, style: p4.display(size: 16)),
                   ),
-                  if (!def.tcpOnly) StatusIndicator(health),
+                  if (!def.tcpOnly) Flexible(child: _status(context, name)),
+                  if (admin && svc != null)
+                    PopupMenuButton<String>(
+                      tooltip: l.serviceActions(name),
+                      icon: Icon(Icons.more_vert, size: 18, color: p4.muted),
+                      onSelected: (v) => v == 'logs'
+                          ? openLogs(context, stack: svc.stack, service: svc.name, title: name)
+                          : _restart(context, svc, name),
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'logs',
+                          child: Row(
+                            children: [const Icon(Icons.notes, size: 18), const SizedBox(width: 12), Text(l.logsMenu)],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'restart',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.restart_alt, size: 18),
+                              const SizedBox(width: 12),
+                              Text(l.stackRestart),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -281,6 +394,30 @@ class _ServiceCard extends StatelessWidget {
                   style: p4.body(size: 14, color: p4.muted),
                 ),
               ),
+              if (svc != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (svc.unhealthy || svc.health == 'starting') ...[
+                      TagBadge(
+                        svc.unhealthy ? l.serviceUnhealthy : l.serviceStarting,
+                        color: svc.unhealthy ? p4.err : p4.warn,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Tooltip(
+                        message: svc.image ?? '',
+                        child: Text(
+                          facts!.isEmpty ? (svc.image ?? '') : facts,
+                          overflow: TextOverflow.ellipsis,
+                          style: p4.mono(size: 12, color: p4.muted, spacing: 0),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               Row(
                 children: [

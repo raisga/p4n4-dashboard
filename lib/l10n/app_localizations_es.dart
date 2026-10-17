@@ -1605,4 +1605,406 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get defaultCameraFirst => 'La primera';
+
+  @override
+  String logsTitle(String name) {
+    return 'Registros de $name';
+  }
+
+  @override
+  String logsFailed(String error) {
+    return 'Detenido: $error';
+  }
+
+  @override
+  String get logsEnded => 'El flujo de registros terminó';
+
+  @override
+  String get logsFollowing => 'Siguiendo las líneas nuevas';
+
+  @override
+  String get copyTooltip => 'Copiar';
+
+  @override
+  String get copied => 'Copiado';
+
+  @override
+  String get logsFilter => 'Filtrar';
+
+  @override
+  String get logsEmpty => 'Aún no hay líneas de registro';
+
+  @override
+  String get logsNoMatch => 'Ninguna línea coincide con el filtro';
+
+  @override
+  String get logsLatest => 'Ir a la línea más reciente';
+
+  @override
+  String get logsMenu => 'Registros';
+
+  @override
+  String get serviceConfirmRestartBody => 'Se detiene un momento para todos los que lo usan.';
+
+  @override
+  String serviceUptime(String time) {
+    return 'activo $time';
+  }
+
+  @override
+  String get serviceUnhealthy => 'No saludable';
+
+  @override
+  String get serviceStarting => 'Iniciando';
+
+  @override
+  String serviceActions(String name) {
+    return 'Acciones de $name';
+  }
+
+  @override
+  String get sectionDevices => 'Dispositivos';
+
+  @override
+  String devicesNote(String platform) {
+    return 'Dispositivos que envían lecturas a $platform-api, cada uno con su propia clave.';
+  }
+
+  @override
+  String get devicesOnlyAdmins => 'Solo los administradores pueden cambiar los dispositivos.';
+
+  @override
+  String devicesLoadFailed(String error) {
+    return 'No se pudieron cargar los dispositivos: $error';
+  }
+
+  @override
+  String get devicesNone => 'Aún no hay dispositivos registrados.';
+
+  @override
+  String get deviceDisabled => 'Desactivado';
+
+  @override
+  String deviceLastSeen(String time) {
+    return 'Visto por última vez $time';
+  }
+
+  @override
+  String get deviceNeverSeen => 'Nunca visto';
+
+  @override
+  String deviceKey(String prefix) {
+    return 'Clave $prefix…';
+  }
+
+  @override
+  String get deviceDisable => 'Desactivar: no podrá iniciar sesión';
+
+  @override
+  String get deviceEnable => 'Activar';
+
+  @override
+  String get rotateKey => 'Nueva clave';
+
+  @override
+  String rotateKeyTitle(String name) {
+    return '¿Nueva clave para $name?';
+  }
+
+  @override
+  String get rotateKeyBody => 'La clave actual deja de funcionar al instante. Pon la nueva en el dispositivo.';
+
+  @override
+  String removeDeviceTitle(String name) {
+    return '¿Quitar $name?';
+  }
+
+  @override
+  String get removeDeviceBody => 'Su clave deja de funcionar al instante y ya no podrá enviar lecturas.';
+
+  @override
+  String get removeDeviceTooltip => 'Quitar dispositivo';
+
+  @override
+  String get showMore => 'Mostrar más';
+
+  @override
+  String get addDevice => 'Añadir dispositivo';
+
+  @override
+  String get editDevice => 'Editar dispositivo';
+
+  @override
+  String get deviceId => 'ID del dispositivo';
+
+  @override
+  String get deviceIdHelp => 'Letras, dígitos, puntos, guiones y guiones bajos; no se puede cambiar después';
+
+  @override
+  String get deviceName => 'Nombre';
+
+  @override
+  String get deviceDescription => 'Descripción';
+
+  @override
+  String deviceKeyTitle(String id) {
+    return 'Clave de $id';
+  }
+
+  @override
+  String get deviceKeyBody => 'Cópiala al dispositivo ahora: no se vuelve a mostrar.';
+
+  @override
+  String get done => 'Listo';
+
+  @override
+  String get contactSupport => 'Contactar con soporte';
+
+  @override
+  String summaryDownFor(String time) {
+    return 'Caído desde hace $time';
+  }
+
+  @override
+  String deviceUpdatedAt(String time) {
+    return 'Actualizado a las $time';
+  }
+
+  @override
+  String deviceStaleSince(String time) {
+    return 'No se pudo actualizar · lecturas de las $time';
+  }
+
+  @override
+  String get sectionThresholds => 'Umbrales';
+
+  @override
+  String get thresholdServiceDown => 'Servicio caído';
+
+  @override
+  String get sensorsTitle => 'Sensores';
+
+  @override
+  String get sensorsSubtitle => 'Lecturas en vivo de los dispositivos. Toca una para ver su historial.';
+
+  @override
+  String sensorsUnavailable(String error) {
+    return 'Sin lecturas en vivo: $error';
+  }
+
+  @override
+  String get sensorsNoBroker => 'Aún sin conexión con el broker MQTT';
+
+  @override
+  String get sensorsWaiting => 'Esperando lecturas…';
+
+  @override
+  String sensorReadAt(String time) {
+    return 'Leído a las $time';
+  }
+
+  @override
+  String get rangeHour => 'Hora';
+
+  @override
+  String get rangeDay => 'Día';
+
+  @override
+  String get rangeWeek => 'Semana';
+
+  @override
+  String sensorHistoryFailed(String error) {
+    return 'No se pudo cargar el historial: $error';
+  }
+
+  @override
+  String get sensorHistoryEmpty => 'No hay lecturas guardadas en este periodo';
+
+  @override
+  String sensorMin(String value) {
+    return 'Mínimo $value';
+  }
+
+  @override
+  String sensorMax(String value) {
+    return 'Máximo $value';
+  }
+
+  @override
+  String get modelTitle => 'Modelo';
+
+  @override
+  String get modelSubtitle => 'El ejecutor de inferencia del dispositivo edge';
+
+  @override
+  String get modelNoRunner => 'Este despliegue no tiene ejecutor de inferencia, o no responde.';
+
+  @override
+  String modelFailed(String error) {
+    return 'No se pudo contactar con el ejecutor: $error';
+  }
+
+  @override
+  String get modelInferences => 'Inferencias';
+
+  @override
+  String get modelLastLatency => 'Última latencia';
+
+  @override
+  String get modelLastAt => 'La última';
+
+  @override
+  String get modelRecent => 'Resultados recientes';
+
+  @override
+  String get classifyTitle => 'Pruébalo';
+
+  @override
+  String get classifyValues => 'Valores de entrada';
+
+  @override
+  String classifyExpects(int expected, int count) {
+    return '$count de $expected valores';
+  }
+
+  @override
+  String get classify => 'Clasificar';
+
+  @override
+  String classifyAnomaly(String score) {
+    return 'anomalía $score';
+  }
+
+  @override
+  String get classifyNotNumbers => 'Escribe números separados por comas o espacios.';
+
+  @override
+  String get commandTitle => 'Enviar un comando';
+
+  @override
+  String get commandSubtitle => 'Publica un mensaje MQTT, p. ej. en el tema de comandos de un dispositivo';
+
+  @override
+  String get commandTopic => 'Tema';
+
+  @override
+  String get commandPayload => 'Mensaje';
+
+  @override
+  String get commandPayloadHelp => 'Texto o JSON';
+
+  @override
+  String get commandRetain => 'Retener';
+
+  @override
+  String commandSent(String topic, int bytes) {
+    return 'Enviado a $topic ($bytes bytes)';
+  }
+
+  @override
+  String commandTopicNotAllowed(String topic) {
+    return 'Este despliegue no permite publicar en $topic (P4N4_API_MQTT_PUBLISH_ALLOW y _DENY en p4n4-api).';
+  }
+
+  @override
+  String commandNoBroker(String error) {
+    return 'p4n4-api no está conectado al broker: $error';
+  }
+
+  @override
+  String get commandNotAllowed => 'Solo los operadores y administradores pueden enviar comandos.';
+
+  @override
+  String commandFailed(String error) {
+    return 'No enviado: $error';
+  }
+
+  @override
+  String thresholdsNote(String deployment) {
+    return 'Cuándo las lecturas de $deployment se muestran como altas o críticas, en este dispositivo.';
+  }
+
+  @override
+  String thresholdLevels(String high, String critical) {
+    return 'Alto desde $high · crítico desde $critical';
+  }
+
+  @override
+  String get thresholdServiceDownHelp => 'Un servicio que deja de responder es primero un aviso y luego crítico';
+
+  @override
+  String get thresholdsReset => 'Volver a los valores predeterminados';
+
+  @override
+  String get fleetNoReadings => 'Sin lecturas del dispositivo';
+
+  @override
+  String get incidentUnreachable => 'Todo';
+
+  @override
+  String incidentOngoing(String service, String start, String length) {
+    return '$service caído desde las $start ($length)';
+  }
+
+  @override
+  String incidentEnded(String service, String start, String end) {
+    return '$service caído $start–$end';
+  }
+
+  @override
+  String get incidentHistory => 'Historial de caídas';
+
+  @override
+  String incidentHistoryOf(String name) {
+    return '$name: caídas';
+  }
+
+  @override
+  String get incidentNone => 'No se han visto caídas desde este dispositivo.';
+
+  @override
+  String get incidentNote => 'Vistas desde este dispositivo mientras mostraba el estado de este despliegue.';
+
+  @override
+  String serviceDownFor(String time) {
+    return 'Sin conexión · $time';
+  }
+
+  @override
+  String get answerStyle => 'Estilo de respuesta';
+
+  @override
+  String get styleStandard => 'Estándar';
+
+  @override
+  String get styleBrief => 'Breve';
+
+  @override
+  String get styleSteps => 'Paso a paso';
+
+  @override
+  String get styleSimple => 'Palabras sencillas';
+
+  @override
+  String get styleCustom => 'Instrucciones propias';
+
+  @override
+  String get styleCustomLabel => '¿Cómo debe responder el asistente?';
+
+  @override
+  String get styleCustomHelp => 'Se envían con cada pregunta desde este dispositivo';
+
+  @override
+  String get videoGridLight => 'Cuadrícula ligera para conexiones lentas';
+
+  @override
+  String get videoGridLightHelp => 'En la cuadrícula, una imagen nueva cada 2 segundos en lugar de movimiento en vivo';
+
+  @override
+  String cameraFrameEvery(int seconds) {
+    return 'cada $seconds s';
+  }
+
+  @override
+  String get clearList => 'Borrar';
 }

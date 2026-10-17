@@ -12,6 +12,7 @@ import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/rich_message.dart';
+import '../widgets/support.dart';
 
 /// Chat with the deployment's assistant, an Ollama model or a Letta agent,
 /// through p4n4-api.
@@ -219,6 +220,7 @@ class _AgentTabState extends State<AgentTab> {
           config.backend,
           target,
           history,
+          system: _systemPrompt(SettingsScope.of(context)),
           onStep: (step) {
             if (!reply.steps.contains(step)) reply.steps.add(step);
             if (step.done) step.textAt = reply.content.trimRight().length;
@@ -246,6 +248,53 @@ class _AgentTabState extends State<AgentTab> {
     _finish(_messages.last);
   }
 
+  /// Asks the last question again, dropping the reply (or error) it got.
+  void _retry() {
+    final last = _messages.lastIndexWhere((m) => m.role == 'user');
+    if (last < 0 || _busy) return;
+    final question = _messages[last].content;
+    widget.history.truncate(last);
+    _send(question);
+  }
+
+  Future<void> _copy(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.copied)));
+  }
+
+  /// How to answer, per this device's answer style; null for the model's own way.
+  static String? _systemPrompt(AppSettings s) {
+    const language = 'Reply in the language the user writes in.';
+    final style = switch (s.assistantStyle) {
+      AssistantStyle.standard => null,
+      AssistantStyle.brief => 'Answer briefly: two or three sentences at most, unless asked for more.',
+      AssistantStyle.steps => 'When explaining how to do something, answer with short numbered steps.',
+      AssistantStyle.simple =>
+        'Use plain, everyday words and avoid jargon; explain any technical term you cannot avoid.',
+      AssistantStyle.custom => s.assistantCustomPrompt.isEmpty ? null : s.assistantCustomPrompt,
+    };
+    return style == null ? null : '$style $language';
+  }
+
+  /// Picks the answer style; [AssistantStyle.custom] asks for its instructions first.
+  Future<void> _pickStyle(AssistantStyle style) async {
+    final s = SettingsScope.of(context);
+    if (style == AssistantStyle.custom) {
+      final text = await showDialog<String>(
+        context: context,
+        builder: (_) => _CustomPromptDialog(initial: s.assistantCustomPrompt),
+      );
+      if (text == null) return;
+      s.assistantCustomPrompt = text;
+      // No instructions: no point in this style.
+      if (text.trim().isEmpty) {
+        s.assistantStyle = AssistantStyle.standard;
+        return;
+      }
+    }
+    s.assistantStyle = style;
+  }
+
   void _finish(ChatMessage reply, {AgentException? error}) {
     if (!mounted) return;
     setState(() => _reply = null);
@@ -265,7 +314,7 @@ class _AgentTabState extends State<AgentTab> {
   /// What went wrong, in words that fit who's reading: the API's own message
   /// for admins and power users, plain language for viewers.
   String _describe(AgentException e) => switch (e) {
-    _ when _technical => e.message,
+    _ when _technical => '$e',
     AgentException(statusCode: 401) => l.sessionExpired,
     AgentException(code: 'assistant_restricted') => l.assistantErrorChanged,
     _ when e.unavailable => l.assistantErrorUnavailable,
@@ -385,6 +434,8 @@ class _AgentTabState extends State<AgentTab> {
                     ),
                   ),
               ],
+              // A Letta agent keeps its own persona.
+              if (ollama && config != null) _styleMenu(),
               if (_messages.isNotEmpty)
                 OutlinedButton.icon(
                   onPressed: _busy ? null : widget.history.clear,
@@ -397,6 +448,39 @@ class _AgentTabState extends State<AgentTab> {
       ),
     );
   }
+
+  Widget _styleMenu() {
+    final current = SettingsScope.of(context).assistantStyle;
+    return PopupMenuButton<AssistantStyle>(
+      tooltip: l.answerStyle,
+      onSelected: _pickStyle,
+      itemBuilder: (_) => [
+        for (final style in AssistantStyle.values)
+          // Writing instructions for the model is for admins and power users.
+          if (style != AssistantStyle.custom || _technical)
+            CheckedPopupMenuItem(value: style, checked: style == current, child: Text(_styleName(style))),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune, size: 18, color: p4.muted),
+            const SizedBox(width: 6),
+            Text(_styleName(current), style: p4.body(size: 14, color: p4.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _styleName(AssistantStyle style) => switch (style) {
+    AssistantStyle.standard => l.styleStandard,
+    AssistantStyle.brief => l.styleBrief,
+    AssistantStyle.steps => l.styleSteps,
+    AssistantStyle.simple => l.styleSimple,
+    AssistantStyle.custom => l.styleCustom,
+  };
 
   Widget _empty() {
     final config = _config;
@@ -417,7 +501,10 @@ class _AgentTabState extends State<AgentTab> {
               color: p4.err,
               title: l.assistantUnavailable,
               message: l.assistantUnavailableMsg,
-              actions: [OutlinedButton(onPressed: _load, child: Text(l.retry))],
+              actions: [
+                OutlinedButton(onPressed: _load, child: Text(l.retry)),
+                const ContactSupportButton(),
+              ],
             );
     }
     if (config == null || options == null) return LoadingState(l.signInConnecting);
@@ -455,8 +542,18 @@ class _AgentTabState extends State<AgentTab> {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
     itemCount: _messages.length,
     itemBuilder: (context, i) {
-      final streaming = _busy && i == _messages.length - 1;
-      return _Bubble(_messages[i], streaming: streaming, started: streaming ? _started : null, lastTook: _lastTook);
+      final last = i == _messages.length - 1;
+      final streaming = _busy && last;
+      final m = _messages[i];
+      return _Bubble(
+        m,
+        streaming: streaming,
+        started: streaming ? _started : null,
+        lastTook: _lastTook,
+        onCopy: streaming || m.role == 'error' || m.content.isEmpty ? null : () => _copy(m.content),
+        // The last answer (or failure) can be asked for again.
+        onRetry: last && !_busy && m.role != 'user' && _target != null ? _retry : null,
+      );
     },
   );
 
@@ -518,10 +615,14 @@ class _AgentTabState extends State<AgentTab> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble(this.msg, {required this.streaming, this.started, this.lastTook});
+  const _Bubble(this.msg, {required this.streaming, this.started, this.lastTook, this.onCopy, this.onRetry});
 
   final ChatMessage msg;
   final bool streaming;
+
+  /// Copies the text; asks the question again. Null where they don't apply.
+  final VoidCallback? onCopy;
+  final VoidCallback? onRetry;
 
   /// While [streaming]: when the question was sent, and how long the last
   /// answer took, if one finished this session.
@@ -570,6 +671,11 @@ class _Bubble extends StatelessWidget {
                     label,
                     style: p4.display(size: 12, color: error ? p4.err : p4.muted, weight: FontWeight.w600, spacing: 0),
                   ),
+                  if (onCopy != null) ...[
+                    const SizedBox(width: 6),
+                    _Action(Icons.copy_outlined, l.copyTooltip, onCopy!),
+                  ],
+                  if (onRetry != null) ...[const SizedBox(width: 2), _Action(Icons.refresh, l.retry, onRetry!)],
                 ],
               ),
               const SizedBox(height: 4),
@@ -610,6 +716,69 @@ class _Bubble extends StatelessWidget {
     final label? => l.agentStepLookup(label),
     null => l.agentStepData,
   };
+}
+
+/// A small action in a bubble's header (copy, ask again).
+class _Action extends StatelessWidget {
+  const _Action(this.icon, this.tooltip, this.onPressed);
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints.tightFor(width: 28, height: 24),
+    iconSize: 15,
+    icon: Icon(icon, color: context.p4.muted),
+  );
+}
+
+/// The answer style's own instructions, written by an admin or power user.
+class _CustomPromptDialog extends StatefulWidget {
+  const _CustomPromptDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_CustomPromptDialog> createState() => _CustomPromptDialogState();
+}
+
+class _CustomPromptDialogState extends State<_CustomPromptDialog> {
+  late final _text = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return AlertDialog(
+      title: Text(l.styleCustom),
+      content: SizedBox(
+        width: 460,
+        child: TextField(
+          controller: _text,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 8,
+          maxLength: 2000,
+          decoration: InputDecoration(labelText: l.styleCustomLabel, helperText: l.styleCustomHelp),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, _text.text), child: Text(l.save)),
+      ],
+    );
+  }
 }
 
 /// A finished lookup, above the reply.

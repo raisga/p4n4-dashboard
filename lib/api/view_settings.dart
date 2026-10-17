@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../core/role.dart';
 import '../core/settings.dart';
 import 'project.dart' show ApiWatcher;
+import 'api_error.dart';
 
 /// Home's cards: the "is everything OK" summary, the device's readings, and
 /// the project's own page (HOME.md).
@@ -147,14 +148,8 @@ class DashboardViewSettings {
 }
 
 /// A change the API turned down (only admins may), or that never arrived.
-class ViewSettingsException implements Exception {
-  const ViewSettingsException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class ViewSettingsException extends ApiException {
+  const ViewSettingsException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 const _timeout = Duration(seconds: 8);
@@ -201,5 +196,9 @@ Map<String, dynamic> _body(http.Response res) {
   try {
     message = ((jsonDecode(utf8.decode(res.bodyBytes)) as Map)['error'] as Map)['message'] as String?;
   } catch (_) {}
-  throw ViewSettingsException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode);
+  throw ViewSettingsException(
+    message ?? 'HTTP ${res.statusCode}',
+    statusCode: res.statusCode,
+    requestId: requestIdOf(res),
+  );
 }

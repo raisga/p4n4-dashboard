@@ -1,3 +1,4 @@
+import 'dart:math' show max;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/widgets.dart';
@@ -62,6 +63,14 @@ class Formats {
     (null, false) => DateFormat.jm(locale),
     (null, true) => DateFormat.jms(locale),
   }.format(t);
+
+  /// A span such as an uptime, in its two largest units: `6d 3h`, `3h 12m`, `4m`.
+  String span(Duration d) {
+    final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
+    if (days > 0) return '${days}d ${h}h';
+    if (h > 0) return '${h}h ${m}m';
+    return '${max(m, 1)}m';
+  }
 
   /// [t]'s date and time of day, e.g. `Oct 15, 2026 2:05 PM`.
   String dateTime(DateTime t) => '${DateFormat.yMMMd(locale).format(t)} ${clock(t)}';

@@ -1150,5 +1150,369 @@
     }
   },
   "defaultCamera": "Default camera",
-  "defaultCameraFirst": "The first one"
+  "defaultCameraFirst": "The first one",
+  "logsTitle": "{name} logs",
+  "@logsTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "logsFailed": "Stopped: {error}",
+  "@logsFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logsEnded": "The log stream ended",
+  "logsFollowing": "Following new lines",
+  "copyTooltip": "Copy",
+  "copied": "Copied",
+  "logsFilter": "Filter",
+  "logsEmpty": "No log lines yet",
+  "logsNoMatch": "No lines match the filter",
+  "logsLatest": "Jump to the newest line",
+  "logsMenu": "Logs",
+  "serviceConfirmRestartBody": "It stops for a moment for everyone using it.",
+  "serviceUptime": "up {time}",
+  "@serviceUptime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "serviceUnhealthy": "Unhealthy",
+  "serviceStarting": "Starting",
+  "serviceActions": "{name} actions",
+  "@serviceActions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionDevices": "Devices",
+  "devicesNote": "Devices that send readings to {platform}-api, each with its own key.",
+  "@devicesNote": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesOnlyAdmins": "Only admins can change devices.",
+  "devicesLoadFailed": "Couldn't load the devices: {error}",
+  "@devicesLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesNone": "No devices registered yet.",
+  "deviceDisabled": "Disabled",
+  "deviceLastSeen": "Last seen {time}",
+  "@deviceLastSeen": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceNeverSeen": "Never seen",
+  "deviceKey": "Key {prefix}…",
+  "@deviceKey": {
+    "placeholders": {
+      "prefix": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceDisable": "Disable: it can't sign in",
+  "deviceEnable": "Enable",
+  "rotateKey": "New key",
+  "rotateKeyTitle": "New key for {name}?",
+  "@rotateKeyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "rotateKeyBody": "The current key stops working at once. Put the new one on the device.",
+  "removeDeviceTitle": "Remove {name}?",
+  "@removeDeviceTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeDeviceBody": "Its key stops working at once, and it can't send readings any more.",
+  "removeDeviceTooltip": "Remove device",
+  "showMore": "Show more",
+  "addDevice": "Add device",
+  "editDevice": "Edit device",
+  "deviceId": "Device ID",
+  "deviceIdHelp": "Letters, digits, dots, dashes and underscores; it can't change later",
+  "deviceName": "Name",
+  "deviceDescription": "Description",
+  "deviceKeyTitle": "Key for {id}",
+  "@deviceKeyTitle": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceKeyBody": "Copy it to the device now: it isn't shown again.",
+  "done": "Done",
+  "contactSupport": "Contact support",
+  "summaryDownFor": "Down for {time}",
+  "@summaryDownFor": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceUpdatedAt": "Updated at {time}",
+  "@deviceUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceStaleSince": "Couldn't refresh · readings from {time}",
+  "@deviceStaleSince": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionThresholds": "Thresholds",
+  "thresholdServiceDown": "Service down",
+  "sensorsTitle": "Sensors",
+  "sensorsSubtitle": "Live readings from the devices. Tap one for its history.",
+  "sensorsUnavailable": "No live readings: {error}",
+  "@sensorsUnavailable": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sensorsNoBroker": "Not connected to the MQTT broker yet",
+  "sensorsWaiting": "Waiting for readings…",
+  "sensorReadAt": "Read at {time}",
+  "@sensorReadAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "rangeHour": "Hour",
+  "rangeDay": "Day",
+  "rangeWeek": "Week",
+  "sensorHistoryFailed": "Couldn't load the history: {error}",
+  "@sensorHistoryFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sensorHistoryEmpty": "No readings stored for this period",
+  "sensorMin": "Lowest {value}",
+  "@sensorMin": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "sensorMax": "Highest {value}",
+  "@sensorMax": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "modelTitle": "Model",
+  "modelSubtitle": "The inference runner on the edge device",
+  "modelNoRunner": "No inference runner on this deployment, or it isn't answering.",
+  "modelFailed": "Couldn't reach the runner: {error}",
+  "@modelFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "modelInferences": "Inferences",
+  "modelLastLatency": "Last latency",
+  "modelLastAt": "Last one",
+  "modelRecent": "Recent results",
+  "classifyTitle": "Try it",
+  "classifyValues": "Feature values",
+  "classifyExpects": "{count} of {expected} values",
+  "@classifyExpects": {
+    "placeholders": {
+      "expected": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "classify": "Classify",
+  "classifyAnomaly": "anomaly {score}",
+  "@classifyAnomaly": {
+    "placeholders": {
+      "score": {
+        "type": "String"
+      }
+    }
+  },
+  "classifyNotNumbers": "Enter numbers separated by commas or spaces.",
+  "commandTitle": "Send a command",
+  "commandSubtitle": "Publishes one MQTT message, e.g. to a device's command topic",
+  "commandTopic": "Topic",
+  "commandPayload": "Message",
+  "commandPayloadHelp": "Text, or JSON",
+  "commandRetain": "Retain",
+  "commandSent": "Sent to {topic} ({bytes} bytes)",
+  "@commandSent": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      },
+      "bytes": {
+        "type": "int"
+      }
+    }
+  },
+  "commandTopicNotAllowed": "This deployment doesn't allow publishing to {topic} (P4N4_API_MQTT_PUBLISH_ALLOW and _DENY on p4n4-api).",
+  "@commandTopicNotAllowed": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNoBroker": "p4n4-api isn't connected to the broker: {error}",
+  "@commandNoBroker": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNotAllowed": "Only operators and admins can send commands.",
+  "commandFailed": "Not sent: {error}",
+  "@commandFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "thresholdsNote": "When {deployment}'s readings show as high or critical, on this device.",
+  "@thresholdsNote": {
+    "placeholders": {
+      "deployment": {
+        "type": "String"
+      }
+    }
+  },
+  "thresholdLevels": "High from {high} · critical from {critical}",
+  "@thresholdLevels": {
+    "placeholders": {
+      "high": {
+        "type": "String"
+      },
+      "critical": {
+        "type": "String"
+      }
+    }
+  },
+  "thresholdServiceDownHelp": "A service that stops answering is a warning at first, then critical",
+  "thresholdsReset": "Back to the defaults",
+  "fleetNoReadings": "No device readings",
+  "incidentUnreachable": "Everything",
+  "incidentOngoing": "{service} down since {start} ({length})",
+  "@incidentOngoing": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "length": {
+        "type": "String"
+      }
+    }
+  },
+  "incidentEnded": "{service} down {start}–{end}",
+  "@incidentEnded": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "incidentHistory": "Outage history",
+  "incidentHistoryOf": "{name}: outages",
+  "@incidentHistoryOf": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "incidentNone": "No outages seen from this device.",
+  "incidentNote": "Seen from this device while it showed this deployment's status.",
+  "serviceDownFor": "Offline · {time}",
+  "@serviceDownFor": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "answerStyle": "Answer style",
+  "styleStandard": "Standard",
+  "styleBrief": "Brief",
+  "styleSteps": "Step by step",
+  "styleSimple": "Plain words",
+  "styleCustom": "Own instructions",
+  "styleCustomLabel": "How should the assistant answer?",
+  "styleCustomHelp": "Sent with every question from this device",
+  "videoGridLight": "Light grid for slow links",
+  "videoGridLightHelp": "In the grid, a new picture every 2 seconds instead of live motion",
+  "cameraFrameEvery": "every {seconds} s",
+  "@cameraFrameEvery": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "clearList": "Clear"
 }

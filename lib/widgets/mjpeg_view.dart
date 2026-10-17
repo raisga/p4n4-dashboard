@@ -21,12 +21,18 @@ import '../platform/html_view.dart';
 /// URLs that look like a still image ([looksLikeSnapshot]) are re-polled.
 ///
 /// Dropped connections are retried with exponential backoff while [active].
+///
+/// With [frameEvery] it shows a frame that often instead of full motion, for
+/// slow links: a stream is opened for one frame, then closed until the next;
+/// snapshots are polled at that pace. On web only snapshots slow down: the
+/// browser's `<img>` can't take one frame of a stream and stop.
 class MjpegView extends StatefulWidget {
   const MjpegView({
     super.key,
     required this.uri,
     this.active = true,
     this.snapshotInterval = const Duration(milliseconds: 500),
+    this.frameEvery,
   });
 
   final Uri uri;
@@ -34,10 +40,14 @@ class MjpegView extends StatefulWidget {
   /// When false the connection is closed (e.g. the tab is hidden).
   final bool active;
   final Duration snapshotInterval;
+  final Duration? frameEvery;
 
   @override
   State<MjpegView> createState() => MjpegViewState();
 }
+
+/// How often the light camera grid shows a new frame (Settings → Appearance).
+const lightFrameInterval = Duration(seconds: 2);
 
 /// Whether [uri] looks like a still image rather than a stream: used on web,
 /// where the response's content type can't be read.
@@ -81,7 +91,7 @@ class MjpegViewState extends State<MjpegView> {
   void didUpdateWidget(MjpegView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (kIsWeb) return;
-    if (oldWidget.uri != widget.uri || oldWidget.active != widget.active) {
+    if (oldWidget.uri != widget.uri || oldWidget.active != widget.active || oldWidget.frameEvery != widget.frameEvery) {
       _disconnect();
       if (widget.active) _connect();
     }
@@ -127,7 +137,7 @@ class MjpegViewState extends State<MjpegView> {
       if (type.startsWith('image/')) {
         _mode = 'snapshot';
         _onFrame(await res.stream.toBytes());
-        _poll = Timer.periodic(widget.snapshotInterval, (_) => _snapshot(client));
+        _poll = Timer.periodic(widget.frameEvery ?? widget.snapshotInterval, (_) => _snapshot(client));
       } else {
         _mode = 'mjpeg';
         _readMjpeg(res.stream);
@@ -233,6 +243,18 @@ class MjpegViewState extends State<MjpegView> {
   void _onFrame(Uint8List bytes) {
     if (!mounted) return;
     _backoff = _minBackoff;
+    // Light: one frame per connection, the next one later. More frames from
+    // the chunk that held this one are dropped.
+    if (widget.frameEvery case final every? when _mode == 'mjpeg') {
+      if (_client == null) return;
+      _sub?.cancel();
+      _sub = null;
+      _client?.close();
+      _client = null;
+      _poll = Timer(every, _connect);
+      setState(() => _frame = bytes);
+      return;
+    }
     _frames++;
     final secs = _fpsWatch.elapsedMilliseconds / 1000;
     if (secs >= 1) {
@@ -248,7 +270,11 @@ class MjpegViewState extends State<MjpegView> {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
-      return _BrowserStream(uri: widget.uri, active: widget.active, snapshotInterval: widget.snapshotInterval);
+      return _BrowserStream(
+        uri: widget.uri,
+        active: widget.active,
+        snapshotInterval: widget.frameEvery ?? widget.snapshotInterval,
+      );
     }
     return Stack(
       fit: StackFit.expand,
@@ -303,7 +329,14 @@ class MjpegViewState extends State<MjpegView> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${context.l10n.cameraLive} · ${_mode.toUpperCase()}${_fps > 0 ? ' · ${_fps.toStringAsFixed(1)} FPS' : ''}',
+                    [
+                      context.l10n.cameraLive,
+                      _mode.toUpperCase(),
+                      if (widget.frameEvery case final every?)
+                        context.l10n.cameraFrameEvery(every.inSeconds)
+                      else if (_fps > 0)
+                        '${_fps.toStringAsFixed(1)} FPS',
+                    ].join(' · '),
                     style: p4.mono(size: 10, color: P4Colors.dark.text),
                   ),
                 ],

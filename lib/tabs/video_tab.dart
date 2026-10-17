@@ -335,7 +335,13 @@ class _VideoTabState extends State<VideoTab> {
             : (context, playback) => overlay(recording.sceneAt(playback.seconds), playback.size ?? recording.frame),
         syncTo: recording == null ? null : () => widget.recorded?.secondsOf(c.id),
       ),
-      (_, final uri?) => MjpegView(key: _key(c), uri: uri, active: widget.active && !_paused),
+      (_, final uri?) => MjpegView(
+        key: _key(c),
+        uri: uri,
+        active: widget.active && !_paused,
+        // On a slow link the grid shows a frame every few seconds (Settings → Appearance).
+        frameEvery: inGrid && s.videoGridLight ? lightFrameInterval : null,
+      ),
       (null, null) => Center(
         child: Text(l.cameraInvalidUrl(c.name), style: p4.body(color: p4.err)),
       ),

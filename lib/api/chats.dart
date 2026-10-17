@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_error.dart';
+
 /// A messaging channel the project has, e.g. its Telegram bot.
 class ChatChannel {
   const ChatChannel({required this.id, this.name, this.state, this.bot, this.url});
@@ -103,15 +105,8 @@ class LinkCode {
 /// A chats request p4n4-api turned down or couldn't relay. [code] `no_chats`:
 /// the project has none; `chats_unavailable`: the bot can't manage them (its
 /// [message] says why).
-class ChatsException implements Exception {
-  const ChatsException(this.message, {this.statusCode, this.code});
-
-  final String message;
-  final int? statusCode;
-  final String? code;
-
-  @override
-  String toString() => message;
+class ChatsException extends ApiException {
+  const ChatsException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 /// p4n4-api's `/api/v1/chats`: admins only (the API checks).
@@ -152,5 +147,10 @@ Map<String, dynamic> _body(http.Response res) {
     code = error['code'] as String?;
     message = error['message'] as String?;
   } catch (_) {}
-  throw ChatsException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode, code: code);
+  throw ChatsException(
+    message ?? 'HTTP ${res.statusCode}',
+    statusCode: res.statusCode,
+    requestId: requestIdOf(res),
+    code: code,
+  );
 }

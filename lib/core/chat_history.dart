@@ -21,7 +21,7 @@ class ChatHistory extends ChangeNotifier {
   /// Only the most recent messages are saved, to keep within browser storage.
   static const saved = 200;
 
-  /// Oldest first. Change it through [add], [remove] and [clear], or call
+  /// Oldest first. Change it through [add], [remove], [truncate] and [clear], or call
   /// [changed] after editing a message in place.
   final List<ChatMessage> messages;
 
@@ -32,6 +32,12 @@ class ChatHistory extends ChangeNotifier {
 
   void remove(ChatMessage m) {
     messages.remove(m);
+    changed();
+  }
+
+  /// Drops message [from] and everything after it (to ask the last question again).
+  void truncate(int from) {
+    messages.removeRange(from, messages.length);
     changed();
   }
 

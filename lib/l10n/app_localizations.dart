@@ -2900,6 +2900,678 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The first one'**
   String get defaultCameraFirst;
+
+  /// No description provided for @logsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} logs'**
+  String logsTitle(String name);
+
+  /// No description provided for @logsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: {error}'**
+  String logsFailed(String error);
+
+  /// No description provided for @logsEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'The log stream ended'**
+  String get logsEnded;
+
+  /// No description provided for @logsFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Following new lines'**
+  String get logsFollowing;
+
+  /// No description provided for @copyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyTooltip;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// No description provided for @logsFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get logsFilter;
+
+  /// No description provided for @logsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No log lines yet'**
+  String get logsEmpty;
+
+  /// No description provided for @logsNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No lines match the filter'**
+  String get logsNoMatch;
+
+  /// No description provided for @logsLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to the newest line'**
+  String get logsLatest;
+
+  /// No description provided for @logsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get logsMenu;
+
+  /// No description provided for @serviceConfirmRestartBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It stops for a moment for everyone using it.'**
+  String get serviceConfirmRestartBody;
+
+  /// No description provided for @serviceUptime.
+  ///
+  /// In en, this message translates to:
+  /// **'up {time}'**
+  String serviceUptime(String time);
+
+  /// No description provided for @serviceUnhealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'Unhealthy'**
+  String get serviceUnhealthy;
+
+  /// No description provided for @serviceStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting'**
+  String get serviceStarting;
+
+  /// No description provided for @serviceActions.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} actions'**
+  String serviceActions(String name);
+
+  /// No description provided for @sectionDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get sectionDevices;
+
+  /// No description provided for @devicesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices that send readings to {platform}-api, each with its own key.'**
+  String devicesNote(String platform);
+
+  /// No description provided for @devicesOnlyAdmins.
+  ///
+  /// In en, this message translates to:
+  /// **'Only admins can change devices.'**
+  String get devicesOnlyAdmins;
+
+  /// No description provided for @devicesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the devices: {error}'**
+  String devicesLoadFailed(String error);
+
+  /// No description provided for @devicesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices registered yet.'**
+  String get devicesNone;
+
+  /// No description provided for @deviceDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get deviceDisabled;
+
+  /// No description provided for @deviceLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen {time}'**
+  String deviceLastSeen(String time);
+
+  /// No description provided for @deviceNeverSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Never seen'**
+  String get deviceNeverSeen;
+
+  /// No description provided for @deviceKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Key {prefix}…'**
+  String deviceKey(String prefix);
+
+  /// No description provided for @deviceDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable: it can\'t sign in'**
+  String get deviceDisable;
+
+  /// No description provided for @deviceEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get deviceEnable;
+
+  /// No description provided for @rotateKey.
+  ///
+  /// In en, this message translates to:
+  /// **'New key'**
+  String get rotateKey;
+
+  /// No description provided for @rotateKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New key for {name}?'**
+  String rotateKeyTitle(String name);
+
+  /// No description provided for @rotateKeyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The current key stops working at once. Put the new one on the device.'**
+  String get rotateKeyBody;
+
+  /// No description provided for @removeDeviceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String removeDeviceTitle(String name);
+
+  /// No description provided for @removeDeviceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its key stops working at once, and it can\'t send readings any more.'**
+  String get removeDeviceBody;
+
+  /// No description provided for @removeDeviceTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove device'**
+  String get removeDeviceTooltip;
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get showMore;
+
+  /// No description provided for @addDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get addDevice;
+
+  /// No description provided for @editDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit device'**
+  String get editDevice;
+
+  /// No description provided for @deviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Device ID'**
+  String get deviceId;
+
+  /// No description provided for @deviceIdHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters, digits, dots, dashes and underscores; it can\'t change later'**
+  String get deviceIdHelp;
+
+  /// No description provided for @deviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get deviceName;
+
+  /// No description provided for @deviceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get deviceDescription;
+
+  /// No description provided for @deviceKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Key for {id}'**
+  String deviceKeyTitle(String id);
+
+  /// No description provided for @deviceKeyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy it to the device now: it isn\'t shown again.'**
+  String get deviceKeyBody;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @contactSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get contactSupport;
+
+  /// No description provided for @summaryDownFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Down for {time}'**
+  String summaryDownFor(String time);
+
+  /// No description provided for @deviceUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated at {time}'**
+  String deviceUpdatedAt(String time);
+
+  /// No description provided for @deviceStaleSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh · readings from {time}'**
+  String deviceStaleSince(String time);
+
+  /// No description provided for @sectionThresholds.
+  ///
+  /// In en, this message translates to:
+  /// **'Thresholds'**
+  String get sectionThresholds;
+
+  /// No description provided for @thresholdServiceDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Service down'**
+  String get thresholdServiceDown;
+
+  /// No description provided for @sensorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensors'**
+  String get sensorsTitle;
+
+  /// No description provided for @sensorsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live readings from the devices. Tap one for its history.'**
+  String get sensorsSubtitle;
+
+  /// No description provided for @sensorsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No live readings: {error}'**
+  String sensorsUnavailable(String error);
+
+  /// No description provided for @sensorsNoBroker.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected to the MQTT broker yet'**
+  String get sensorsNoBroker;
+
+  /// No description provided for @sensorsWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for readings…'**
+  String get sensorsWaiting;
+
+  /// No description provided for @sensorReadAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Read at {time}'**
+  String sensorReadAt(String time);
+
+  /// No description provided for @rangeHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Hour'**
+  String get rangeHour;
+
+  /// No description provided for @rangeDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get rangeDay;
+
+  /// No description provided for @rangeWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get rangeWeek;
+
+  /// No description provided for @sensorHistoryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the history: {error}'**
+  String sensorHistoryFailed(String error);
+
+  /// No description provided for @sensorHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No readings stored for this period'**
+  String get sensorHistoryEmpty;
+
+  /// No description provided for @sensorMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Lowest {value}'**
+  String sensorMin(String value);
+
+  /// No description provided for @sensorMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest {value}'**
+  String sensorMax(String value);
+
+  /// No description provided for @modelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get modelTitle;
+
+  /// No description provided for @modelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The inference runner on the edge device'**
+  String get modelSubtitle;
+
+  /// No description provided for @modelNoRunner.
+  ///
+  /// In en, this message translates to:
+  /// **'No inference runner on this deployment, or it isn\'t answering.'**
+  String get modelNoRunner;
+
+  /// No description provided for @modelFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the runner: {error}'**
+  String modelFailed(String error);
+
+  /// No description provided for @modelInferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Inferences'**
+  String get modelInferences;
+
+  /// No description provided for @modelLastLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Last latency'**
+  String get modelLastLatency;
+
+  /// No description provided for @modelLastAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last one'**
+  String get modelLastAt;
+
+  /// No description provided for @modelRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent results'**
+  String get modelRecent;
+
+  /// No description provided for @classifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it'**
+  String get classifyTitle;
+
+  /// No description provided for @classifyValues.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature values'**
+  String get classifyValues;
+
+  /// No description provided for @classifyExpects.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {expected} values'**
+  String classifyExpects(int expected, int count);
+
+  /// No description provided for @classify.
+  ///
+  /// In en, this message translates to:
+  /// **'Classify'**
+  String get classify;
+
+  /// No description provided for @classifyAnomaly.
+  ///
+  /// In en, this message translates to:
+  /// **'anomaly {score}'**
+  String classifyAnomaly(String score);
+
+  /// No description provided for @classifyNotNumbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter numbers separated by commas or spaces.'**
+  String get classifyNotNumbers;
+
+  /// No description provided for @commandTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a command'**
+  String get commandTitle;
+
+  /// No description provided for @commandSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Publishes one MQTT message, e.g. to a device\'s command topic'**
+  String get commandSubtitle;
+
+  /// No description provided for @commandTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic'**
+  String get commandTopic;
+
+  /// No description provided for @commandPayload.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get commandPayload;
+
+  /// No description provided for @commandPayloadHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, or JSON'**
+  String get commandPayloadHelp;
+
+  /// No description provided for @commandRetain.
+  ///
+  /// In en, this message translates to:
+  /// **'Retain'**
+  String get commandRetain;
+
+  /// No description provided for @commandSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to {topic} ({bytes} bytes)'**
+  String commandSent(String topic, int bytes);
+
+  /// No description provided for @commandTopicNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'This deployment doesn\'t allow publishing to {topic} (P4N4_API_MQTT_PUBLISH_ALLOW and _DENY on p4n4-api).'**
+  String commandTopicNotAllowed(String topic);
+
+  /// No description provided for @commandNoBroker.
+  ///
+  /// In en, this message translates to:
+  /// **'p4n4-api isn\'t connected to the broker: {error}'**
+  String commandNoBroker(String error);
+
+  /// No description provided for @commandNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Only operators and admins can send commands.'**
+  String get commandNotAllowed;
+
+  /// No description provided for @commandFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent: {error}'**
+  String commandFailed(String error);
+
+  /// No description provided for @thresholdsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'When {deployment}\'s readings show as high or critical, on this device.'**
+  String thresholdsNote(String deployment);
+
+  /// No description provided for @thresholdLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'High from {high} · critical from {critical}'**
+  String thresholdLevels(String high, String critical);
+
+  /// No description provided for @thresholdServiceDownHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'A service that stops answering is a warning at first, then critical'**
+  String get thresholdServiceDownHelp;
+
+  /// No description provided for @thresholdsReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the defaults'**
+  String get thresholdsReset;
+
+  /// No description provided for @fleetNoReadings.
+  ///
+  /// In en, this message translates to:
+  /// **'No device readings'**
+  String get fleetNoReadings;
+
+  /// No description provided for @incidentUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything'**
+  String get incidentUnreachable;
+
+  /// No description provided for @incidentOngoing.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} down since {start} ({length})'**
+  String incidentOngoing(String service, String start, String length);
+
+  /// No description provided for @incidentEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} down {start}–{end}'**
+  String incidentEnded(String service, String start, String end);
+
+  /// No description provided for @incidentHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Outage history'**
+  String get incidentHistory;
+
+  /// No description provided for @incidentHistoryOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: outages'**
+  String incidentHistoryOf(String name);
+
+  /// No description provided for @incidentNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No outages seen from this device.'**
+  String get incidentNone;
+
+  /// No description provided for @incidentNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen from this device while it showed this deployment\'s status.'**
+  String get incidentNote;
+
+  /// No description provided for @serviceDownFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline · {time}'**
+  String serviceDownFor(String time);
+
+  /// No description provided for @answerStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer style'**
+  String get answerStyle;
+
+  /// No description provided for @styleStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get styleStandard;
+
+  /// No description provided for @styleBrief.
+  ///
+  /// In en, this message translates to:
+  /// **'Brief'**
+  String get styleBrief;
+
+  /// No description provided for @styleSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Step by step'**
+  String get styleSteps;
+
+  /// No description provided for @styleSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain words'**
+  String get styleSimple;
+
+  /// No description provided for @styleCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Own instructions'**
+  String get styleCustom;
+
+  /// No description provided for @styleCustomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How should the assistant answer?'**
+  String get styleCustomLabel;
+
+  /// No description provided for @styleCustomHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent with every question from this device'**
+  String get styleCustomHelp;
+
+  /// No description provided for @videoGridLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light grid for slow links'**
+  String get videoGridLight;
+
+  /// No description provided for @videoGridLightHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'In the grid, a new picture every 2 seconds instead of live motion'**
+  String get videoGridLightHelp;
+
+  /// No description provided for @cameraFrameEvery.
+  ///
+  /// In en, this message translates to:
+  /// **'every {seconds} s'**
+  String cameraFrameEvery(int seconds);
+
+  /// No description provided for @clearList.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearList;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

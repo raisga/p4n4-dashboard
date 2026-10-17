@@ -35,6 +35,44 @@ class BrandLink {
   final Uri url;
 }
 
+/// Who people can contact when something's wrong, from brand.json `support`:
+/// any of an email address, a phone number and a web page. The dashboard
+/// offers it where viewers would otherwise be stuck (nothing answering, the
+/// assistant down).
+class BrandSupport {
+  const BrandSupport({this.email, this.phone, this.url});
+
+  /// From `{"email": …, "phone": …, "url": …}`; null when it names none.
+  static BrandSupport? fromJson(Object? raw) {
+    if (raw == null) return null;
+    if (raw is! Map) throw const FormatException('brand.json support must be an object');
+    String? field(String key) => switch (raw[key]) {
+      null => null,
+      final String v when v.trim().isNotEmpty => v.trim(),
+      _ => throw FormatException('brand.json support.$key must be a non-empty string'),
+    };
+    final url = field('url');
+    if (url != null &&
+        !(Uri.tryParse(url)?.isScheme('https') ?? false) &&
+        !(Uri.tryParse(url)?.isScheme('http') ?? false)) {
+      throw const FormatException('brand.json support.url must be an http(s) URL');
+    }
+    final support = BrandSupport(email: field('email'), phone: field('phone'), url: url);
+    return support.email == null && support.phone == null && support.url == null ? null : support;
+  }
+
+  final String? email;
+  final String? phone;
+  final String? url;
+
+  /// The ways to get in touch, in the order they're offered: the page, then email, then phone.
+  List<Uri> get contacts => [
+    if (url != null) Uri.parse(url!),
+    if (email != null) Uri(scheme: 'mailto', path: email),
+    if (phone != null) Uri(scheme: 'tel', path: phone!.replaceAll(RegExp(r'[^\d+]'), '')),
+  ];
+}
+
 /// White-label configuration, loaded from `assets/brand/brand.json`.
 ///
 /// That folder holds exactly one brand: `dart run tool/brand.dart <id>` copies
@@ -55,6 +93,7 @@ class Brand {
     required this.tabs,
     required this.links,
     required this.defaults,
+    this.support,
     this.tour = const {},
     this.assistantSuggestions = const {},
     this.demoCameras = const [],
@@ -88,6 +127,9 @@ class Brand {
 
   /// Initial values for [AppSettings] keys (host, themeMode, videoUrl, …).
   final Map<String, Object> defaults;
+
+  /// Who to contact when something's wrong; null when the brand names nobody.
+  final BrandSupport? support;
 
   /// Tour text that replaces the built-in copy: step → language code (`*`
   /// for every language) → text.
@@ -207,6 +249,7 @@ class Brand {
           BrandLink((l as Map)['label'] as String, Uri.parse(l['url'] as String)),
       ],
       defaults: ((j['defaults'] as Map?) ?? const {}).cast<String, Object>(),
+      support: BrandSupport.fromJson(j['support']),
       tour: _tour(j['tour']),
       assistantSuggestions: _suggestions(((j['assistant'] as Map?) ?? const {})['suggestions']),
       demoCameras: _demoCameras(video['demoCameras']),

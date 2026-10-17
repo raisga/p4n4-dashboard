@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/settings.dart';
 import 'project.dart' show ApiWatcher;
+import 'api_error.dart';
 
 enum BannerTone { info, warning }
 
@@ -42,14 +43,8 @@ class DashboardBanner {
 }
 
 /// A change the API turned down (only admins may), or that never arrived.
-class BannerException implements Exception {
-  const BannerException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class BannerException extends ApiException {
+  const BannerException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 const _timeout = Duration(seconds: 8);
@@ -90,5 +85,5 @@ Map<String, dynamic> _body(http.Response res) {
   try {
     message = ((jsonDecode(res.body) as Map)['error'] as Map)['message'] as String?;
   } catch (_) {}
-  throw BannerException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode);
+  throw BannerException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode, requestId: requestIdOf(res));
 }

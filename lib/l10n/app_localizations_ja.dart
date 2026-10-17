@@ -1571,4 +1571,406 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get defaultCameraFirst => '最初のカメラ';
+
+  @override
+  String logsTitle(String name) {
+    return '$name のログ';
+  }
+
+  @override
+  String logsFailed(String error) {
+    return '停止しました: $error';
+  }
+
+  @override
+  String get logsEnded => 'ログのストリームが終了しました';
+
+  @override
+  String get logsFollowing => '新しい行を追跡中';
+
+  @override
+  String get copyTooltip => 'コピー';
+
+  @override
+  String get copied => 'コピーしました';
+
+  @override
+  String get logsFilter => '絞り込み';
+
+  @override
+  String get logsEmpty => 'まだログはありません';
+
+  @override
+  String get logsNoMatch => '条件に合う行がありません';
+
+  @override
+  String get logsLatest => '最新の行へ移動';
+
+  @override
+  String get logsMenu => 'ログ';
+
+  @override
+  String get serviceConfirmRestartBody => '使用中のすべての人にとって一時的に停止します。';
+
+  @override
+  String serviceUptime(String time) {
+    return '稼働 $time';
+  }
+
+  @override
+  String get serviceUnhealthy => '異常';
+
+  @override
+  String get serviceStarting => '起動中';
+
+  @override
+  String serviceActions(String name) {
+    return '$name の操作';
+  }
+
+  @override
+  String get sectionDevices => 'デバイス';
+
+  @override
+  String devicesNote(String platform) {
+    return '$platform-api に測定値を送るデバイス。それぞれ専用のキーを持ちます。';
+  }
+
+  @override
+  String get devicesOnlyAdmins => 'デバイスを変更できるのは管理者だけです。';
+
+  @override
+  String devicesLoadFailed(String error) {
+    return 'デバイスを読み込めませんでした: $error';
+  }
+
+  @override
+  String get devicesNone => '登録済みのデバイスはまだありません。';
+
+  @override
+  String get deviceDisabled => '無効';
+
+  @override
+  String deviceLastSeen(String time) {
+    return '最終確認 $time';
+  }
+
+  @override
+  String get deviceNeverSeen => '未確認';
+
+  @override
+  String deviceKey(String prefix) {
+    return 'キー $prefix…';
+  }
+
+  @override
+  String get deviceDisable => '無効にする（サインインできなくなります）';
+
+  @override
+  String get deviceEnable => '有効にする';
+
+  @override
+  String get rotateKey => '新しいキー';
+
+  @override
+  String rotateKeyTitle(String name) {
+    return '$name に新しいキーを発行しますか？';
+  }
+
+  @override
+  String get rotateKeyBody => '現在のキーはすぐに使えなくなります。新しいキーをデバイスに設定してください。';
+
+  @override
+  String removeDeviceTitle(String name) {
+    return '$name を削除しますか？';
+  }
+
+  @override
+  String get removeDeviceBody => 'キーはすぐに使えなくなり、測定値を送れなくなります。';
+
+  @override
+  String get removeDeviceTooltip => 'デバイスを削除';
+
+  @override
+  String get showMore => 'さらに表示';
+
+  @override
+  String get addDevice => 'デバイスを追加';
+
+  @override
+  String get editDevice => 'デバイスを編集';
+
+  @override
+  String get deviceId => 'デバイス ID';
+
+  @override
+  String get deviceIdHelp => '英字、数字、ピリオド、ハイフン、アンダースコア。あとから変更できません';
+
+  @override
+  String get deviceName => '名前';
+
+  @override
+  String get deviceDescription => '説明';
+
+  @override
+  String deviceKeyTitle(String id) {
+    return '$id のキー';
+  }
+
+  @override
+  String get deviceKeyBody => '今すぐデバイスにコピーしてください。再表示はされません。';
+
+  @override
+  String get done => '完了';
+
+  @override
+  String get contactSupport => 'サポートに問い合わせる';
+
+  @override
+  String summaryDownFor(String time) {
+    return '停止して $time';
+  }
+
+  @override
+  String deviceUpdatedAt(String time) {
+    return '$time に更新';
+  }
+
+  @override
+  String deviceStaleSince(String time) {
+    return '更新できません · $time の測定値';
+  }
+
+  @override
+  String get sectionThresholds => 'しきい値';
+
+  @override
+  String get thresholdServiceDown => 'サービス停止';
+
+  @override
+  String get sensorsTitle => 'センサー';
+
+  @override
+  String get sensorsSubtitle => 'デバイスからのライブ測定値。タップすると履歴を表示します。';
+
+  @override
+  String sensorsUnavailable(String error) {
+    return 'ライブ測定値がありません: $error';
+  }
+
+  @override
+  String get sensorsNoBroker => 'MQTT ブローカーにまだ接続していません';
+
+  @override
+  String get sensorsWaiting => '測定値を待っています…';
+
+  @override
+  String sensorReadAt(String time) {
+    return '$time に測定';
+  }
+
+  @override
+  String get rangeHour => '1時間';
+
+  @override
+  String get rangeDay => '1日';
+
+  @override
+  String get rangeWeek => '1週間';
+
+  @override
+  String sensorHistoryFailed(String error) {
+    return '履歴を読み込めませんでした: $error';
+  }
+
+  @override
+  String get sensorHistoryEmpty => 'この期間の測定値は保存されていません';
+
+  @override
+  String sensorMin(String value) {
+    return '最小 $value';
+  }
+
+  @override
+  String sensorMax(String value) {
+    return '最大 $value';
+  }
+
+  @override
+  String get modelTitle => 'モデル';
+
+  @override
+  String get modelSubtitle => 'エッジデバイス上の推論ランナー';
+
+  @override
+  String get modelNoRunner => 'このデプロイメントには推論ランナーがないか、応答していません。';
+
+  @override
+  String modelFailed(String error) {
+    return 'ランナーに接続できません: $error';
+  }
+
+  @override
+  String get modelInferences => '推論回数';
+
+  @override
+  String get modelLastLatency => '直近のレイテンシ';
+
+  @override
+  String get modelLastAt => '直近の推論';
+
+  @override
+  String get modelRecent => '最近の結果';
+
+  @override
+  String get classifyTitle => '試してみる';
+
+  @override
+  String get classifyValues => '入力値';
+
+  @override
+  String classifyExpects(int expected, int count) {
+    return '$expected 個中 $count 個の値';
+  }
+
+  @override
+  String get classify => '分類';
+
+  @override
+  String classifyAnomaly(String score) {
+    return '異常度 $score';
+  }
+
+  @override
+  String get classifyNotNumbers => 'カンマか空白で区切った数値を入力してください。';
+
+  @override
+  String get commandTitle => 'コマンドを送信';
+
+  @override
+  String get commandSubtitle => 'MQTT メッセージを 1 件送信します（例: デバイスのコマンドトピック）';
+
+  @override
+  String get commandTopic => 'トピック';
+
+  @override
+  String get commandPayload => 'メッセージ';
+
+  @override
+  String get commandPayloadHelp => 'テキストまたは JSON';
+
+  @override
+  String get commandRetain => '保持（retain）';
+
+  @override
+  String commandSent(String topic, int bytes) {
+    return '$topic に送信しました（$bytes バイト）';
+  }
+
+  @override
+  String commandTopicNotAllowed(String topic) {
+    return 'このデプロイメントでは $topic への送信は許可されていません（p4n4-api の P4N4_API_MQTT_PUBLISH_ALLOW と _DENY）。';
+  }
+
+  @override
+  String commandNoBroker(String error) {
+    return 'p4n4-api がブローカーに接続していません: $error';
+  }
+
+  @override
+  String get commandNotAllowed => 'コマンドを送信できるのはオペレーターと管理者だけです。';
+
+  @override
+  String commandFailed(String error) {
+    return '送信されませんでした: $error';
+  }
+
+  @override
+  String thresholdsNote(String deployment) {
+    return 'このデバイスで $deployment の測定値を高い・危険と表示する基準です。';
+  }
+
+  @override
+  String thresholdLevels(String high, String critical) {
+    return '$high から高い · $critical から危険';
+  }
+
+  @override
+  String get thresholdServiceDownHelp => '応答しなくなったサービスは最初は警告、その後は危険になります';
+
+  @override
+  String get thresholdsReset => '既定値に戻す';
+
+  @override
+  String get fleetNoReadings => 'デバイスの測定値なし';
+
+  @override
+  String get incidentUnreachable => 'すべて';
+
+  @override
+  String incidentOngoing(String service, String start, String length) {
+    return '$service が $start から停止中（$length）';
+  }
+
+  @override
+  String incidentEnded(String service, String start, String end) {
+    return '$service 停止 $start–$end';
+  }
+
+  @override
+  String get incidentHistory => '停止の履歴';
+
+  @override
+  String incidentHistoryOf(String name) {
+    return '$name: 停止';
+  }
+
+  @override
+  String get incidentNone => 'このデバイスでは停止は確認されていません。';
+
+  @override
+  String get incidentNote => 'このデバイスがこのデプロイメントの状態を表示していた間に確認したものです。';
+
+  @override
+  String serviceDownFor(String time) {
+    return 'オフライン · $time';
+  }
+
+  @override
+  String get answerStyle => '回答スタイル';
+
+  @override
+  String get styleStandard => '標準';
+
+  @override
+  String get styleBrief => '簡潔';
+
+  @override
+  String get styleSteps => '手順ごと';
+
+  @override
+  String get styleSimple => 'やさしい言葉';
+
+  @override
+  String get styleCustom => '独自の指示';
+
+  @override
+  String get styleCustomLabel => 'アシスタントにどう答えてほしいですか？';
+
+  @override
+  String get styleCustomHelp => 'このデバイスからの質問ごとに送信されます';
+
+  @override
+  String get videoGridLight => '低速回線向けの軽量グリッド';
+
+  @override
+  String get videoGridLightHelp => 'グリッドでは動画の代わりに 2 秒ごとに新しい画像を表示します';
+
+  @override
+  String cameraFrameEvery(int seconds) {
+    return '$seconds 秒ごと';
+  }
+
+  @override
+  String get clearList => '消去';
 }

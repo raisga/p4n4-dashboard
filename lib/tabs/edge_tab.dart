@@ -1,15 +1,16 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../api/edge_metrics.dart';
+import '../api/metrics_monitor.dart';
 import '../core/format.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../core/thresholds.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/edge_sections.dart';
 import '../widgets/sparkline.dart';
+import '../widgets/support.dart';
 
 const _interval = Duration(seconds: 2);
 
@@ -17,7 +18,8 @@ const _interval = Duration(seconds: 2);
 /// minutes is a setting (Settings → Appearance).
 const _perMinute = 30;
 
-/// Live system metrics for the edge device.
+/// Live system metrics for the edge device, then its sensors, and for admins
+/// and power users its inference model and a way to send devices a command.
 class EdgeTab extends StatefulWidget {
   const EdgeTab({super.key, required this.active});
 
@@ -30,23 +32,16 @@ class EdgeTab extends StatefulWidget {
 class _EdgeTabState extends State<EdgeTab> {
   P4Colors get p4 => context.p4;
 
-  final _cpu = <double>[], _mem = <double>[], _temp = <double>[], _inf = <double>[];
-  final _demo = DemoMetrics();
-  EdgeMetrics? _latest;
-  Object? _error;
-  Timer? _timer;
-  String? _sourceKey;
-  bool _inFlight = false;
+  // The shared monitor polls and keeps the history, so Home's card and this
+  // tab show the same readings and switching tabs keeps the charts.
+  late MetricsMonitor _monitor;
+  late MetricsSource _source;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final s = SettingsScope.of(context);
-    final key = '${s.edgeDemo}|${s.edgeMetricsUri}';
-    if (key != _sourceKey) {
-      _sourceKey = key;
-      _reset();
-    }
+    _monitor = MetricsScope.of(context);
+    _source = SettingsScope.of(context).metricsSource;
     _schedule();
   }
 
@@ -58,58 +53,11 @@ class _EdgeTabState extends State<EdgeTab> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _monitor.unwatch(this);
     super.dispose();
   }
 
-  void _reset() {
-    for (final l in [_cpu, _mem, _temp, _inf]) {
-      l.clear();
-    }
-    _latest = null;
-    _error = null;
-  }
-
-  void _schedule() {
-    if (!widget.active) {
-      _timer?.cancel();
-      _timer = null;
-    } else if (_timer == null) {
-      _tick();
-      _timer = Timer.periodic(_interval, (_) => _tick());
-    }
-  }
-
-  Future<void> _tick() async {
-    if (_inFlight) return;
-    final settings = SettingsScope.of(context);
-    final key = _sourceKey;
-    _inFlight = true;
-    try {
-      final m = settings.edgeDemo ? _demo.next() : await fetchEdgeMetrics(settings.edgeMetricsUri);
-      if (!mounted || key != _sourceKey) return;
-      final capacity = settings.edgeHistoryMinutes * _perMinute;
-      setState(() {
-        _error = null;
-        _latest = m;
-        _push(_cpu, m.cpu, capacity);
-        _push(_mem, m.mem, capacity);
-        if (m.tempC != null) _push(_temp, m.tempC!, capacity);
-        if (m.inferenceMs != null) _push(_inf, m.inferenceMs!, capacity);
-      });
-    } catch (e) {
-      if (mounted && key == _sourceKey) setState(() => _error = e);
-    } finally {
-      _inFlight = false;
-    }
-  }
-
-  static void _push(List<double> l, double v, int capacity) {
-    l.add(v);
-    while (l.length > capacity) {
-      l.removeAt(0);
-    }
-  }
+  void _schedule() => widget.active ? _monitor.watch(this, [_source], interval: _interval) : _monitor.unwatch(this);
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +66,10 @@ class _EdgeTabState extends State<EdgeTab> {
     final technical = session.isTechnical;
     final l = context.l10n;
     final f = context.formats;
-    final m = _latest;
+    final t = settings.thresholds;
+    final metrics = _monitor.of(_source);
+    final m = metrics.latest;
+    final error = metrics.error;
 
     final header = PageHeader(
       title: l.navEdge,
@@ -138,7 +89,7 @@ class _EdgeTabState extends State<EdgeTab> {
           : null,
     );
 
-    if (m == null && _error != null) {
+    if (m == null && error != null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
         child: Column(
@@ -149,17 +100,37 @@ class _EdgeTabState extends State<EdgeTab> {
                 icon: Icons.sensors_off_outlined,
                 color: p4.err,
                 title: l.edgeNoMetrics,
-                message: technical ? l.edgeFetchFailed('${settings.edgeMetricsUri}', '$_error') : l.edgeUnavailable,
+                message: technical ? l.edgeFetchFailed('${_source.uri}', '$error') : l.edgeUnavailable,
                 actions: [
                   if (session.isAdmin)
                     FilledButton(onPressed: () => settings.edgeDemo = true, child: Text(l.useDemoData)),
-                  OutlinedButton(onPressed: _tick, child: Text(l.retry)),
+                  OutlinedButton(onPressed: () => _monitor.refresh(_source), child: Text(l.retry)),
+                  if (!technical) const ContactSupportButton(),
                 ],
               ),
             ),
           ],
         ),
       );
+    }
+
+    final capacity = settings.edgeHistoryMinutes * _perMinute;
+    final window = metrics.history.length > capacity
+        ? metrics.history.sublist(metrics.history.length - capacity)
+        : metrics.history;
+    final temps = [
+      for (final s in window)
+        if (s.metrics.tempC != null) s,
+    ];
+    final infs = [
+      for (final s in window)
+        if (s.metrics.inferenceMs != null) s,
+    ];
+    final now = DateTime.now();
+    String ago(List<MetricsSample> samples, int i) => '−${f.span(now.difference(samples[i].at))}';
+    String agoSeconds(List<MetricsSample> samples, int i) {
+      final secs = now.difference(samples[i].at).inSeconds;
+      return secs < 120 ? '−${secs}s' : ago(samples, i);
     }
 
     return PageBody(
@@ -173,16 +144,16 @@ class _EdgeTabState extends State<EdgeTab> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             StatusIndicator(
-              _error != null
+              error != null
                   ? Health.down
                   : (m == null ? Health.pending : (settings.edgeDemo ? Health.unknown : Health.up)),
-              label: _error != null
+              label: error != null
                   ? l.edgeStale
                   : (settings.edgeDemo ? l.edgeDemoLabel : (m == null ? null : l.edgeLive)),
             ),
             if (technical || settings.edgeDemo)
               Text(
-                settings.edgeDemo ? l.edgeSynthetic : settings.edgeMetricsUri.toString(),
+                settings.edgeDemo ? l.edgeSynthetic : _source.uri.toString(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: settings.edgeDemo ? p4.body(size: 13, color: p4.muted) : p4.mono(size: 12, spacing: 0),
@@ -199,18 +170,20 @@ class _EdgeTabState extends State<EdgeTab> {
               _MetricTile(
                 l.readingProcessor,
                 f.percent(m.cpu, technical ? 1 : 0),
-                _cpu,
+                [for (final s in window) s.metrics.cpu],
                 (v) => f.percent(v, 1),
                 maxY: 100,
-                level: (usageLevel(m.cpu), l.levelName(usageLevel(m.cpu))),
+                readAt: (i) => agoSeconds(window, i),
+                level: (t.level(Reading.cpu, m.cpu), l.levelName(t.level(Reading.cpu, m.cpu))),
               ),
               _MetricTile(
                 l.readingMemory,
                 f.percent(m.mem, technical ? 1 : 0),
-                _mem,
+                [for (final s in window) s.metrics.mem],
                 (v) => f.percent(v, 1),
                 maxY: 100,
-                level: (usageLevel(m.mem), l.levelName(usageLevel(m.mem))),
+                readAt: (i) => agoSeconds(window, i),
+                level: (t.level(Reading.memory, m.mem), l.levelName(t.level(Reading.memory, m.mem))),
                 sub: m.memUsedMb != null && m.memTotalMb != null
                     ? '${f.decimal(m.memUsedMb! / 1024)} / ${f.decimal(m.memTotalMb! / 1024)} GB'
                     : null,
@@ -219,19 +192,24 @@ class _EdgeTabState extends State<EdgeTab> {
                 _MetricTile(
                   l.readingTemperature,
                   f.temperature(m.tempC!, technical ? 1 : 0),
-                  _temp,
+                  [for (final s in temps) s.metrics.tempC!],
                   (v) => f.temperature(v, 1),
                   maxY: 100,
                   color: p4.amber,
-                  level: (temperatureLevel(m.tempC!), l.levelName(temperatureLevel(m.tempC!), temperature: true)),
+                  readAt: (i) => agoSeconds(temps, i),
+                  level: (
+                    t.level(Reading.temperature, m.tempC!),
+                    l.levelName(t.level(Reading.temperature, m.tempC!), temperature: true),
+                  ),
                 ),
               if (m.inferenceMs != null)
                 _MetricTile(
                   l.metricInference,
                   '${f.decimal(m.inferenceMs!, technical ? 1 : 0)} ms',
-                  _inf,
+                  [for (final s in infs) s.metrics.inferenceMs!],
                   (v) => '${f.decimal(v)} ms',
                   color: p4.blue,
+                  readAt: (i) => agoSeconds(infs, i),
                 ),
             ],
           ),
@@ -239,13 +217,17 @@ class _EdgeTabState extends State<EdgeTab> {
           TileGrid(
             minWidth: 220,
             children: [
-              if (m.disk != null) _Fact(l.factDisk, f.percent(m.disk!), progress: m.disk! / 100),
+              if (m.disk != null)
+                _Fact(l.factDisk, f.percent(m.disk!), progress: m.disk! / 100, level: t.level(Reading.disk, m.disk!)),
               // Load average means little without knowing the core count: technical users only.
               if (m.load != null && technical) _Fact(l.factLoad, m.load!.map((e) => f.decimal(e, 2)).join('  ')),
               if (m.uptime != null) _Fact(l.factUptime, _uptime(m.uptime!)),
             ],
           ),
         ],
+        const SizedBox(height: 32),
+        SensorsPanel(active: widget.active),
+        if (technical) ...[ModelPanel(active: widget.active), CommandPanel()],
       ],
     );
   }
@@ -257,7 +239,17 @@ class _EdgeTabState extends State<EdgeTab> {
 }
 
 class _MetricTile extends StatelessWidget {
-  const _MetricTile(this.label, this.value, this.history, this.format, {this.maxY, this.sub, this.color, this.level});
+  const _MetricTile(
+    this.label,
+    this.value,
+    this.history,
+    this.format, {
+    this.maxY,
+    this.sub,
+    this.color,
+    this.level,
+    this.readAt,
+  });
 
   final String label;
   final String value;
@@ -266,6 +258,9 @@ class _MetricTile extends StatelessWidget {
   final double? maxY;
   final String? sub;
   final Color? color;
+
+  /// When each of [history]'s readings came, for the chart's hover readout.
+  final String Function(int index)? readAt;
 
   /// How the reading compares with normal, and that in words.
   final (Level, String)? level;
@@ -309,14 +304,7 @@ class _MetricTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Sparkline(
-            // A shorter window applies at once, before the next reading trims the list.
-            values: history.length > capacity ? history.sublist(history.length - capacity) : history,
-            format: format,
-            maxY: maxY,
-            color: color,
-            capacity: capacity,
-          ),
+          Sparkline(values: history, format: format, maxY: maxY, color: color, capacity: capacity, label: readAt),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -332,11 +320,14 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _Fact extends StatelessWidget {
-  const _Fact(this.label, this.value, {this.progress});
+  const _Fact(this.label, this.value, {this.progress, this.level});
 
   final String label;
   final String value;
   final double? progress;
+
+  /// The bar's colour: how [progress] compares with the deployment's thresholds.
+  final Level? level;
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +350,7 @@ class _Fact extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress!.clamp(0, 1),
                 minHeight: 6,
-                color: levelColor(p4, usageLevel(progress! * 100)),
+                color: levelColor(p4, level ?? Level.normal),
                 backgroundColor: p4.bg3,
               ),
             ),

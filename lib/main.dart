@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'api/auth.dart';
 import 'api/banner.dart';
 import 'api/feed.dart';
+import 'api/metrics_monitor.dart';
 import 'api/project.dart';
 import 'api/status_monitor.dart';
 import 'api/view_settings.dart';
@@ -18,6 +19,7 @@ import 'api/vision_recorded.dart';
 import 'core/alerts.dart';
 import 'core/brand.dart';
 import 'core/chat_history.dart';
+import 'core/incidents.dart';
 import 'core/runtime_config.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
@@ -95,15 +97,24 @@ class _SessionCredentials implements ApiCredentials {
 }
 
 class DashboardApp extends StatefulWidget {
-  const DashboardApp({super.key});
+  const DashboardApp({super.key, this.status, this.metrics});
+
+  /// Service status and edge readings; the app makes its own unless a test
+  /// passes one that answers without a network.
+  final StatusMonitor? status;
+  final MetricsMonitor? metrics;
 
   @override
   State<DashboardApp> createState() => _DashboardAppState();
 }
 
 class _DashboardAppState extends State<DashboardApp> {
-  /// Above the navigator, so pushed screens (e.g. Clients on phones) share it.
-  final _status = StatusMonitor();
+  /// Above the navigator, so pushed screens (e.g. Clients on phones) share them.
+  late final _status = widget.status ?? StatusMonitor();
+  late final _metrics = widget.metrics ?? MetricsMonitor();
+
+  /// Outages seen in [_status]'s checks, per deployment.
+  IncidentLog? _incidents;
 
   /// To close whatever is open over the shell (Settings, a dialog) when idle.
   final _navigator = GlobalKey<NavigatorState>();
@@ -138,8 +149,17 @@ class _DashboardAppState extends State<DashboardApp> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _incidents ??= IncidentLog(_status, SettingsScope.of(context));
+  }
+
+  @override
   void dispose() {
-    _status.dispose();
+    _incidents?.dispose();
+    // A test's own monitors are the test's to dispose.
+    if (widget.status == null) _status.dispose();
+    if (widget.metrics == null) _metrics.dispose();
     super.dispose();
   }
 
@@ -177,16 +197,22 @@ class _DashboardAppState extends State<DashboardApp> {
     // MaterialApp takes these from the MediaQuery above it (see MediaQuery.fromView's platformData).
     return StatusScope(
       monitor: _status,
-      child: MediaQuery(
-        data: device.copyWith(
-          textScaler: _scaled(device.textScaler, settings.textScale),
-          disableAnimations: reduceMotion,
-          highContrast: highContrast,
-        ),
-        child: IdleWatcher(
-          timeout: idleAfter,
-          onIdle: onIdle,
-          child: TourHost(child: app),
+      child: MetricsScope(
+        monitor: _metrics,
+        child: IncidentScope(
+          log: _incidents!,
+          child: MediaQuery(
+            data: device.copyWith(
+              textScaler: _scaled(device.textScaler, settings.textScale),
+              disableAnimations: reduceMotion,
+              highContrast: highContrast,
+            ),
+            child: IdleWatcher(
+              timeout: idleAfter,
+              onIdle: onIdle,
+              child: TourHost(child: app),
+            ),
+          ),
         ),
       ),
     );

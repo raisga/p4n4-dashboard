@@ -8,10 +8,12 @@ import '../core/format.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../core/thresholds.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import 'admin_sections.dart';
 import 'chats_section.dart';
+import 'devices_section.dart';
 import 'kiosk_dialogs.dart';
 import 'password_page.dart';
 
@@ -28,6 +30,8 @@ enum SettingsCategory {
   language,
   connection,
   endpoints,
+  devices,
+  thresholds,
   views,
   users,
   banner,
@@ -105,7 +109,7 @@ List<_Category> _categories(BuildContext context) {
         l.themeSystem,
         l.themeLight,
         l.themeDark,
-        if (brand.tabs.contains(DashTab.video)) ...[l.sectionVideo, l.videoGridDefault],
+        if (brand.tabs.contains(DashTab.video)) ...[l.sectionVideo, l.videoGridDefault, l.videoGridLight],
         if (session.isTechnical) ...[
           l.viewStartTab,
           if (brand.tabs.contains(DashTab.edge)) l.chartHistory,
@@ -174,6 +178,26 @@ List<_Category> _categories(BuildContext context) {
           ],
           build: (_) => const _EndpointsPage(),
         ),
+      _Category(
+        SettingsCategory.devices,
+        _Heading.deployment,
+        Icons.sensors,
+        l.sectionDevices,
+        summary: '',
+        keywords: [l.addDevice, l.rotateKey],
+        build: (_) => const _Group(
+          children: [Padding(padding: EdgeInsets.all(20), child: DevicesSection())],
+        ),
+      ),
+      _Category(
+        SettingsCategory.thresholds,
+        _Heading.deployment,
+        Icons.tune,
+        l.sectionThresholds,
+        summary: '',
+        keywords: [l.readingProcessor, l.readingMemory, l.readingTemperature, l.factDisk, l.thresholdServiceDown],
+        build: (_) => const _ThresholdsPage(),
+      ),
     ],
     if (session.isAdmin) ...[
       _Category(
@@ -1005,6 +1029,13 @@ class _AppearancePage extends StatelessWidget {
                 icon: Icons.grid_view,
                 value: s.videoGrid,
                 onChanged: (v) => s.videoGrid = v,
+              ),
+              _Tile(
+                icon: Icons.network_check,
+                title: l.videoGridLight,
+                subtitle: l.videoGridLightHelp,
+                onTap: () => s.videoGridLight = !s.videoGridLight,
+                trailing: Switch(value: s.videoGridLight, onChanged: (v) => s.videoGridLight = v),
               ),
               if (own && cameras.isNotEmpty)
                 _Tile(
@@ -1861,6 +1892,136 @@ class _DevicePage extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// When readings turn high or critical, and how long a service may be down
+/// before that's critical: per deployment, on this device.
+class _ThresholdsPage extends StatelessWidget {
+  const _ThresholdsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final p4 = context.p4;
+    final f = context.formats;
+    final s = SettingsScope.of(context);
+    final t = s.thresholds;
+    String percent(double v) => f.percent(v);
+    String degrees(double v) => f.temperature(v);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+          child: Text(l.thresholdsNote(s.deployment.name), style: p4.body(size: 13, color: p4.muted)),
+        ),
+        _Group(
+          children: [
+            for (final (reading, title, format, range) in [
+              (Reading.cpu, l.readingProcessor, percent, (0.0, 100.0)),
+              (Reading.memory, l.readingMemory, percent, (0.0, 100.0)),
+              (Reading.disk, l.factDisk, percent, (0.0, 100.0)),
+              (Reading.temperature, l.readingTemperature, degrees, (30.0, 110.0)),
+            ])
+              _Tile(
+                title: title,
+                subtitle: l.thresholdLevels(format(t.of(reading).$1), format(t.of(reading).$2)),
+                below: _ThresholdSlider(
+                  key: ValueKey('${s.deployment.id}.${reading.name}'),
+                  value: t.of(reading),
+                  range: range,
+                  format: format,
+                  onChanged: (v) => s.setThresholds(s.thresholds.copyWith(reading, v)),
+                ),
+              ),
+          ],
+        ),
+        _Group(
+          children: [
+            _Tile(
+              icon: Icons.timer_outlined,
+              title: l.thresholdServiceDown,
+              subtitle: l.thresholdServiceDownHelp,
+              below: DropdownButton<int>(
+                key: const ValueKey('serviceDownMinutes'),
+                value: const [1, 2, 5, 10, 15, 30, 60].contains(t.serviceDownMinutes) ? t.serviceDownMinutes : null,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                style: p4.display(size: 14, color: p4.text, weight: FontWeight.w500, spacing: 0),
+                dropdownColor: p4.bg2,
+                items: [
+                  for (final m in const [1, 2, 5, 10, 15, 30, 60])
+                    DropdownMenuItem(
+                      value: m,
+                      child: Text(l.idleAfterMinutes(m), overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (m) => m == null ? null : s.setThresholds(s.thresholds.withServiceDown(m)),
+              ),
+            ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: s.ownThresholds ? () => s.setThresholds(null) : null,
+            icon: const Icon(Icons.restart_alt, size: 18),
+            label: Text(l.thresholdsReset),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// High and critical on one slider; saved when let go, not at every step.
+class _ThresholdSlider extends StatefulWidget {
+  const _ThresholdSlider({
+    super.key,
+    required this.value,
+    required this.range,
+    required this.format,
+    required this.onChanged,
+  });
+
+  final (double, double) value;
+  final (double, double) range;
+  final String Function(double) format;
+  final ValueChanged<(double, double)> onChanged;
+
+  @override
+  State<_ThresholdSlider> createState() => _ThresholdSliderState();
+}
+
+class _ThresholdSliderState extends State<_ThresholdSlider> {
+  RangeValues? _dragging;
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    final (lo, hi) = widget.range;
+    final v = _dragging ?? RangeValues(widget.value.$1.clamp(lo, hi), widget.value.$2.clamp(lo, hi));
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        activeTrackColor: p4.warn,
+        inactiveTrackColor: p4.bg3,
+        thumbColor: p4.err,
+        rangeValueIndicatorShape: const PaddleRangeSliderValueIndicatorShape(),
+      ),
+      child: RangeSlider(
+        values: v,
+        min: lo,
+        max: hi,
+        divisions: (hi - lo).round(),
+        labels: RangeLabels(widget.format(v.start), widget.format(v.end)),
+        onChanged: (r) => setState(() => _dragging = r),
+        onChangeEnd: (r) {
+          setState(() => _dragging = null);
+          widget.onChanged((r.start.roundToDouble(), r.end.roundToDouble()));
+        },
+      ),
     );
   }
 }

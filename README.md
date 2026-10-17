@@ -4,11 +4,11 @@ Flutter dashboard for the [p4n4](https://p4n4.com) platform. It runs in the brow
 
 | Tab | What it does | Talks to |
 |-----|--------------|----------|
-| **Services** | Launcher for every p4n4 service, with live status | `p4n4-api` `GET /api/v1/stacks`, or a direct HTTP probe of each port when the API is down |
-| **Edge** | CPU, memory, SoC temperature and inference latency, with 2 minutes of history (10 or 30 in Settings → Appearance) | Configurable metrics URL (see [below](#edge-metrics-contract)); a demo mode is built in |
-| **Assistant** | Chat with a local model or a stateful agent | p4n4-api `/api/v1/agents/chat` (Ollama, streaming) or `/api/v1/agents/{id}/chat` (Letta); admins and power users choose the model for everyone |
+| **Services** | Launcher for every p4n4 service, with live status, and for admins and power users each one's version, uptime and health; admins also follow a stack's or a service's logs and restart one service | `p4n4-api` `GET /api/v1/stacks` and `/api/v1/stacks/{stack}/logs` (server-sent events), or a direct HTTP probe of each port when the API is down |
+| **Edge** (Device) | CPU, memory, SoC temperature and inference latency, with 2 minutes of history (10 or 30 in Settings → Appearance); live sensor readings with their history; for admins and power users the inference runner's model, a form to classify values, its recent results and a **Send a command** form (one MQTT message) | Configurable metrics URL (see [below](#edge-metrics-contract)), with a built-in demo mode; p4n4-api `/api/v1/telemetry` (and its `/stream`), `/api/v1/inference/*`, `/api/v1/mqtt/publish` |
+| **Assistant** | Chat with a local model or a stateful agent; copy or ask again per message, and an answer style (brief, step by step, plain words, or an admin's own instructions) per device | p4n4-api `/api/v1/agents/chat` (Ollama, streaming) or `/api/v1/agents/{id}/chat` (Letta); admins and power users choose the model for everyone |
 | **Grafana** | Embedded Grafana, in kiosk mode by default and in the app's light or dark theme (an `<iframe>` on web) | `http://<host>:3000` |
-| **Video** | Live camera feeds from the edge device: all of them in a grid, or pick one (Settings → Appearance → Video says which it opens on). Admins can switch to demo cameras (openly licensed sample clips) to show it off without any | Any MJPEG stream (`multipart/x-mixed-replace`), JPEG snapshot URL, or video file (`.mp4`, `.webm`, `.mov`, `.m3u8`) |
+| **Video** | Live camera feeds from the edge device: all of them in a grid, or pick one (Settings → Appearance → Video says which it opens on). Admins can switch to demo cameras (openly licensed sample clips) to show it off without any. On slow links, the light grid (Settings → Appearance) shows a frame every 2 s per camera (on web, snapshot cameras only) | Any MJPEG stream (`multipart/x-mixed-replace`), JPEG snapshot URL, or video file (`.mp4`, `.webm`, `.mov`, `.m3u8`) |
 
 ## Admin, power and normie views
 
@@ -18,8 +18,8 @@ On launch you sign in to the connected deployment's p4n4-api with a username and
 |---|---|---|---|
 | Tabs | **Home**, every brand tab, then **Clients** | **Home**, plus the brand tabs an admin enables (default: all) | **Home**, plus the brand tabs an admin enables (default: Agent, Grafana, Video) |
 | Home | One large "everything is working / something needs attention" card, the edge device's readings, then the project's `HOME.md`. No service names, hosts, ports or URLs | Same as admin | Same as admin |
-| Clients | Client deployments, each a connection profile (name, host, optional API URL), with live status from each one's API, or port probes as a fallback. **Connect** switches the dashboard, with all its connection settings, to that deployment | — | — |
-| Services | Launcher, plus a stack-controls menu (start/restart/stop) | Launcher; no stack controls | Only if enabled; no stack controls |
+| Clients | The fleet: a card per client deployment (a connection profile: name, host, optional API URL) with live status from its API (or port probes as a fallback), its edge device's processor and temperature with a sparkline, and the outages seen from this device. **Connect** switches the dashboard, with all its connection settings, to that deployment | — | — |
+| Services | Launcher with each service's version, uptime and health, plus a stack-controls menu (start/restart/stop, logs) and per service logs and restart | Launcher with versions, uptime and health; no controls | Only if enabled; no stack controls |
 | Tabs' config and details | Hosts in the app bar, URLs and raw errors; add/edit/remove cameras, Grafana URL, agent backend, edge and camera demo toggles | Same as admin, without the demo toggles | Hidden (camera names, not URLs); errors are shown in plain language |
 | Settings | Everything, plus **Views** (the tab order; each view's tabs, start tab, Home cards, Grafana page, cameras and alerts; and a preview of it), **Users** (p4n4-api accounts, their views and last sign-in; reset a password, require a new one, sign out everywhere), **Banner** (a message above every view on every device), **Audit log** (who changed what), **This device** (kiosk mode, idle reset and idle sign-out) and **Diagnostics** (sign-in, token and service checks, a settings dump with secrets hidden) | Appearance, connection (switch to another saved deployment, or edit this one), edge metrics, agent, Grafana, video, account and about | Appearance, account and about only |
 
@@ -37,7 +37,17 @@ Brand tabs come in one order for every view, after Home: **Agent → Grafana →
 
 On phones the bottom bar holds at most five destinations; any extras (e.g. admin **Services** and **Clients** in the default order) open from app-bar buttons.
 
-Settings (the ⚙ button) are grouped into categories: a list beside the open one on wide screens, a list of pages on phones, with a search field over both. Everyone gets **Account**, **Appearance** (theme; for admins and power users also the tab this device opens on, the Device tab's chart history and the default camera), **Accessibility** (text size, high contrast, reduce motion), **Language & region** (language, temperature unit, 12/24-hour time) and **About**; power users also **Connection** and **Endpoints**; admins also **Views**, **Users**, **Banner**, **Audit log**, **This device** and **Diagnostics**. Accounts from p4n4-api can change their password under **Account**; one an admin asked to choose a new password gets only that form after signing in. Connection settings (host, API, metrics, Grafana and cameras, which are managed on the Video tab) belong to the connected deployment and persist between launches. Theme, language, accessibility and region settings are app-wide; accessibility settings add to the device's own (they never turn off what the device turned on), and *Auto* follows the device's region (°F in the US and a few other countries) and 24-hour setting, else the language's custom. Numbers use the language's decimal style; the tab order and each view's tabs belong to the deployment and are kept by its p4n4-api. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
+Settings (the ⚙ button) are grouped into categories: a list beside the open one on wide screens, a list of pages on phones, with a search field over both. Everyone gets **Account**, **Appearance** (theme, how the Video tab opens and the light grid for slow links; for admins and power users also the tab this device opens on, the Device tab's chart history and the default camera), **Accessibility** (text size, high contrast, reduce motion), **Language & region** (language, temperature unit, 12/24-hour time) and **About**; power users also **Connection**, **Endpoints**, **Devices** (the devices that send readings to p4n4-api; admins register them, showing the key once, disable them, rotate their keys and remove them) and **Thresholds**; admins also **Views**, **Users**, **Banner**, **Audit log**, **This device** and **Diagnostics**. Accounts from p4n4-api can change their password under **Account**; one an admin asked to choose a new password gets only that form after signing in. Connection settings (host, API, metrics, Grafana and cameras, which are managed on the Video tab) belong to the connected deployment and persist between launches. Theme, language, accessibility and region settings are app-wide; accessibility settings add to the device's own (they never turn off what the device turned on), and *Auto* follows the device's region (°F in the US and a few other countries) and 24-hour setting, else the language's custom. Numbers use the language's decimal style; the tab order and each view's tabs belong to the deployment and are kept by its p4n4-api. The app has light and dark themes and follows the system setting by default. Switch themes with the app-bar toggle or on the settings page. Use host `10.0.2.2` to reach your machine from the Android emulator.
+
+## Fleet, thresholds and outages
+
+Readings and service status are polled once for every screen that shows them (`StatusMonitor` and `MetricsMonitor` in `lib/api/`), as often as the most eager one asks: the Device tab every 2 s, Home and Clients every 30 s. What no screen has shown for 10 minutes is forgotten.
+
+**Thresholds** (Settings → Thresholds, per deployment) say when processor, memory, disk and temperature readings show as high (amber) or critical (red), on Home, the Device tab and Clients; the built-in ones are 75/90 %, 75/90 %, 80/95 % and 70/80 °C. They also say how long a service can be down before that's critical: a service that stops answering is amber at first, red after 5 minutes by default. A brand or project can set its own (`thresholds` in its defaults, see [brands/README.md](brands/README.md)).
+
+**Outages** (`lib/core/incidents.dart`) are recorded from those status checks: a service that stops answering opens one, coming back ends it, and a deployment where nothing answers is one outage of its own. Services cards and Home say how long a service has been down; each Clients card lists the ongoing and latest ones (e.g. "Node-RED down 14:02–14:09"), and its history button shows the last 50. They're kept on the device that saw them, and only cover the time it showed that deployment's status.
+
+**Request IDs.** Every call to p4n4-api carries an `X-Request-ID`, which the API logs and sends back. Errors shown to admins and power users end with it, e.g. "That username is taken. (request 3f2a…)", so a report can be matched to the server's log.
 
 ## Languages
 
@@ -181,7 +191,7 @@ cd p4n4-api   && docker compose up -d
 
 ## Edge metrics contract
 
-By default the Edge tab polls `GET {p4n4-api}/api/v1/edge/metrics` every 2 s. That endpoint is not implemented in p4n4-api v0.1 yet. You can point the tab at any URL that returns:
+By default the Edge tab polls `GET {p4n4-api}/api/v1/edge/metrics` every 2 s (p4n4-api 0.2 and later serve it). You can point the tab at any URL that returns:
 
 ```json
 {
@@ -315,13 +325,15 @@ lib/
 │   ├── brand.dart         # white-label config (assets/brand/brand.json)
 │   ├── theme.dart         # light/dark palettes (P4Colors ThemeExtension) + fonts
 │   ├── settings.dart      # persisted connection settings (SettingsScope)
+│   ├── thresholds.dart    # when readings turn high or critical, per deployment
+│   ├── incidents.dart     # outages seen in the status checks (IncidentLog)
 │   └── alerts.dart        # alert toasts (AlertCenter), new feed alerts
 ├── l10n/                  # app_<code>.arb strings, generated AppLocalizations, context.l10n
-├── api/                   # services catalog + status (shared StatusMonitor), edge metrics, cameras, deployments, project, assistant (via p4n4-api), stack actions, vision overlay (recorded and live), chats
+├── api/                   # services catalog + status (shared StatusMonitor), edge metrics (shared MetricsMonitor), cameras, deployments, project, assistant (via p4n4-api), stack actions and logs, devices, telemetry, inference, MQTT publish, vision overlay (recorded and live), chats; ApiException and the SSE reader they share
 ├── platform/              # web vs native: <iframe>/<img>/<video> views, port probes, WebSocket, chime (conditional imports)
 ├── tabs/                  # one file per tab
-├── pages/                 # settings (categories, search), sign-in, admin sections (users, chats, diagnostics)
-└── widgets/               # shared UI, sparkline, MJPEG viewer, the normie view's tour
+├── pages/                 # settings (categories, search), sign-in, admin sections (users, devices, chats, diagnostics), logs
+└── widgets/               # shared UI, sparkline, MJPEG viewer, the Device tab's sensors/model/command sections, Contact support, the normie view's tour
 test/                      # unit, widget and brand tests
 android/ ios/ linux/ macos/ windows/   # native platform projects
 ```

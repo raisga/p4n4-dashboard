@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_error.dart';
+
 /// What an item asks a person to do (an alert to review), or doesn't (an event).
 enum FeedTone { info, review, neutral }
 
@@ -103,17 +105,10 @@ class FeedPage {
 
 /// A feed request p4n4-api turned down or couldn't relay. [code] `no_feed`:
 /// the project doesn't publish one.
-class FeedException implements Exception {
-  const FeedException(this.message, {this.statusCode, this.code});
-
-  final String message;
-  final int? statusCode;
-  final String? code;
+class FeedException extends ApiException {
+  const FeedException(super.message, {super.statusCode, super.code, super.requestId});
 
   bool get notConfigured => code == 'no_feed';
-
-  @override
-  String toString() => message;
 }
 
 class FeedApi {
@@ -165,5 +160,10 @@ Map<String, dynamic> _body(http.Response res) {
     code = error['code'] as String?;
     message = error['message'] as String?;
   } catch (_) {}
-  throw FeedException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode, code: code);
+  throw FeedException(
+    message ?? 'HTTP ${res.statusCode}',
+    statusCode: res.statusCode,
+    requestId: requestIdOf(res),
+    code: code,
+  );
 }

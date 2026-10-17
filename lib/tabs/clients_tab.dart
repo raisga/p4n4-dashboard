@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../api/fleet.dart';
+import '../api/metrics_monitor.dart';
 import '../api/status_monitor.dart';
+import '../core/brand.dart';
+import '../core/format.dart';
+import '../core/incidents.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../core/thresholds.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/sparkline.dart';
 
-/// Admin list of client deployments with live status from each host.
+/// Admins' fleet overview: a card per client deployment with live status
+/// from its host, its edge device's readings and the outages seen from here.
 class ClientsTab extends StatefulWidget {
   const ClientsTab({super.key, required this.active});
 
@@ -21,18 +28,24 @@ class _ClientsTabState extends State<ClientsTab> {
   P4Colors get p4 => context.p4;
   AppLocalizations get l => context.l10n;
 
-  late StatusMonitor _monitor;
-  late List<StatusTarget> _targets;
+  static const _interval = Duration(seconds: 30);
 
-  /// Every deployment's status comes from the shared StatusMonitor, keyed by
-  /// host and API, so renaming a deployment keeps its status and the
-  /// connected one shares checks with Home and Services.
+  late StatusMonitor _monitor;
+  late MetricsMonitor _metrics;
+  late List<StatusTarget> _targets;
+  late List<MetricsSource> _sources;
+
+  /// Every deployment's status and readings come from the shared monitors,
+  /// keyed by where they're read from, so renaming a deployment keeps them
+  /// and the connected one shares checks with Home, Services and Device.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _monitor = StatusScope.of(context);
+    _metrics = MetricsScope.of(context);
     final s = SettingsScope.of(context);
     _targets = [for (final d in s.deployments) s.targetOf(d)];
+    _sources = [for (final d in s.deployments) s.metricsSourceOf(d)];
     _watch();
   }
 
@@ -42,16 +55,25 @@ class _ClientsTabState extends State<ClientsTab> {
     _watch();
   }
 
-  void _watch() =>
-      widget.active ? _monitor.watch(this, _targets, interval: const Duration(seconds: 30)) : _monitor.unwatch(this);
+  void _watch() {
+    if (widget.active) {
+      _monitor.watch(this, _targets, interval: _interval);
+      _metrics.watch(this, _sources, interval: _interval);
+    } else {
+      _monitor.unwatch(this);
+      _metrics.unwatch(this);
+    }
+  }
 
   @override
   void dispose() {
     _monitor.unwatch(this);
+    _metrics.unwatch(this);
     super.dispose();
   }
 
-  Future<void> _refresh() => Future.wait(_targets.toSet().map(_monitor.refresh));
+  Future<void> _refresh() =>
+      (Future.wait(_targets.toSet().map(_monitor.refresh)), Future.wait(_sources.toSet().map(_metrics.refresh))).wait;
 
   Future<void> _edit(AppSettings s, [Deployment? d]) async {
     final result = await showDialog<_DeploymentForm>(
@@ -76,7 +98,11 @@ class _ClientsTabState extends State<ClientsTab> {
   Widget build(BuildContext context) {
     final s = SettingsScope.of(context);
     final list = s.deployments;
+    // Rebuilt when readings or incidents change.
+    MetricsScope.of(context);
+    IncidentScope.maybeOf(context);
     return PageBody(
+      maxWidth: 1400,
       onRefresh: _refresh,
       children: [
         PageHeader(
@@ -92,86 +118,225 @@ class _ClientsTabState extends State<ClientsTab> {
         if (list.isEmpty)
           EmptyState(icon: Icons.devices_other_outlined, title: l.noDeployments, message: l.noDeploymentsMsg)
         else
-          for (final d in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: _row(s, d)),
+          TileGrid(minWidth: 340, children: [for (final d in list) _card(s, d)]),
       ],
     );
   }
 
-  Widget _row(AppSettings s, Deployment d) {
+  Widget _card(AppSettings s, Deployment d) {
     final r = _monitor.statusOf(s.targetOf(d)).report;
     final current = d.id == s.deployment.id;
     final api = s.apiUriOf(d);
     final customApi = api != Uri.parse('http://${s.hostOf(d)}:8000');
+    final thresholds = s.thresholdsOf(d);
+    final log = IncidentScope.maybeOf(context);
+    final incidents = log?.of(d) ?? const <Incident>[];
+    final now = DateTime.now();
+    final open = [
+      for (final i in incidents)
+        if (i.ongoing) i,
+    ];
+    // How long the longest outage now has gone on, for its colour.
+    final longest = open.isEmpty ? null : open.map((i) => i.lengthAt(now)).reduce((a, b) => a > b ? a : b);
     final health = switch (r) {
       null => Health.pending,
       _ when r.known == 0 => Health.unknown,
       _ when r.online == 0 => Health.down,
       _ => Health.up,
     };
+    final degraded = r != null && r.online > 0 && r.online < r.known;
     final label = switch (r) {
       null => null,
       _ when r.online == 0 => l.healthOffline,
       _ when r.viaApi => l.clientsUp(r.online, r.known),
       _ => l.clientsUpProbed(r.online, r.known),
     };
-    final info = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Flexible(
-              child: Text(d.name, overflow: TextOverflow.ellipsis, style: p4.display(size: 16)),
-            ),
-            if (current) ...[const SizedBox(width: 10), TagBadge(l.currentBadge, color: p4.ok)],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          customApi ? '${s.hostOf(d)} · api $api' : s.hostOf(d),
-          overflow: TextOverflow.ellipsis,
-          style: p4.mono(size: 12, spacing: 0),
-        ),
-        const SizedBox(height: 8),
-        StatusIndicator(health, label: label),
-      ],
-    );
-    final actions = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextButton(onPressed: current ? null : () => s.connect(d.id), child: Text(l.connect)),
-        IconButton(
-          tooltip: l.editTooltip,
-          onPressed: () => _edit(s, d),
-          icon: const Icon(Icons.edit_outlined, size: 18),
-        ),
-        IconButton(
-          tooltip: current ? l.removeCurrentTooltip : l.removeTooltip,
-          onPressed: current ? null : () => s.removeDeployment(d.id),
-          icon: const Icon(Icons.delete_outline, size: 18),
-        ),
-      ],
-    );
+    // Something down: amber at first, red once it has been down longer than the threshold.
+    final statusColor = health == Health.down || degraded
+        ? (longest != null ? levelColor(p4, thresholds.downLevel(longest)) : (degraded ? p4.warn : null))
+        : null;
+    final metrics = _metrics.of(s.metricsSourceOf(d));
     return Panel(
-      padding: const EdgeInsets.fromLTRB(20, 14, 8, 14),
-      // Actions sit beside the details when there's room, below them on phones.
-      child: LayoutBuilder(
-        builder: (context, c) => c.maxWidth >= 520
-            ? Row(
-                children: [
-                  Expanded(child: info),
-                  actions,
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  info,
-                  Align(alignment: Alignment.centerRight, child: actions),
-                ],
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+      accent: statusColor ?? (health == Health.down ? p4.err : null),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Flexible(
+                child: Text(d.name, overflow: TextOverflow.ellipsis, style: p4.display(size: 16)),
               ),
+              if (current) ...[const SizedBox(width: 10), TagBadge(l.currentBadge, color: p4.ok)],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            customApi ? '${s.hostOf(d)} · api $api' : s.hostOf(d),
+            overflow: TextOverflow.ellipsis,
+            style: p4.mono(size: 12, spacing: 0),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Flexible(child: StatusIndicator(health, label: label)),
+              if (statusColor != null) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.warning_amber_rounded, size: 16, color: statusColor),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          _readings(metrics, thresholds),
+          if (incidents.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            for (final i in [
+              ...open.reversed,
+              ...incidents.reversed.where((i) => !i.ongoing).take(open.isEmpty ? 2 : 1),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  _incidentText(i, now),
+                  overflow: TextOverflow.ellipsis,
+                  style: p4.body(
+                    size: 12,
+                    color: i.ongoing ? levelColor(p4, thresholds.downLevel(i.lengthAt(now))) : p4.muted,
+                    weight: i.ongoing ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 4),
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(onPressed: current ? null : () => s.connect(d.id), child: Text(l.connect)),
+              if (log != null)
+                IconButton(
+                  tooltip: l.incidentHistory,
+                  onPressed: () => _history(log, d),
+                  icon: const Icon(Icons.history, size: 18),
+                ),
+              IconButton(
+                tooltip: l.editTooltip,
+                onPressed: () => _edit(s, d),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+              ),
+              IconButton(
+                tooltip: current ? l.removeCurrentTooltip : l.removeTooltip,
+                onPressed: current ? null : () => s.removeDeployment(d.id),
+                icon: const Icon(Icons.delete_outline, size: 18),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+
+  /// The edge device's processor and temperature, with the processor's last readings.
+  Widget _readings(SourceMetrics metrics, Thresholds t) {
+    final m = metrics.latest;
+    final f = context.formats;
+    if (m == null) {
+      return Text(
+        metrics.error != null ? l.fleetNoReadings : l.deviceLoading,
+        style: p4.body(size: 13, color: p4.muted),
+      );
+    }
+    final cpus = [for (final s in metrics.history.reversed.take(_spark).toList().reversed) s.metrics.cpu];
+    Widget value(String label, String text, Level level) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: p4.body(size: 12, color: p4.muted)),
+        Text(
+          text,
+          style: p4.display(size: 18, weight: FontWeight.w800, spacing: -0.4, color: levelColor(p4, level)),
+        ),
+      ],
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        value(l.readingProcessor, f.percent(m.cpu), t.level(Reading.cpu, m.cpu)),
+        if (m.tempC != null) ...[
+          const SizedBox(width: 20),
+          value(l.readingTemperature, f.temperature(m.tempC!), t.level(Reading.temperature, m.tempC!)),
+        ],
+        const SizedBox(width: 20),
+        Expanded(
+          child: Opacity(
+            opacity: metrics.error != null ? 0.4 : 1,
+            child: Sparkline(
+              values: cpus,
+              format: (v) => f.percent(v),
+              maxY: 100,
+              capacity: _spark,
+              height: 36,
+              label: (i) => f.clock(metrics.history[metrics.history.length - cpus.length + i].at),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Readings in a card's sparkline: the last quarter hour at one every 30 s.
+  static const _spark = 30;
+
+  String _serviceName(String service) => service == Incident.unreachable
+      ? l.incidentUnreachable
+      : service.replaceFirst('p4n4', BrandScope.of(context).platform);
+
+  /// `Node-RED down since 14:02 (12m)`, or `Node-RED down 14:02–14:09`.
+  String _incidentText(Incident i, DateTime now) {
+    final f = context.formats;
+    String at(DateTime t) => DateUtils.isSameDay(t, now) ? f.clock(t) : f.dateTime(t);
+    final name = _serviceName(i.service);
+    return i.ongoing
+        ? l.incidentOngoing(name, at(i.start), f.span(i.lengthAt(now)))
+        : l.incidentEnded(name, at(i.start), DateUtils.isSameDay(i.start, i.end!) ? f.clock(i.end!) : at(i.end!));
+  }
+
+  Future<void> _history(IncidentLog log, Deployment d) => showDialog<void>(
+    context: context,
+    builder: (context) => ListenableBuilder(
+      listenable: log,
+      builder: (context, _) {
+        final now = DateTime.now();
+        final all = log.of(d).reversed.toList();
+        return AlertDialog(
+          title: Text(l.incidentHistoryOf(d.name)),
+          content: SizedBox(
+            width: 460,
+            child: all.isEmpty
+                ? Text(l.incidentNone, style: p4.body(color: p4.muted))
+                : ListView(
+                    shrinkWrap: true,
+                    children: [
+                      Text(l.incidentNote, style: p4.body(size: 12, color: p4.muted)),
+                      const SizedBox(height: 10),
+                      for (final i in all)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            _incidentText(i, now),
+                            style: p4.body(size: 14, color: i.ongoing ? p4.err : p4.text),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          actions: [
+            if (all.isNotEmpty) TextButton(onPressed: () => log.clear(d), child: Text(l.clearList)),
+            FilledButton(onPressed: () => Navigator.pop(context), child: Text(l.done)),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 typedef _DeploymentForm = ({String name, String host, String apiBase});

@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_error.dart';
+
 /// The assistant, through p4n4-api's `/api/v1/agents` endpoints: an Ollama
 /// model or a Letta agent. The API requires sign-in, keeps the Letta password
 /// on the server and decides who may use which model (normies only chat with
@@ -98,25 +100,14 @@ bool seedAvailable(AssistantConfig seed, List<AgentOption> options) =>
     seed.chosen == null ? options.isNotEmpty : options.any((o) => o.id == seed.chosen);
 
 /// A request p4n4-api, Ollama or Letta turned down, or one that never arrived.
-class AgentException implements Exception {
-  const AgentException(this.message, {this.statusCode, this.code});
-
-  final String message;
-
-  /// Null when the API couldn't be reached.
-  final int? statusCode;
-
-  /// The API's error code, e.g. `assistant_restricted`, `ollama_unavailable`.
-  final String? code;
+class AgentException extends ApiException {
+  const AgentException(super.message, {super.statusCode, super.code, super.requestId});
 
   /// Signed out, or not allowed (e.g. a normie asking for another model).
   bool get denied => statusCode == 401 || statusCode == 403;
 
   /// The API, Ollama or Letta is down or not answering.
   bool get unavailable => statusCode == null || statusCode == 502 || statusCode == 503 || statusCode == 504;
-
-  @override
-  String toString() => message;
 }
 
 class AgentApi {
@@ -159,17 +150,26 @@ class AgentApi {
   /// [onStep] gets each tool the agent runs, when it starts and again (the
   /// same [ToolStep]) when it's done. Only p4n4's agent says; plain Ollama
   /// and Letta never call it.
+  ///
+  /// [system], instructions on how to answer, goes to Ollama ahead of the
+  /// conversation; a Letta agent keeps its own persona and doesn't get it.
   Stream<String> send(
     AgentBackend backend,
     String id,
     List<ChatMessage> history, {
     void Function(ToolStep step)? onStep,
+    String? system,
   }) => switch (backend) {
-    AgentBackend.ollama => _ollama(id, history, onStep),
+    AgentBackend.ollama => _ollama(id, history, onStep, system),
     AgentBackend.letta => _letta(id, history),
   };
 
-  Stream<String> _ollama(String model, List<ChatMessage> history, void Function(ToolStep step)? onStep) async* {
+  Stream<String> _ollama(
+    String model,
+    List<ChatMessage> history,
+    void Function(ToolStep step)? onStep,
+    String? system,
+  ) async* {
     final client = http.Client();
     try {
       final req = http.Request('POST', _url('/chat'))
@@ -179,6 +179,7 @@ class AgentApi {
           'stream': true,
           'include_status': true,
           'messages': [
+            if (system != null && system.isNotEmpty) {'role': 'system', 'content': system},
             for (final m in history)
               if (m.role != 'error') m.toJson(),
           ],
@@ -260,5 +261,10 @@ Object? _body(http.Response res) {
     code = error['code'] as String?;
     message = error['message'] as String?;
   } catch (_) {}
-  throw AgentException(message ?? 'HTTP ${res.statusCode}', statusCode: res.statusCode, code: code);
+  throw AgentException(
+    message ?? 'HTTP ${res.statusCode}',
+    statusCode: res.statusCode,
+    requestId: requestIdOf(res),
+    code: code,
+  );
 }

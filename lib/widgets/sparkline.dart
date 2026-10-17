@@ -14,6 +14,7 @@ class Sparkline extends StatefulWidget {
     this.maxY,
     this.capacity = 60,
     this.height = 64,
+    this.label,
   });
 
   final List<double> values;
@@ -28,6 +29,10 @@ class Sparkline extends StatefulWidget {
   /// Number of slots on the x-axis, so the line fills in from the right.
   final int capacity;
   final double height;
+
+  /// When value [index] was read, for the hover readout (e.g. `−42s`, `14:05`);
+  /// by default, seconds back at one reading every 2 s.
+  final String Function(int index)? label;
 
   @override
   State<Sparkline> createState() => _SparklineState();
@@ -82,7 +87,7 @@ class _SparklineState extends State<Sparkline> {
                           color: p4.bg3,
                           child: Text(
                             '${widget.format(widget.values[_hover!])}  '
-                            '−${(widget.values.length - 1 - _hover!) * 2}s',
+                            '${widget.label?.call(_hover!) ?? '−${(widget.values.length - 1 - _hover!) * 2}s'}',
                             style: p4.mono(size: 10, color: p4.text),
                           ),
                         ),

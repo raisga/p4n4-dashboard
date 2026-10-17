@@ -8,6 +8,7 @@ import '../api/agent_client.dart' show AgentBackend, AssistantConfig;
 import '../api/banner.dart' show DashboardBanner;
 import '../api/camera.dart';
 import '../api/fleet.dart';
+import '../api/metrics_monitor.dart' show MetricsSource;
 import '../api/project.dart';
 import '../api/services.dart' show StackDef;
 import '../api/status_monitor.dart';
@@ -17,6 +18,7 @@ import '../api/vision.dart' show VisionBundle;
 import 'brand.dart';
 import 'role.dart';
 import 'secrets.dart';
+import 'thresholds.dart';
 
 /// Settings that belong to a deployment, so switching deployments switches
 /// them all. Everything else (theme, language) is app-wide; each view's tabs
@@ -35,6 +37,7 @@ const profileKeys = {
   'session',
   'myStartTab',
   'defaultCamera',
+  'thresholds',
 };
 
 /// Profile keys that say where the services are, cleared by
@@ -374,11 +377,43 @@ class AppSettings extends ChangeNotifier {
   // Edge metrics
   String get edgeMetricsUrl => _str('edgeMetricsUrl', '');
   set edgeMetricsUrl(String v) => _set('edgeMetricsUrl', v.trim());
-  Uri get edgeMetricsUri =>
-      edgeMetricsUrl.isNotEmpty ? Uri.parse(edgeMetricsUrl) : apiUri.resolve('api/v1/edge/metrics');
+  Uri get edgeMetricsUri => metricsSourceOf(deployment).uri;
 
   bool get edgeDemo => _bool('edgeDemo', false);
   set edgeDemo(bool v) => _set('edgeDemo', v);
+
+  /// Where [d]'s edge readings come from (see [MetricsMonitor]): its metrics
+  /// URL, else its p4n4-api's; or made up, with demo data on.
+  MetricsSource metricsSourceOf(Deployment d) {
+    final url = _str('edgeMetricsUrl', '', d);
+    return (
+      uri: url.isNotEmpty ? Uri.parse(url) : apiUriOf(d).resolve('api/v1/edge/metrics'),
+      demo: _bool('edgeDemo', false, d),
+    );
+  }
+
+  /// The connected deployment's [metricsSourceOf].
+  MetricsSource get metricsSource => metricsSourceOf(deployment);
+
+  /// When the connected deployment's readings turn high or critical (Settings → Thresholds).
+  Thresholds get thresholds => thresholdsOf(deployment);
+
+  /// [d]'s thresholds: as set on this device, else the project's or brand's
+  /// `thresholds` default, else the built-in ones.
+  Thresholds thresholdsOf(Deployment d) => switch (d.values['thresholds'] ?? _default<Map>('thresholds')) {
+    final Map m => Thresholds.fromJson(m.cast()),
+    _ => const Thresholds(),
+  };
+
+  /// Whether the connected deployment's thresholds were set on this device.
+  bool get ownThresholds => deployment.values.containsKey('thresholds');
+
+  /// Saves the connected deployment's thresholds; null goes back to the defaults.
+  Future<void> setThresholds(Thresholds? t) async {
+    t == null ? deployment.values.remove('thresholds') : deployment.values['thresholds'] = t.toJson();
+    await _saveDeployments();
+    notifyListeners();
+  }
 
   // Grafana
 
@@ -430,6 +465,11 @@ class AppSettings extends ChangeNotifier {
     deployment.values.remove('videoUrl'); // superseded by the list
     _set('cameras', [for (final c in v) c.toJson()]);
   }
+
+  /// In the grid, a frame every few seconds rather than full motion, for slow
+  /// links (Settings → Appearance). App-wide: it's about this device's link.
+  bool get videoGridLight => _bool('videoGridLight', false);
+  set videoGridLight(bool v) => _set('videoGridLight', v);
 
   /// Show [demoCameras] in place of [cameras] (which stay as they are).
   bool get videoDemo => _bool('videoDemo', false);
@@ -499,6 +539,30 @@ class AppSettings extends ChangeNotifier {
   /// every message, so this doesn't notify listeners.
   Future<void> setChatOf(Deployment d, String who, List<Map<String, String>> messages) =>
       messages.isEmpty ? _prefs.remove(_chatKey(d, who)) : _prefs.setString(_chatKey(d, who), jsonEncode(messages));
+
+  /// How the Assistant answers on this device: an [AssistantStyle]'s name.
+  AssistantStyle get assistantStyle =>
+      AssistantStyle.values.asNameMap()[_str('assistantStyle', 'standard')] ?? AssistantStyle.standard;
+  set assistantStyle(AssistantStyle v) => _set('assistantStyle', v.name);
+
+  /// The instructions for [AssistantStyle.custom], written by an admin or power user.
+  String get assistantCustomPrompt => _str('assistantCustomPrompt', '');
+  set assistantCustomPrompt(String v) => _set('assistantCustomPrompt', v.trim());
+
+  static String _incidentsKey(Deployment d) => 'incidents.${d.id}';
+
+  /// [d]'s service outages seen from this device, oldest first (see [IncidentLog]).
+  List<Map<String, Object?>> incidentsOf(Deployment d) {
+    try {
+      return [for (final m in jsonDecode(_prefs.getString(_incidentsKey(d)) ?? '[]') as List) (m as Map).cast()];
+    } on Object {
+      return [];
+    }
+  }
+
+  /// Stores (or, empty, forgets) [d]'s incidents. [IncidentLog] notifies its own listeners.
+  Future<void> setIncidentsOf(Deployment d, List<Map<String, Object?>> incidents) =>
+      incidents.isEmpty ? _prefs.remove(_incidentsKey(d)) : _prefs.setString(_incidentsKey(d), jsonEncode(incidents));
 
   /// The deployment whose p4n4-api serves [url], if any.
   Deployment? deploymentForApi(Uri url) {
@@ -711,6 +775,7 @@ class AppSettings extends ChangeNotifier {
       for (final key in _prefs.getKeys().where((k) => k.startsWith('chat.${d.id}.')).toList()) {
         await _prefs.remove(key);
       }
+      await _prefs.remove(_incidentsKey(d));
       for (final key in secretKeys) {
         if (_secrets.remove(_secretId(d, key)) != null && _secretsOk) {
           try {
@@ -777,6 +842,11 @@ class AppSettings extends ChangeNotifier {
     }
   }
 }
+
+/// How the Assistant answers (Settings, or the Assistant's toolbar): extra
+/// instructions sent with each conversation, on this device. [custom] is an
+/// admin's or power user's own ([AppSettings.assistantCustomPrompt]).
+enum AssistantStyle { standard, brief, steps, simple, custom }
 
 /// How temperatures are shown. [auto] follows the device's region: °F in the
 /// few countries that use it, °C everywhere else.

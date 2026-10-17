@@ -23,11 +23,16 @@ class TargetStatus {
 ///
 /// Tabs [watch] the targets they show while visible and [unwatch] when hidden.
 /// Watched targets are re-checked once their data is older than the shortest
-/// interval any watcher asked for; a check already in flight is shared.
+/// interval any watcher asked for; a check already in flight is shared. What
+/// nobody has watched for [keep] is forgotten, so a large fleet's statuses
+/// don't pile up.
 class StatusMonitor extends ChangeNotifier {
-  StatusMonitor({Future<ServiceReport> Function(StatusTarget)? check, DateTime Function()? clock})
-    : _check = check ?? _checkServices,
-      _now = clock ?? DateTime.now;
+  StatusMonitor({
+    Future<ServiceReport> Function(StatusTarget)? check,
+    DateTime Function()? clock,
+    this.keep = const Duration(minutes: 10),
+  }) : _check = check ?? _checkServices,
+       _now = clock ?? DateTime.now;
 
   static Future<ServiceReport> _checkServices(StatusTarget t) =>
       checkServices(t.api, (d) => Uri.parse('http://${t.host}:${d.port}${d.path}'));
@@ -37,6 +42,7 @@ class StatusMonitor extends ChangeNotifier {
 
   final Future<ServiceReport> Function(StatusTarget) _check;
   final DateTime Function() _now;
+  final Duration keep;
 
   final _status = <StatusTarget, TargetStatus>{};
   final _inFlight = <StatusTarget, Future<void>>{};
@@ -45,6 +51,12 @@ class StatusMonitor extends ChangeNotifier {
   bool _disposed = false;
 
   TargetStatus statusOf(StatusTarget t) => _status[t] ?? const TargetStatus();
+
+  /// The targets it keeps a status for now, watched or not (yet) forgotten.
+  Iterable<StatusTarget> get known => _status.keys;
+
+  /// The targets anyone watches now.
+  Set<StatusTarget> get watched => {for (final w in _watchers.values) ...w.targets};
 
   /// Polls [targets] every [interval] on behalf of [owner], replacing what
   /// [owner] watched before. Stale or never-checked targets are checked now.
@@ -55,7 +67,8 @@ class StatusMonitor extends ChangeNotifier {
   }
 
   void unwatch(Object owner) {
-    _watchers.remove(owner);
+    if (_watchers.remove(owner) == null) return;
+    _prune();
     if (_watchers.isEmpty) {
       _timer?.cancel();
       _timer = null;
@@ -79,6 +92,22 @@ class StatusMonitor extends ChangeNotifier {
     for (final MapEntry(key: t, value: interval) in due.entries) {
       final at = _status[t]?.checkedAt;
       if (at == null || _now().difference(at) >= interval) refresh(t);
+    }
+    _prune();
+  }
+
+  /// Forgets targets nobody has watched for [keep]. Without notifying: it runs
+  /// as tabs watch (while building) and unwatch (while disposing), and nobody
+  /// shows what's forgotten.
+  void _prune() {
+    final watched = this.watched;
+    final now = _now();
+    final stale = [
+      for (final MapEntry(key: t, value: s) in _status.entries)
+        if (!watched.contains(t) && !_inFlight.containsKey(t) && now.difference(s.checkedAt ?? now) >= keep) t,
+    ];
+    for (final t in stale) {
+      _status.remove(t);
     }
   }
 

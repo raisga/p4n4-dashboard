@@ -1570,4 +1570,406 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get defaultCameraFirst => '첫 번째 카메라';
+
+  @override
+  String logsTitle(String name) {
+    return '$name 로그';
+  }
+
+  @override
+  String logsFailed(String error) {
+    return '중지됨: $error';
+  }
+
+  @override
+  String get logsEnded => '로그 스트림이 끝났습니다';
+
+  @override
+  String get logsFollowing => '새 줄을 따라가는 중';
+
+  @override
+  String get copyTooltip => '복사';
+
+  @override
+  String get copied => '복사됨';
+
+  @override
+  String get logsFilter => '필터';
+
+  @override
+  String get logsEmpty => '아직 로그가 없습니다';
+
+  @override
+  String get logsNoMatch => '필터와 일치하는 줄이 없습니다';
+
+  @override
+  String get logsLatest => '최신 줄로 이동';
+
+  @override
+  String get logsMenu => '로그';
+
+  @override
+  String get serviceConfirmRestartBody => '사용 중인 모든 사람에게 잠시 중단됩니다.';
+
+  @override
+  String serviceUptime(String time) {
+    return '가동 $time';
+  }
+
+  @override
+  String get serviceUnhealthy => '비정상';
+
+  @override
+  String get serviceStarting => '시작 중';
+
+  @override
+  String serviceActions(String name) {
+    return '$name 작업';
+  }
+
+  @override
+  String get sectionDevices => '장치';
+
+  @override
+  String devicesNote(String platform) {
+    return '$platform-api로 측정값을 보내는 장치이며, 각각 고유한 키가 있습니다.';
+  }
+
+  @override
+  String get devicesOnlyAdmins => '장치는 관리자만 변경할 수 있습니다.';
+
+  @override
+  String devicesLoadFailed(String error) {
+    return '장치를 불러오지 못했습니다: $error';
+  }
+
+  @override
+  String get devicesNone => '아직 등록된 장치가 없습니다.';
+
+  @override
+  String get deviceDisabled => '사용 안 함';
+
+  @override
+  String deviceLastSeen(String time) {
+    return '마지막 확인 $time';
+  }
+
+  @override
+  String get deviceNeverSeen => '확인된 적 없음';
+
+  @override
+  String deviceKey(String prefix) {
+    return '키 $prefix…';
+  }
+
+  @override
+  String get deviceDisable => '사용 안 함: 로그인할 수 없게 됩니다';
+
+  @override
+  String get deviceEnable => '사용';
+
+  @override
+  String get rotateKey => '새 키';
+
+  @override
+  String rotateKeyTitle(String name) {
+    return '$name의 키를 새로 만들까요?';
+  }
+
+  @override
+  String get rotateKeyBody => '현재 키는 즉시 작동하지 않습니다. 새 키를 장치에 넣으세요.';
+
+  @override
+  String removeDeviceTitle(String name) {
+    return '$name을(를) 제거할까요?';
+  }
+
+  @override
+  String get removeDeviceBody => '키가 즉시 작동하지 않으며 더 이상 측정값을 보낼 수 없습니다.';
+
+  @override
+  String get removeDeviceTooltip => '장치 제거';
+
+  @override
+  String get showMore => '더 보기';
+
+  @override
+  String get addDevice => '장치 추가';
+
+  @override
+  String get editDevice => '장치 편집';
+
+  @override
+  String get deviceId => '장치 ID';
+
+  @override
+  String get deviceIdHelp => '영문자, 숫자, 점, 하이픈, 밑줄. 나중에 바꿀 수 없습니다';
+
+  @override
+  String get deviceName => '이름';
+
+  @override
+  String get deviceDescription => '설명';
+
+  @override
+  String deviceKeyTitle(String id) {
+    return '$id의 키';
+  }
+
+  @override
+  String get deviceKeyBody => '지금 장치에 복사하세요. 다시 표시되지 않습니다.';
+
+  @override
+  String get done => '완료';
+
+  @override
+  String get contactSupport => '지원팀에 문의';
+
+  @override
+  String summaryDownFor(String time) {
+    return '$time 동안 중단됨';
+  }
+
+  @override
+  String deviceUpdatedAt(String time) {
+    return '$time에 업데이트됨';
+  }
+
+  @override
+  String deviceStaleSince(String time) {
+    return '새로 고칠 수 없음 · $time의 측정값';
+  }
+
+  @override
+  String get sectionThresholds => '임계값';
+
+  @override
+  String get thresholdServiceDown => '서비스 중단';
+
+  @override
+  String get sensorsTitle => '센서';
+
+  @override
+  String get sensorsSubtitle => '장치의 실시간 측정값입니다. 하나를 누르면 기록을 볼 수 있습니다.';
+
+  @override
+  String sensorsUnavailable(String error) {
+    return '실시간 측정값 없음: $error';
+  }
+
+  @override
+  String get sensorsNoBroker => '아직 MQTT 브로커에 연결되지 않았습니다';
+
+  @override
+  String get sensorsWaiting => '측정값을 기다리는 중…';
+
+  @override
+  String sensorReadAt(String time) {
+    return '$time에 측정';
+  }
+
+  @override
+  String get rangeHour => '1시간';
+
+  @override
+  String get rangeDay => '1일';
+
+  @override
+  String get rangeWeek => '1주';
+
+  @override
+  String sensorHistoryFailed(String error) {
+    return '기록을 불러오지 못했습니다: $error';
+  }
+
+  @override
+  String get sensorHistoryEmpty => '이 기간에 저장된 측정값이 없습니다';
+
+  @override
+  String sensorMin(String value) {
+    return '최저 $value';
+  }
+
+  @override
+  String sensorMax(String value) {
+    return '최고 $value';
+  }
+
+  @override
+  String get modelTitle => '모델';
+
+  @override
+  String get modelSubtitle => '엣지 장치의 추론 러너';
+
+  @override
+  String get modelNoRunner => '이 배포에 추론 러너가 없거나 응답하지 않습니다.';
+
+  @override
+  String modelFailed(String error) {
+    return '러너에 연결할 수 없습니다: $error';
+  }
+
+  @override
+  String get modelInferences => '추론 횟수';
+
+  @override
+  String get modelLastLatency => '마지막 지연 시간';
+
+  @override
+  String get modelLastAt => '마지막 추론';
+
+  @override
+  String get modelRecent => '최근 결과';
+
+  @override
+  String get classifyTitle => '사용해 보기';
+
+  @override
+  String get classifyValues => '입력 값';
+
+  @override
+  String classifyExpects(int expected, int count) {
+    return '$expected개 중 $count개 값';
+  }
+
+  @override
+  String get classify => '분류';
+
+  @override
+  String classifyAnomaly(String score) {
+    return '이상 점수 $score';
+  }
+
+  @override
+  String get classifyNotNumbers => '쉼표나 공백으로 구분한 숫자를 입력하세요.';
+
+  @override
+  String get commandTitle => '명령 보내기';
+
+  @override
+  String get commandSubtitle => 'MQTT 메시지 하나를 게시합니다(예: 장치의 명령 토픽)';
+
+  @override
+  String get commandTopic => '토픽';
+
+  @override
+  String get commandPayload => '메시지';
+
+  @override
+  String get commandPayloadHelp => '텍스트 또는 JSON';
+
+  @override
+  String get commandRetain => '보존(retain)';
+
+  @override
+  String commandSent(String topic, int bytes) {
+    return '$topic(으)로 보냄($bytes바이트)';
+  }
+
+  @override
+  String commandTopicNotAllowed(String topic) {
+    return '이 배포에서는 $topic에 게시할 수 없습니다(p4n4-api의 P4N4_API_MQTT_PUBLISH_ALLOW 및 _DENY).';
+  }
+
+  @override
+  String commandNoBroker(String error) {
+    return 'p4n4-api가 브로커에 연결되어 있지 않습니다: $error';
+  }
+
+  @override
+  String get commandNotAllowed => '명령은 운영자와 관리자만 보낼 수 있습니다.';
+
+  @override
+  String commandFailed(String error) {
+    return '보내지 못함: $error';
+  }
+
+  @override
+  String thresholdsNote(String deployment) {
+    return '이 장치에서 $deployment의 측정값을 높음 또는 위험으로 표시하는 기준입니다.';
+  }
+
+  @override
+  String thresholdLevels(String high, String critical) {
+    return '$high부터 높음 · $critical부터 위험';
+  }
+
+  @override
+  String get thresholdServiceDownHelp => '응답하지 않는 서비스는 처음에는 경고, 그 후에는 위험입니다';
+
+  @override
+  String get thresholdsReset => '기본값으로 되돌리기';
+
+  @override
+  String get fleetNoReadings => '장치 측정값 없음';
+
+  @override
+  String get incidentUnreachable => '전체';
+
+  @override
+  String incidentOngoing(String service, String start, String length) {
+    return '$service $start부터 중단 중($length)';
+  }
+
+  @override
+  String incidentEnded(String service, String start, String end) {
+    return '$service 중단 $start–$end';
+  }
+
+  @override
+  String get incidentHistory => '중단 기록';
+
+  @override
+  String incidentHistoryOf(String name) {
+    return '$name: 중단';
+  }
+
+  @override
+  String get incidentNone => '이 장치에서 확인된 중단이 없습니다.';
+
+  @override
+  String get incidentNote => '이 장치가 이 배포의 상태를 표시하는 동안 확인한 내용입니다.';
+
+  @override
+  String serviceDownFor(String time) {
+    return '오프라인 · $time';
+  }
+
+  @override
+  String get answerStyle => '답변 스타일';
+
+  @override
+  String get styleStandard => '기본';
+
+  @override
+  String get styleBrief => '짧게';
+
+  @override
+  String get styleSteps => '단계별로';
+
+  @override
+  String get styleSimple => '쉬운 말로';
+
+  @override
+  String get styleCustom => '직접 지시';
+
+  @override
+  String get styleCustomLabel => '어시스턴트가 어떻게 답해야 하나요?';
+
+  @override
+  String get styleCustomHelp => '이 장치에서 보내는 모든 질문과 함께 전송됩니다';
+
+  @override
+  String get videoGridLight => '느린 연결용 가벼운 그리드';
+
+  @override
+  String get videoGridLightHelp => '그리드에서 실시간 영상 대신 2초마다 새 이미지를 보여 줍니다';
+
+  @override
+  String cameraFrameEvery(int seconds) {
+    return '$seconds초마다';
+  }
+
+  @override
+  String get clearList => '지우기';
 }

@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_error.dart';
+
 /// p4n4-api's sign-in endpoints (`/api/v1/auth/*`).
 ///
 /// Access tokens last 1 h and refresh tokens 7 d. Every refresh returns a new
@@ -42,14 +44,8 @@ class ApiTokens {
 
 /// A sign-in that failed for a reason worth showing (bad password, expired
 /// session, rate limit), as opposed to the API being unreachable.
-class AuthException implements Exception {
-  const AuthException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class AuthException extends ApiException {
+  const AuthException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 /// What p4n4-api says about sign-in, from `GET /auth/me` without a token.
@@ -180,6 +176,9 @@ class AuthClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final url = request.url;
+    // So a failure can be found in p4n4-api's log (see ApiException.requestId);
+    // a retry below keeps it: it's the same request.
+    if (url.path.contains('/api/v1/')) request.headers.putIfAbsent(requestIdHeader, newRequestId);
     // The auth endpoints carry their own credentials and must not loop on 401;
     // changing your password is the one that needs the access token.
     if (url.path.contains('/api/v1/auth/') && !url.path.endsWith('/auth/password')) return _inner.send(request);

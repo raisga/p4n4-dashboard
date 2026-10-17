@@ -1,20 +1,21 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../api/edge_metrics.dart';
+import '../api/metrics_monitor.dart';
 import '../api/project.dart';
 import '../api/services.dart';
 import '../api/view_settings.dart';
 import '../api/status_monitor.dart';
 import '../core/brand.dart';
 import '../core/format.dart';
+import '../core/incidents.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../core/thresholds.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/markdown_panel.dart';
+import '../widgets/support.dart';
 
 const _interval = Duration(seconds: 30);
 
@@ -43,13 +44,6 @@ class _OverviewTabState extends State<OverviewTab> {
   P4Colors get p4 => context.p4;
   AppLocalizations get l => context.l10n;
 
-  final _demo = DemoMetrics();
-  EdgeMetrics? _metrics;
-  bool _metricsFailed = false;
-  bool _metricsLoading = false;
-  Timer? _timer;
-  String? _metricsKey;
-
   // The connected project's HOME.md in the app's language, null while it has
   // none; read again on reconnecting, switching language, refreshing, and
   // coming back to the tab.
@@ -57,25 +51,25 @@ class _OverviewTabState extends State<OverviewTab> {
   ProjectInfo? _homeProject;
   String? _homeLang;
 
-  // Service status comes from the shared StatusMonitor; only edge metrics are polled here.
+  // Service status and edge readings come from the shared monitors, which
+  // poll for every screen that shows them.
   late StatusMonitor _monitor;
   late StatusTarget _target;
+  late MetricsMonitor _metricsMonitor;
+  late MetricsSource _source;
 
   TargetStatus get _status => _monitor.statusOf(_target);
-  bool get _loading => _metricsLoading || _status.checking;
+  SourceMetrics get _metrics => _metricsMonitor.of(_source);
+  bool get _loading => _metrics.checking || _status.checking;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _monitor = StatusScope.of(context);
+    _metricsMonitor = MetricsScope.of(context);
     final s = SettingsScope.of(context);
     _target = s.statusTarget;
-    final key = '${s.edgeDemo}|${s.edgeMetricsUri}';
-    if (key != _metricsKey) {
-      _metricsKey = key;
-      _metrics = null;
-      _fetchMetrics();
-    }
+    _source = s.metricsSource;
     final lang = Localizations.localeOf(context).languageCode;
     if (s.project != _homeProject || lang != _homeLang) {
       _homeProject = s.project;
@@ -89,30 +83,25 @@ class _OverviewTabState extends State<OverviewTab> {
   @override
   void didUpdateWidget(OverviewTab old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) {
-      _fetchMetrics();
-      _fetchHome();
-    }
+    if (widget.active && !old.active) _fetchHome();
     _schedule();
   }
 
-  /// Matches polling to [active]; a no-op otherwise, so rebuilds don't push
-  /// the next poll back.
+  /// Watches while [active]; the monitors make that a no-op when nothing changed.
   void _schedule() {
     if (!widget.active) {
-      _timer?.cancel();
-      _timer = null;
       _monitor.unwatch(this);
-    } else {
-      _timer ??= Timer.periodic(_interval, (_) => _fetchMetrics());
-      _monitor.watch(this, [_target], interval: _interval);
+      _metricsMonitor.unwatch(this);
+      return;
     }
+    _monitor.watch(this, [_target], interval: _interval);
+    _showsDevice ? _metricsMonitor.watch(this, [_source], interval: _interval) : _metricsMonitor.unwatch(this);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _monitor.unwatch(this);
+    _metricsMonitor.unwatch(this);
     super.dispose();
   }
 
@@ -127,7 +116,11 @@ class _OverviewTabState extends State<OverviewTab> {
       SettingsScope.of(context).projectAllows(DashTab.edge) &&
       _shows(HomeCard.device);
 
-  Future<void> _refresh() => (_monitor.refresh(_target), _fetchMetrics(), _fetchHome()).wait;
+  Future<void> _refresh() => (
+    _monitor.refresh(_target),
+    _showsDevice ? _metricsMonitor.refresh(_source) : Future<void>.value(),
+    _fetchHome(),
+  ).wait;
 
   /// Only once p4n4-api has described the project: without it there's no file to read.
   Future<void> _fetchHome() async {
@@ -141,32 +134,12 @@ class _OverviewTabState extends State<OverviewTab> {
     }
   }
 
-  Future<void> _fetchMetrics() async {
-    if (_metricsLoading || !_showsDevice) return;
-    final s = SettingsScope.of(context);
-    final key = _metricsKey;
-    // Not setState: this can run from didChangeDependencies, mid-build.
-    _metricsLoading = true;
-    try {
-      final m = s.edgeDemo ? _demo.next() : await fetchEdgeMetrics(s.edgeMetricsUri);
-      if (mounted && key == _metricsKey) {
-        setState(() {
-          _metrics = m;
-          _metricsFailed = false;
-        });
-      }
-    } catch (_) {
-      if (mounted && key == _metricsKey) setState(() => _metricsFailed = true);
-    } finally {
-      _metricsLoading = false;
-      if (mounted) setState(() {});
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final brand = BrandScope.of(context);
     final checkedAt = _status.checkedAt;
+    // Rebuilt when readings change.
+    MetricsScope.of(context);
     return PageBody(
       maxWidth: 1000,
       onRefresh: _refresh,
@@ -202,13 +175,21 @@ class _OverviewTabState extends State<OverviewTab> {
       _ when r.online == r.known => (Health.up, l.summaryOk, l.summaryOkSub),
       _ => (Health.down, l.summaryAttention, l.summaryAttentionSub),
     };
+    final settings = SettingsScope.of(context);
+    // Down for less than the deployment's threshold: a warning; longer: critical.
+    final down = r == null ? null : _downFor(r, settings);
     final (color, icon) = switch (health) {
       Health.up => (p4.ok, Icons.check_circle_outline),
+      Health.down when down != null && settings.thresholds.downLevel(down) == Level.high => (
+        p4.warn,
+        Icons.error_outline,
+      ),
       Health.down => (p4.err, Icons.error_outline),
       Health.pending => (p4.warn, Icons.hourglass_empty),
       _ => (p4.warn, Icons.help_outline),
     };
     final affected = health == Health.down && r != null && r.online > 0 ? _affected(r) : const <String>[];
+    final stuck = (health == Health.down || health == Health.unknown) && !SessionScope.of(context).isTechnical;
     return Panel(
       accent: color,
       padding: const EdgeInsets.all(24),
@@ -236,12 +217,38 @@ class _OverviewTabState extends State<OverviewTab> {
                     style: p4.body(size: 14, color: p4.text, weight: FontWeight.w600),
                   ),
                 ],
+                if (down != null && SessionScope.of(context).isTechnical) ...[
+                  const SizedBox(height: 4),
+                  Text(l.summaryDownFor(context.formats.span(down)), style: p4.body(size: 13, color: p4.muted)),
+                ],
+                // Viewers can't fix it: the brand's support can.
+                if (stuck) ...[const SizedBox(height: 12), const ContactSupportButton()],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// How long the longest outage now has lasted, from this device's
+  /// incidents; null when nothing is down or none was seen starting.
+  Duration? _downFor(ServiceReport r, AppSettings settings) {
+    final log = IncidentScope.maybeOf(context);
+    if (log == null) return null;
+    final now = DateTime.now();
+    final unreachable = !r.viaApi && r.online == 0;
+    final lengths = [
+      for (final name
+          in unreachable
+              ? [Incident.unreachable]
+              : [
+                  for (final MapEntry(key: def, value: up) in r.up.entries)
+                    if (up == false) def.name,
+                ])
+        ?log.ongoing(settings.deployment, name)?.lengthAt(now),
+    ];
+    return lengths.isEmpty ? null : lengths.reduce((a, b) => a > b ? a : b);
   }
 
   /// What's down: service names for those who know them, and for viewers the
@@ -269,16 +276,33 @@ class _OverviewTabState extends State<OverviewTab> {
   }
 
   Widget _device() {
-    final m = _metrics;
+    final metrics = _metrics;
+    final m = metrics.latest;
     final f = context.formats;
+    final t = SettingsScope.of(context).thresholds;
     final details = widget.tabs.contains(DashTab.edge);
+    final updated = metrics.updatedAt;
+    // Readings that couldn't be refreshed say how old they are.
+    final stale = m != null && metrics.error != null;
     return Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(l.yourDevice, style: p4.display(size: 17))),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.yourDevice, style: p4.display(size: 17)),
+                    if (updated != null)
+                      Text(
+                        stale ? l.deviceStaleSince(f.clock(updated)) : l.deviceUpdatedAt(f.clock(updated)),
+                        style: p4.body(size: 12, color: stale ? p4.warn : p4.muted),
+                      ),
+                  ],
+                ),
+              ),
               if (details)
                 TextButton.icon(
                   onPressed: () => widget.onOpen(DashTab.edge),
@@ -289,18 +313,18 @@ class _OverviewTabState extends State<OverviewTab> {
           ),
           const SizedBox(height: 14),
           if (m == null)
-            Text(_metricsFailed ? l.deviceUnavailable : l.deviceLoading, style: p4.body(color: p4.muted))
+            Text(metrics.error != null ? l.deviceUnavailable : l.deviceLoading, style: p4.body(color: p4.muted))
           else
             TileGrid(
               minWidth: 180,
               children: [
-                _reading(l.readingProcessor, f.percent(m.cpu), usageLevel(m.cpu)),
-                _reading(l.readingMemory, f.percent(m.mem), usageLevel(m.mem)),
+                _reading(l.readingProcessor, f.percent(m.cpu), t.level(Reading.cpu, m.cpu)),
+                _reading(l.readingMemory, f.percent(m.mem), t.level(Reading.memory, m.mem)),
                 if (m.tempC != null)
                   _reading(
                     l.readingTemperature,
                     f.temperature(m.tempC!),
-                    temperatureLevel(m.tempC!),
+                    t.level(Reading.temperature, m.tempC!),
                     temperature: true,
                   ),
               ],

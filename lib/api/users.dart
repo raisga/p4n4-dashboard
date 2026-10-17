@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/role.dart';
+import 'api_error.dart';
 
 /// p4n4-api accounts (`/api/v1/users`), for admins. Requests carry the
 /// signed-in admin's token (see `AuthClient`).
@@ -43,14 +44,8 @@ class ApiUser {
 
 /// A request the API turned down, with its message for people (e.g. "the
 /// last admin can't be demoted", "username taken", a short password).
-class UsersException implements Exception {
-  const UsersException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => message;
+class UsersException extends ApiException {
+  const UsersException(super.message, {super.statusCode, super.code, super.requestId});
 }
 
 const _timeout = Duration(seconds: 8);
@@ -127,7 +122,7 @@ Object? _body(http.Response res) {
     403 => 'Only admins can manage users.',
     _ => _message(res.body) ?? 'HTTP ${res.statusCode}',
   };
-  throw UsersException(message, statusCode: res.statusCode);
+  throw UsersException(message, statusCode: res.statusCode, requestId: requestIdOf(res));
 }
 
 String? _message(String body) {

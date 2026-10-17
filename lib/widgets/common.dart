@@ -213,15 +213,18 @@ enum Health { up, down, unknown, pending }
 
 /// Coloured dot + label; never colour alone.
 class StatusIndicator extends StatelessWidget {
-  const StatusIndicator(this.health, {super.key, this.label});
+  const StatusIndicator(this.health, {super.key, this.label, this.color});
 
   final Health health;
   final String? label;
 
+  /// In place of [health]'s colour, e.g. amber for an outage that just began.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
-    final color = healthColor(p4, health);
+    final color = this.color ?? healthColor(p4, health);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -251,22 +254,9 @@ Color healthColor(P4Colors p4, Health health) => switch (health) {
 };
 
 /// How a device reading compares with what's normal, so people don't have to
-/// know what 85% or 78°C means.
+/// know what 85% or 78°C means. Where each level starts is a deployment's
+/// `Thresholds` (core/thresholds.dart).
 enum Level { normal, high, critical }
-
-/// CPU or memory use, in percent.
-Level usageLevel(double percent) => percent >= 90
-    ? Level.critical
-    : percent >= 75
-    ? Level.high
-    : Level.normal;
-
-/// Board temperature, in °C. Raspberry Pis start throttling at 80°C.
-Level temperatureLevel(double celsius) => celsius >= 80
-    ? Level.critical
-    : celsius >= 70
-    ? Level.high
-    : Level.normal;
 
 Color levelColor(P4Colors p4, Level level) => switch (level) {
   Level.normal => p4.ok,

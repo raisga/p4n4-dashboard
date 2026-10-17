@@ -1570,4 +1570,406 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultCameraFirst => '第一个';
+
+  @override
+  String logsTitle(String name) {
+    return '$name 日志';
+  }
+
+  @override
+  String logsFailed(String error) {
+    return '已停止：$error';
+  }
+
+  @override
+  String get logsEnded => '日志流已结束';
+
+  @override
+  String get logsFollowing => '正在跟踪新的行';
+
+  @override
+  String get copyTooltip => '复制';
+
+  @override
+  String get copied => '已复制';
+
+  @override
+  String get logsFilter => '筛选';
+
+  @override
+  String get logsEmpty => '暂无日志';
+
+  @override
+  String get logsNoMatch => '没有符合筛选条件的行';
+
+  @override
+  String get logsLatest => '跳到最新一行';
+
+  @override
+  String get logsMenu => '日志';
+
+  @override
+  String get serviceConfirmRestartBody => '所有正在使用它的人都会短暂中断。';
+
+  @override
+  String serviceUptime(String time) {
+    return '已运行 $time';
+  }
+
+  @override
+  String get serviceUnhealthy => '不健康';
+
+  @override
+  String get serviceStarting => '正在启动';
+
+  @override
+  String serviceActions(String name) {
+    return '$name 操作';
+  }
+
+  @override
+  String get sectionDevices => '设备';
+
+  @override
+  String devicesNote(String platform) {
+    return '向 $platform-api 发送读数的设备，每台都有自己的密钥。';
+  }
+
+  @override
+  String get devicesOnlyAdmins => '只有管理员可以更改设备。';
+
+  @override
+  String devicesLoadFailed(String error) {
+    return '无法加载设备：$error';
+  }
+
+  @override
+  String get devicesNone => '尚未注册任何设备。';
+
+  @override
+  String get deviceDisabled => '已停用';
+
+  @override
+  String deviceLastSeen(String time) {
+    return '最后在线 $time';
+  }
+
+  @override
+  String get deviceNeverSeen => '从未在线';
+
+  @override
+  String deviceKey(String prefix) {
+    return '密钥 $prefix…';
+  }
+
+  @override
+  String get deviceDisable => '停用：它将无法登录';
+
+  @override
+  String get deviceEnable => '启用';
+
+  @override
+  String get rotateKey => '新密钥';
+
+  @override
+  String rotateKeyTitle(String name) {
+    return '要为 $name 生成新密钥吗？';
+  }
+
+  @override
+  String get rotateKeyBody => '当前密钥会立即失效。请把新密钥放到设备上。';
+
+  @override
+  String removeDeviceTitle(String name) {
+    return '要移除 $name 吗？';
+  }
+
+  @override
+  String get removeDeviceBody => '它的密钥会立即失效，且不能再发送读数。';
+
+  @override
+  String get removeDeviceTooltip => '移除设备';
+
+  @override
+  String get showMore => '显示更多';
+
+  @override
+  String get addDevice => '添加设备';
+
+  @override
+  String get editDevice => '编辑设备';
+
+  @override
+  String get deviceId => '设备 ID';
+
+  @override
+  String get deviceIdHelp => '字母、数字、点、连字符和下划线；之后无法更改';
+
+  @override
+  String get deviceName => '名称';
+
+  @override
+  String get deviceDescription => '描述';
+
+  @override
+  String deviceKeyTitle(String id) {
+    return '$id 的密钥';
+  }
+
+  @override
+  String get deviceKeyBody => '请立即复制到设备上：它不会再次显示。';
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get contactSupport => '联系支持';
+
+  @override
+  String summaryDownFor(String time) {
+    return '已中断 $time';
+  }
+
+  @override
+  String deviceUpdatedAt(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String deviceStaleSince(String time) {
+    return '无法刷新 · $time 的读数';
+  }
+
+  @override
+  String get sectionThresholds => '阈值';
+
+  @override
+  String get thresholdServiceDown => '服务中断';
+
+  @override
+  String get sensorsTitle => '传感器';
+
+  @override
+  String get sensorsSubtitle => '设备的实时读数。点按一个查看其历史。';
+
+  @override
+  String sensorsUnavailable(String error) {
+    return '没有实时读数：$error';
+  }
+
+  @override
+  String get sensorsNoBroker => '尚未连接到 MQTT 代理';
+
+  @override
+  String get sensorsWaiting => '正在等待读数…';
+
+  @override
+  String sensorReadAt(String time) {
+    return '读取于 $time';
+  }
+
+  @override
+  String get rangeHour => '小时';
+
+  @override
+  String get rangeDay => '天';
+
+  @override
+  String get rangeWeek => '周';
+
+  @override
+  String sensorHistoryFailed(String error) {
+    return '无法加载历史：$error';
+  }
+
+  @override
+  String get sensorHistoryEmpty => '这段时间没有保存的读数';
+
+  @override
+  String sensorMin(String value) {
+    return '最低 $value';
+  }
+
+  @override
+  String sensorMax(String value) {
+    return '最高 $value';
+  }
+
+  @override
+  String get modelTitle => '模型';
+
+  @override
+  String get modelSubtitle => '边缘设备上的推理运行器';
+
+  @override
+  String get modelNoRunner => '此部署没有推理运行器，或它没有响应。';
+
+  @override
+  String modelFailed(String error) {
+    return '无法连接运行器：$error';
+  }
+
+  @override
+  String get modelInferences => '推理次数';
+
+  @override
+  String get modelLastLatency => '最近延迟';
+
+  @override
+  String get modelLastAt => '最近一次';
+
+  @override
+  String get modelRecent => '最近结果';
+
+  @override
+  String get classifyTitle => '试一试';
+
+  @override
+  String get classifyValues => '输入值';
+
+  @override
+  String classifyExpects(int expected, int count) {
+    return '$count / $expected 个值';
+  }
+
+  @override
+  String get classify => '分类';
+
+  @override
+  String classifyAnomaly(String score) {
+    return '异常 $score';
+  }
+
+  @override
+  String get classifyNotNumbers => '请输入用逗号或空格分隔的数字。';
+
+  @override
+  String get commandTitle => '发送命令';
+
+  @override
+  String get commandSubtitle => '发布一条 MQTT 消息，例如发到设备的命令主题';
+
+  @override
+  String get commandTopic => '主题';
+
+  @override
+  String get commandPayload => '消息';
+
+  @override
+  String get commandPayloadHelp => '文本或 JSON';
+
+  @override
+  String get commandRetain => '保留（retain）';
+
+  @override
+  String commandSent(String topic, int bytes) {
+    return '已发送到 $topic（$bytes 字节）';
+  }
+
+  @override
+  String commandTopicNotAllowed(String topic) {
+    return '此部署不允许发布到 $topic（p4n4-api 的 P4N4_API_MQTT_PUBLISH_ALLOW 和 _DENY）。';
+  }
+
+  @override
+  String commandNoBroker(String error) {
+    return 'p4n4-api 未连接到代理：$error';
+  }
+
+  @override
+  String get commandNotAllowed => '只有操作员和管理员可以发送命令。';
+
+  @override
+  String commandFailed(String error) {
+    return '未发送：$error';
+  }
+
+  @override
+  String thresholdsNote(String deployment) {
+    return '在此设备上，$deployment 的读数何时显示为偏高或危险。';
+  }
+
+  @override
+  String thresholdLevels(String high, String critical) {
+    return '$high 起偏高 · $critical 起危险';
+  }
+
+  @override
+  String get thresholdServiceDownHelp => '停止响应的服务起初是警告，之后变为危险';
+
+  @override
+  String get thresholdsReset => '恢复默认值';
+
+  @override
+  String get fleetNoReadings => '没有设备读数';
+
+  @override
+  String get incidentUnreachable => '全部';
+
+  @override
+  String incidentOngoing(String service, String start, String length) {
+    return '$service 自 $start 起中断（$length）';
+  }
+
+  @override
+  String incidentEnded(String service, String start, String end) {
+    return '$service 中断 $start–$end';
+  }
+
+  @override
+  String get incidentHistory => '中断历史';
+
+  @override
+  String incidentHistoryOf(String name) {
+    return '$name：中断';
+  }
+
+  @override
+  String get incidentNone => '此设备未发现中断。';
+
+  @override
+  String get incidentNote => '在此设备显示该部署状态期间发现。';
+
+  @override
+  String serviceDownFor(String time) {
+    return '离线 · $time';
+  }
+
+  @override
+  String get answerStyle => '回答风格';
+
+  @override
+  String get styleStandard => '标准';
+
+  @override
+  String get styleBrief => '简短';
+
+  @override
+  String get styleSteps => '分步骤';
+
+  @override
+  String get styleSimple => '通俗易懂';
+
+  @override
+  String get styleCustom => '自定义指示';
+
+  @override
+  String get styleCustomLabel => '助手应该如何回答？';
+
+  @override
+  String get styleCustomHelp => '随此设备的每个问题一起发送';
+
+  @override
+  String get videoGridLight => '适合慢速网络的轻量网格';
+
+  @override
+  String get videoGridLightHelp => '在网格中每 2 秒显示一张新画面，而不是实时视频';
+
+  @override
+  String cameraFrameEvery(int seconds) {
+    return '每 $seconds 秒';
+  }
+
+  @override
+  String get clearList => '清除';
 }
