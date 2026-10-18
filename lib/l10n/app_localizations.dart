@@ -2469,11 +2469,53 @@ abstract class AppLocalizations {
   /// **'Attended'**
   String get feedStatusAttended;
 
+  /// No description provided for @feedStatusConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get feedStatusConfirmed;
+
   /// No description provided for @feedStatusDismissed.
   ///
   /// In en, this message translates to:
   /// **'Dismissed'**
   String get feedStatusDismissed;
+
+  /// No description provided for @feedPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String feedPosition(int index, int count);
+
+  /// No description provided for @feedPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get feedPrevious;
+
+  /// No description provided for @feedNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get feedNext;
+
+  /// No description provided for @feedKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys: 1, 2… take the actions · J / K next / previous · Esc back'**
+  String get feedKeys;
+
+  /// No description provided for @feedPicture.
+  ///
+  /// In en, this message translates to:
+  /// **'The alert\'s picture'**
+  String get feedPicture;
+
+  /// No description provided for @feedPictureFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the picture.'**
+  String get feedPictureFailed;
 
   /// No description provided for @changePassword.
   ///

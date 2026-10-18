@@ -1,15 +1,15 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../api/feed.dart';
-import '../core/format.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import 'feed_item_page.dart';
 
 const _interval = Duration(seconds: 10);
 const _pageSize = 50;
@@ -18,7 +18,8 @@ enum _Filter { all, alerts, pending }
 
 /// The project's live events and alerts (`.p4n4.json` `dashboard.feed`, through
 /// p4n4-api): what happened, and what asks a person to do something. Operators
-/// and admins act on alerts (attend, dismiss); viewers only read.
+/// and admins act on alerts (attend, dismiss); viewers only read. An item opens
+/// in full ([FeedItemPage]), with its picture when it has one.
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key, required this.active});
 
@@ -130,6 +131,29 @@ class _FeedTabState extends State<FeedTab> {
     }
   }
 
+  /// For [FeedItemPage]: the action, then the feed as it is now (this tab's filter).
+  Future<List<FeedItem>> _actAndRefresh(FeedItem item, FeedAction action) async {
+    await _api!.act(item.id, action.id);
+    _older.removeWhere((i) => i.id == item.id);
+    await _refresh();
+    return _items;
+  }
+
+  void _open(FeedItem item) {
+    final items = _items;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedItemPage(
+          api: _api!,
+          items: items,
+          index: items.indexWhere((i) => i.id == item.id).clamp(0, items.length - 1),
+          canAct: _first?.canAct ?? false,
+          act: _actAndRefresh,
+        ),
+      ),
+    );
+  }
+
   void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   List<FeedItem> get _items {
@@ -204,7 +228,14 @@ class _FeedTabState extends State<FeedTab> {
           EmptyState(icon: Icons.dynamic_feed_outlined, title: l.feedEmpty, message: l.feedEmptyMsg)
         else
           for (final item in items) ...[
-            _FeedCard(item: item, canAct: page.canAct, busy: _acting.contains(item.id), onAction: (a) => _act(item, a)),
+            _FeedCard(
+              item: item,
+              api: _api!,
+              canAct: page.canAct,
+              busy: _acting.contains(item.id),
+              onAction: (a) => _act(item, a),
+              onOpen: () => _open(item),
+            ),
             const SizedBox(height: 10),
           ],
         if (_olderCursor != null && items.isNotEmpty)
@@ -221,42 +252,35 @@ class _FeedTabState extends State<FeedTab> {
 }
 
 class _FeedCard extends StatelessWidget {
-  const _FeedCard({required this.item, required this.canAct, required this.busy, required this.onAction});
+  const _FeedCard({
+    required this.item,
+    required this.api,
+    required this.canAct,
+    required this.busy,
+    required this.onAction,
+    required this.onOpen,
+  });
 
   final FeedItem item;
+  final FeedApi api;
   final bool canAct;
   final bool busy;
   final ValueChanged<FeedAction> onAction;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
     final l = context.l10n;
-    final f = context.formats;
-    final tone = switch (item.tone) {
-      FeedTone.review => p4.warn,
-      FeedTone.info => p4.blue,
-      FeedTone.neutral => p4.muted,
-    };
-    final time = item.time?.toLocal();
-    final now = DateTime.now();
-    final when = time == null
-        ? null
-        : time.year == now.year && time.month == now.month && time.day == now.day
-        ? f.clock(time)
-        : '${DateFormat.MMMd(f.locale).format(time)} ${f.clock(time)}';
-    final status = switch (item.status) {
-      null => null,
-      'pending_review' => (l.feedStatusPending, p4.warn),
-      'attended' => (l.feedStatusAttended, p4.ok),
-      'dismissed' => (l.feedStatusDismissed, p4.muted),
-      final other => (other, p4.muted),
-    };
+    final tone = feedTone(context, item.tone);
+    final when = feedWhen(context, item.time);
+    final status = feedStatus(context, item.status);
     final meta = [?when, ...item.meta.values];
 
     return Panel(
       accent: item.alert ? tone : null,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -277,6 +301,8 @@ class _FeedCard extends StatelessWidget {
                 ),
               ),
               if (status != null) ...[const SizedBox(width: 10), TagBadge(status.$1, color: status.$2)],
+              // The evidence of what's still to review, at a glance (the rest on opening them)
+              if (item.image && item.pending) ...[const SizedBox(width: 12), _Thumbnail(api: api, itemId: item.id)],
             ],
           ),
           if (item.detail != null) ...[
@@ -298,6 +324,7 @@ class _FeedCard extends StatelessWidget {
             children: [
               if (meta.isNotEmpty) Text(meta.join(' · '), style: p4.mono(size: 12, color: p4.muted)),
               if (item.synthetic) TagBadge(l.feedDemoData),
+              if (item.image && !item.pending) Icon(Icons.photo_outlined, size: 16, color: p4.muted),
             ],
           ),
           if (canAct && item.actions.isNotEmpty) ...[
@@ -314,6 +341,41 @@ class _FeedCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _Thumbnail extends StatefulWidget {
+  const _Thumbnail({required this.api, required this.itemId});
+
+  final FeedApi api;
+  final String itemId;
+
+  @override
+  State<_Thumbnail> createState() => _ThumbnailState();
+}
+
+class _ThumbnailState extends State<_Thumbnail> {
+  late final Future<Uint8List> _picture = widget.api.image(widget.itemId);
+
+  @override
+  Widget build(BuildContext context) {
+    final p4 = context.p4;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 128,
+        height: 72,
+        child: ColoredBox(
+          color: p4.bg,
+          child: FutureBuilder<Uint8List>(
+            future: _picture,
+            builder: (context, snap) => snap.hasData
+                ? Image.memory(snap.data!, fit: BoxFit.cover, semanticLabel: context.l10n.feedPicture)
+                : Icon(snap.hasError ? Icons.broken_image_outlined : Icons.photo_outlined, color: p4.muted),
+          ),
+        ),
       ),
     );
   }

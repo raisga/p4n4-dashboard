@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -19,7 +20,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/brands.dart';
 
-Map<String, Object?> _feed({bool canAct = true, String status = 'pending_review'}) => {
+/// A 1×1 PNG: an item's picture.
+final _png = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+);
+
+Map<String, Object?> _feed({bool canAct = true, String status = 'pending_review', bool image = false}) => {
   'title': 'Live activity',
   'items': [
     {
@@ -39,6 +45,10 @@ Map<String, Object?> _feed({bool canAct = true, String status = 'pending_review'
         ],
       'meta': {'camera_id': 'boutique-cam-04', 'zone_id': 'b-fitting'},
       'synthetic': true,
+      if (image) ...{
+        'image': true,
+        'link': {'label': 'Full review', 'url': 'https://review.example/#ALT-20261003-000001'},
+      },
     },
     {'id': 'EVT-20261003-000007', 'time': '2026-10-03T18:14:00-05:00', 'kind': 'event', 'title': 'Takes garment'},
   ],
@@ -156,6 +166,30 @@ void main() {
       expect(jsonDecode(sent.body), {'action': 'attended'});
     });
 
+    test('an item may have a picture and an http(s) link; any other link is none', () {
+      final item = FeedPage.fromJson(_feed(image: true)).items.first;
+      expect((item.image, item.link?.label, item.link?.url.host), (true, 'Full review', 'review.example'));
+      final odd = FeedItem.fromJson({
+        'id': 'x',
+        'title': 'x',
+        'link': {'label': 'x', 'url': 'javascript:alert(1)'},
+      });
+      expect((odd.image, odd.link), (false, null));
+    });
+
+    test('fetches a picture once, through the API', () async {
+      final asked = <Uri>[];
+      final pictures = await http.runWithClient(
+        () async => [await api.image('ALT-20261003-000001'), await api.image('ALT-20261003-000001')],
+        () => MockClient((r) async {
+          asked.add(r.url);
+          return http.Response.bytes(_png, 200, headers: {'content-type': 'image/png'});
+        }),
+      );
+      expect(asked.single.path, '/api/v1/feed/ALT-20261003-000001/image');
+      expect(pictures.first, _png);
+    });
+
     test('a project without a feed says so', () async {
       final error = await http.runWithClient(
         () => api.page().then<Object?>((_) => null, onError: (Object e) => e),
@@ -248,6 +282,68 @@ void main() {
       expect(requests.where((r) => r.method == 'POST').single.url.path, '/api/v1/feed/ALT-20261003-000001/action');
       expect(find.text('Attended'), findsOneWidget);
       expect(find.text('1 to review'), findsNothing);
+    });
+
+    testWidgets('a pending alert shows its picture; opened, it is reviewed from the keyboard', (tester) async {
+      var attended = false;
+      Future<http.Response> handler(http.Request r) async {
+        if (r.url.path.endsWith('/image')) {
+          return http.Response.bytes(_png, 200, headers: {'content-type': 'image/png'});
+        }
+        if (r.method == 'POST') {
+          attended = true;
+          return _json({'action': 'attended', 'item': {}});
+        }
+        return _json(_feed(image: true, status: attended ? 'attended' : 'pending_review'));
+      }
+
+      final requests = await pump(tester, Role.power, handler);
+      expect(requests.where((r) => r.url.path.endsWith('/image')), hasLength(1));
+      expect(find.byType(Image), findsOneWidget);
+
+      await http.runWithClient(
+        () async {
+          await tester.tap(find.text('Fitting room assistance'));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+        },
+        () => MockClient((r) async {
+          requests.add(r);
+          return handler(r);
+        }),
+      );
+      expect(find.text('1 of 2'), findsOneWidget);
+      expect(find.text('1 · Attend'), findsOneWidget);
+      expect(find.text('Full review'), findsOneWidget);
+      expect(find.textContaining('J / K'), findsOneWidget);
+
+      await http.runWithClient(
+        () async {
+          await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 100));
+        },
+        () => MockClient((r) async {
+          requests.add(r);
+          return handler(r);
+        }),
+      );
+      expect(requests.where((r) => r.method == 'POST').single.url.path, '/api/v1/feed/ALT-20261003-000001/action');
+      expect(find.text('Attended'), findsWidgets);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.pump();
+      expect(find.text('2 of 2'), findsOneWidget);
+      expect(find.text('Takes garment'), findsWidgets);
+    });
+
+    testWidgets('viewers open an item without its actions', (tester) async {
+      await pump(tester, Role.normie, (r) async => _json(_feed(canAct: false)));
+      await tester.tap(find.text('Fitting room assistance'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('1 of 2'), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
     });
 
     testWidgets('the filter narrows to alerts', (tester) async {

@@ -1336,7 +1336,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get feedStatusAttended => '已处理';
 
   @override
+  String get feedStatusConfirmed => '已确认';
+
+  @override
   String get feedStatusDismissed => '已忽略';
+
+  @override
+  String feedPosition(int index, int count) {
+    return '第 $index 项，共 $count 项';
+  }
+
+  @override
+  String get feedPrevious => '上一项';
+
+  @override
+  String get feedNext => '下一项';
+
+  @override
+  String get feedKeys => '按键：1、2… 执行操作 · J / K 下一项 / 上一项 · Esc 返回';
+
+  @override
+  String get feedPicture => '警报图片';
+
+  @override
+  String get feedPictureFailed => '无法加载图片。';
 
   @override
   String get changePassword => '更改密码';

@@ -1352,7 +1352,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedStatusAttended => 'Attended';
 
   @override
+  String get feedStatusConfirmed => 'Confirmed';
+
+  @override
   String get feedStatusDismissed => 'Dismissed';
+
+  @override
+  String feedPosition(int index, int count) {
+    return '$index of $count';
+  }
+
+  @override
+  String get feedPrevious => 'Previous';
+
+  @override
+  String get feedNext => 'Next';
+
+  @override
+  String get feedKeys => 'Keys: 1, 2… take the actions · J / K next / previous · Esc back';
+
+  @override
+  String get feedPicture => 'The alert\'s picture';
+
+  @override
+  String get feedPictureFailed => 'Couldn\'t load the picture.';
 
   @override
   String get changePassword => 'Change password';

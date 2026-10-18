@@ -91,6 +91,8 @@ class VisionOverlay extends StatelessWidget {
     Color objectColor(int kind) => style.objects[bundle.objects.elementAtOrNull(kind)?.id] ?? visionObjectColor(kind);
     final objects = style.showObjects ? scene.objects : const <VisionObject>[];
     final tags = detailed && style.showTags;
+    // A person of a kind (e.g. a team) in that kind's colour
+    Color personColor(VisionBox b) => b.kind == null ? people : objectColor(b.kind!);
 
     return IgnorePointer(
       child: LayoutBuilder(
@@ -111,7 +113,7 @@ class VisionOverlay extends StatelessWidget {
               Positioned.fill(
                 child: CustomPaint(
                   painter: _HudPainter(
-                    boxes: [for (final b in scene.boxes) (place(b.rect), b.track == focus)],
+                    boxes: [for (final b in scene.boxes) (place(b.rect), b.track == focus, personColor(b))],
                     objects: [for (final o in objects) (place(o.rect), objectColor(o.kind))],
                     people: people,
                     view: view,
@@ -127,11 +129,13 @@ class VisionOverlay extends StatelessWidget {
                       place(b.rect).topLeft,
                       _Tag(
                         [
-                          '#${b.track} · ${(b.confidence * 100).round()}%',
+                          '#${b.track}',
+                          if (b.kind != null) bundle.objectLabel(b.kind!, lang),
+                          '${(b.confidence * 100).round()}%',
                           if (behavior != null && behavior.track == b.track)
                             bundle.behaviorLabel(behavior.behavior, lang),
                         ].join(' · '),
-                        color: b.track == focus ? tone! : people,
+                        color: b.track == focus ? tone! : personColor(b),
                       ),
                     ),
                   for (final o in [...objects]..sort((a, b) => b.confidence.compareTo(a.confidence)))
@@ -218,8 +222,9 @@ class _HudPainter extends CustomPainter {
     this.tone,
   });
 
-  /// Each box in pixels, and whether it's the person the alert is about.
-  final List<(Rect, bool)> boxes;
+  /// Each box in pixels, whether it's the person the alert is about, and
+  /// its colour otherwise (the people's, or their kind's).
+  final List<(Rect, bool, Color)> boxes;
 
   /// Each object's box in pixels, and its kind's colour.
   final List<(Rect, Color)> objects;
@@ -261,8 +266,8 @@ class _HudPainter extends CustomPainter {
       );
     }
 
-    for (final (rect, focus) in boxes) {
-      final color = focus ? tone! : people;
+    for (final (rect, focus, own) in boxes) {
+      final color = focus ? tone! : own;
       if (focus) canvas.drawRect(rect, Paint()..color = color.withValues(alpha: 0.14));
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
@@ -311,7 +316,7 @@ class _HudPainter extends CustomPainter {
       !_sameBoxes(old.boxes, boxes) ||
       !_sameBoxes(old.objects, objects);
 
-  static bool _sameBoxes<T>(List<(Rect, T)> a, List<(Rect, T)> b) {
+  static bool _sameBoxes<T extends Record>(List<T> a, List<T> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;

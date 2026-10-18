@@ -200,11 +200,16 @@ class VisionCamera {
 
 /// One person on screen: a box normalised to the frame (0..1).
 class VisionBox {
-  const VisionBox(this.track, this.rect, this.confidence);
+  const VisionBox(this.track, this.rect, this.confidence, {this.kind});
 
   final int track;
   final Rect rect;
   final double confidence;
+
+  /// The group the person belongs to (e.g. their team), an index into
+  /// [VisionBundle.objects]: drawn in that kind's colour and named on the
+  /// tag. Null: the people's colour.
+  final int? kind;
 }
 
 /// Something other than a person the detector found (a garment, a bag): a
@@ -276,11 +281,13 @@ class VisionRecording {
               t.toDouble(),
               [
                 for (final b in boxes)
-                  if (b case [final num id, final num x1, final num y1, final num x2, final num y2, final num c])
+                  if (b case [final num id, final num x1, final num y1, final num x2, final num y2, final num c, ...])
                     VisionBox(
                       id.toInt(),
                       Rect.fromLTRB(x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble()),
                       c.toDouble(),
+                      // An optional 7th: the person's kind (e.g. their team)
+                      kind: b.length > 6 && b[6] is num ? (b[6] as num).toInt() : null,
                     ),
               ],
             ),
@@ -359,7 +366,7 @@ class VisionRecording {
     return [
       for (final b in prev.$2)
         switch (k > 0 ? ahead[b.track] : null) {
-          final to? => VisionBox(b.track, Rect.lerp(b.rect, to.rect, k)!, b.confidence),
+          final to? => VisionBox(b.track, Rect.lerp(b.rect, to.rect, k)!, b.confidence, kind: b.kind),
           null => b,
         },
     ];

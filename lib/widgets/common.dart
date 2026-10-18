@@ -160,29 +160,33 @@ class Wordmark extends StatelessWidget {
 /// whose colour carries meaning (e.g. the status summary). A [Material], so
 /// list tiles and ink inside it paint properly.
 class Panel extends StatelessWidget {
-  const Panel({super.key, required this.child, this.padding = const EdgeInsets.all(20), this.accent});
+  const Panel({super.key, required this.child, this.padding = const EdgeInsets.all(20), this.accent, this.onTap});
 
   final Widget child;
   final EdgeInsets padding;
   final Color? accent;
 
+  /// Makes the whole panel tappable (with the ink ripple).
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final p4 = context.p4;
+    final content = accent == null
+        ? Padding(padding: padding, child: child)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(height: 4, color: accent),
+              Padding(padding: padding, child: child),
+            ],
+          );
     return Material(
       color: p4.bg2,
       shape: Radii.cardShape.copyWith(side: BorderSide(color: p4.border)),
       clipBehavior: Clip.antiAlias,
-      child: accent == null
-          ? Padding(padding: padding, child: child)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(height: 4, color: accent),
-                Padding(padding: padding, child: child),
-              ],
-            ),
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
   }
 }

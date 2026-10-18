@@ -1336,7 +1336,30 @@ class AppLocalizationsKo extends AppLocalizations {
   String get feedStatusAttended => '처리됨';
 
   @override
+  String get feedStatusConfirmed => '확인됨';
+
+  @override
   String get feedStatusDismissed => '무시됨';
+
+  @override
+  String feedPosition(int index, int count) {
+    return '$index / $count';
+  }
+
+  @override
+  String get feedPrevious => '이전';
+
+  @override
+  String get feedNext => '다음';
+
+  @override
+  String get feedKeys => '키: 1, 2… 작업 · J / K 다음 / 이전 · Esc 뒤로';
+
+  @override
+  String get feedPicture => '알림 이미지';
+
+  @override
+  String get feedPictureFailed => '이미지를 불러오지 못했습니다.';
 
   @override
   String get changePassword => '비밀번호 변경';

@@ -1023,7 +1023,24 @@
   "feedDemoData": "Demo data",
   "feedStatusPending": "To review",
   "feedStatusAttended": "Attended",
+  "feedStatusConfirmed": "Confirmed",
   "feedStatusDismissed": "Dismissed",
+  "feedPosition": "{index} of {count}",
+  "@feedPosition": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "feedPrevious": "Previous",
+  "feedNext": "Next",
+  "feedKeys": "Keys: 1, 2… take the actions · J / K next / previous · Esc back",
+  "feedPicture": "The alert's picture",
+  "feedPictureFailed": "Couldn't load the picture.",
   "changePassword": "Change password",
   "changePasswordSubtitle": "Signs you out on your other devices",
   "changePasswordTitle": "Choose a new password",

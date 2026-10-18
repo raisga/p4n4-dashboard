@@ -1337,7 +1337,30 @@ class AppLocalizationsJa extends AppLocalizations {
   String get feedStatusAttended => '対応済み';
 
   @override
+  String get feedStatusConfirmed => '確認済み';
+
+  @override
   String get feedStatusDismissed => '却下';
+
+  @override
+  String feedPosition(int index, int count) {
+    return '$index / $count';
+  }
+
+  @override
+  String get feedPrevious => '前へ';
+
+  @override
+  String get feedNext => '次へ';
+
+  @override
+  String get feedKeys => 'キー: 1, 2… で操作 · J / K で次 / 前 · Esc で戻る';
+
+  @override
+  String get feedPicture => 'アラートの画像';
+
+  @override
+  String get feedPictureFailed => '画像を読み込めませんでした。';
 
   @override
   String get changePassword => 'パスワードを変更';

@@ -1358,7 +1358,30 @@ class AppLocalizationsPt extends AppLocalizations {
   String get feedStatusAttended => 'Atendido';
 
   @override
+  String get feedStatusConfirmed => 'Confirmada';
+
+  @override
   String get feedStatusDismissed => 'Descartado';
+
+  @override
+  String feedPosition(int index, int count) {
+    return '$index de $count';
+  }
+
+  @override
+  String get feedPrevious => 'Anterior';
+
+  @override
+  String get feedNext => 'Seguinte';
+
+  @override
+  String get feedKeys => 'Teclas: 1, 2… as ações · J / K seguinte / anterior · Esc voltar';
+
+  @override
+  String get feedPicture => 'A imagem do alerta';
+
+  @override
+  String get feedPictureFailed => 'Não foi possível carregar a imagem.';
 
   @override
   String get changePassword => 'Alterar senha';

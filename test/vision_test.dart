@@ -197,6 +197,31 @@ void main() {
       expect(rec.sceneAt(0.7).boxes, isEmpty);
     });
 
+    test('a person may belong to a kind (e.g. a team), kept while the box walks', () {
+      final teams = VisionRecording.fromJson({
+        'duration': 2.0,
+        'boxes': [
+          [
+            0.0,
+            [
+              [4, 0.1, 0.1, 0.2, 0.5, 0.8, 1],
+              [5, 0.5, 0.1, 0.6, 0.5, 0.7],
+            ],
+          ],
+          [
+            0.5,
+            [
+              [4, 0.2, 0.1, 0.3, 0.5, 0.8, 1],
+              [5, 0.5, 0.1, 0.6, 0.5, 0.7],
+            ],
+          ],
+        ],
+      });
+      final boxes = teams.sceneAt(0.25).boxes;
+      expect(boxes.map((b) => b.kind), [1, null]);
+      expect(boxes.first.rect.left, closeTo(0.15, 1e-9));
+    });
+
     test('no interpolation across the loop seam', () {
       expect(rec.sceneAt(9.9).boxes.single.track, 7);
       expect(rec.sceneAt(9.9).boxes.single.rect, const Rect.fromLTRB(0.5, 0.5, 0.6, 0.9));
@@ -537,6 +562,22 @@ void main() {
       expect(find.text('#1 · 90% · Takes garment'), findsOneWidget);
       expect(find.textContaining('Jackets'), findsNothing);
       expect(find.text('Person'), findsNothing);
+    });
+
+    testWidgets('a person of a kind is drawn and named in its colour', (tester) async {
+      Color tagColor(String text) =>
+          tester.widget<Container>(find.ancestor(of: find.text(text), matching: find.byType(Container)).first).color!;
+      const scene = VisionScene(
+        boxes: [
+          VisionBox(3, Rect.fromLTRB(0.1, 0.1, 0.3, 0.9), 0.8, kind: 0),
+          VisionBox(9, Rect.fromLTRB(0.6, 0.1, 0.8, 0.9), 0.7),
+        ],
+        frame: Size(480, 270),
+      );
+      await tester.pumpWidget(_app(VisionOverlay(scene: scene, bundle: bundle, detailed: true)));
+      expect(tagColor('#3 · Jackets and coats · 80%'), visionObjectColor(0));
+      expect(tagColor('#9 · 70%'), hudColor);
+      expect(find.text('2 people'), findsOneWidget);
     });
 
     testWidgets('tags that would cover each other: the more confident shows', (tester) async {

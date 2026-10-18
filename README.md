@@ -232,7 +232,8 @@ The upstream answers `GET <url>?limit=50&before=<next_before>` with:
       "detail": "Assist at the fitting room: offer another size.", "badge": "A3",
       "tone": "info", "status": "pending_review",
       "actions": [{ "id": "attended", "label": "Attend" }, { "id": "dismissed", "label": "Dismiss" }],
-      "meta": { "camera_id": "cam-04", "zone_id": "b-fitting" }, "synthetic": true
+      "meta": { "camera_id": "cam-04", "zone_id": "b-fitting" }, "synthetic": true,
+      "image": true, "link": { "label": "Open the clip", "url": "http://192.168.1.20:8090/clips/ALT-20261003-000001" }
     }
   ],
   "counts": { "pending": 1 },
@@ -240,7 +241,9 @@ The upstream answers `GET <url>?limit=50&before=<next_before>` with:
 }
 ```
 
-Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended` and `dismissed` are shown translated, other values as they are. An action posts `POST <url>/<id>/action` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
+Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended`, `confirmed` and `dismissed` are shown translated, other values as they are. An action posts `POST <url>/<id>/action` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
+
+Tapping an item opens it in full, made for reviewing alerts one after another: its picture as large as the screen allows (pinch or scroll to zoom), everything it says, its link and its actions. The keyboard drives it: `1`, `2`… take the actions in order, `J`/`K` (or the arrows) move to the next or previous item, `Esc` goes back; after an action it moves on to the next item still to review. An item with `"image": true` has a picture (an alert's evidence, say): p4n4-api relays `GET <url>/<id>/image` (JPEG, PNG or WebP, up to 8 MB) with the feed's token, and pending alerts show it as a thumbnail in the list. `link` is a page about the item, such as the project's own review screen, opened in the browser; p4n4-api drops a link that isn't http(s).
 
 ## Chats contract
 
@@ -304,7 +307,7 @@ A project can show what its vision model sees on the Video tab: a box on each pe
 }
 ```
 
-- **Recorded**: a camera whose id has a `recording` and that plays a video file (a demo camera, or an MP4 in `dashboard.cameras`) gets its boxes and behaviours by the second of playback, so they follow the people in the clip. Its behaviours also run on a clock of their own from sign-in on, for anyone whose view has the Video tab: their alerts toast on every tab, whether or not that camera is on screen (or the tab paused), and the video jumps back in step with the clock when it plays. `boxes` are `[t, [[track, x1, y1, x2, y2, confidence], …]]`, normalised to the frame; a box is interpolated between samples and held over gaps up to 0.4 s. `behaviors` are `[start, end, track, behaviour, confidence]` in seconds. An MJPEG stream has no playback position, so a recording isn't drawn over one.
+- **Recorded**: a camera whose id has a `recording` and that plays a video file (a demo camera, or an MP4 in `dashboard.cameras`) gets its boxes and behaviours by the second of playback, so they follow the people in the clip. Its behaviours also run on a clock of their own from sign-in on, for anyone whose view has the Video tab: their alerts toast on every tab, whether or not that camera is on screen (or the tab paused), and the video jumps back in step with the clock when it plays. `boxes` are `[t, [[track, x1, y1, x2, y2, confidence], …]]`, normalised to the frame, with an optional 7th element, the person's kind (an index into `objects`, e.g. their team), which draws and names the box in that kind's colour; a box is interpolated between samples and held over gaps up to 0.4 s. `behaviors` are `[start, end, track, behaviour, confidence]` in seconds. An MJPEG stream has no playback position, so a recording isn't drawn over one.
 - **Live**: with `live` (a `ws(s)://` `url`, or a `port` and `path` on the connected host), the dashboard follows that WebSocket from sign-in on and draws over any camera it reports, MJPEG included. It expects two kinds of message: `{"type": "detection", "camera_id", "frame_width", "frame_height", "objects": [{"track_id", "confidence", "bbox": [x1, y1, x2, y2]}]}` in pixels (boxes without the frame size are not drawn), and `{"type": "verdict", "camera_id", "event_id", "track_id", "zone": {"id"}, "behavior": {"class", "confidence"}, "window": {"dwell_ms"}}`. Boxes go after 1.5 s without news and a verdict after its dwell (8 s at least). It reconnects on its own, backing off to 30 s. The browser connects straight to it, as it does to the cameras.
 - **Alerts**: the first rule whose `behaviors` has the behaviour, and whose `zones` (if any) include the verdict's zone or, for a recording, one of the camera's `zones`, wins. Labels are by language code, falling back to English, then Spanish. The same alert on the same camera toasts once a minute (a demo clip loops every few seconds), and its flag on the camera shows every time.
 
