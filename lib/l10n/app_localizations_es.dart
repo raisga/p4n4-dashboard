@@ -574,6 +574,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String servicesApiNoStatus(String platform, String reason) {
+    return '$platform-api no da el estado de los servicios ($reason), así que el estado se obtiene comprobando el puerto de cada servicio.';
+  }
+
+  @override
   String get servicesTitle => 'Servicios';
 
   @override
@@ -968,6 +973,104 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get dashboardsUnavailableMsg =>
       'Las gráficas no se pueden cargar en este momento. Vuelve a intentarlo en un rato.';
+
+  @override
+  String get viewerClose => 'Volver a servicios';
+
+  @override
+  String viewerLoading(String service) {
+    return 'Cargando $service…';
+  }
+
+  @override
+  String viewerBlankHint(String service) {
+    return '¿En blanco? Puede que $service no permita mostrarse dentro de la app.';
+  }
+
+  @override
+  String get viewerDismissHint => 'Descartar';
+
+  @override
+  String openService(String service) {
+    return 'Abrir $service';
+  }
+
+  @override
+  String viewerDownTitle(String service) {
+    return '$service está caído';
+  }
+
+  @override
+  String get viewerDownMsg =>
+      'Su contenedor no está en marcha. Inícialo o reinícialo desde la pestaña Servicios y vuelve a intentarlo.';
+
+  @override
+  String get viewerDownMsgPlain => 'No está funcionando ahora mismo. Vuelve a intentarlo en un rato.';
+
+  @override
+  String viewerUnsupportedMsg(String service) {
+    return 'El WebView de Flutter es compatible con Android, iOS y macOS. En esta plataforma $service se abre en tu navegador predeterminado.';
+  }
+
+  @override
+  String viewerBlockedTitle(String service) {
+    return 'No se puede mostrar $service aquí';
+  }
+
+  @override
+  String viewerBlockedMsg(String service) {
+    return '$service no permite mostrarse dentro de otro sitio. Sírvelo a través del proxy del panel (mismo origen) o ábrelo en el navegador.';
+  }
+
+  @override
+  String viewerInsecureMsg(String service) {
+    return 'El panel usa HTTPS y $service solo HTTP, así que el navegador no lo muestra aquí. Sírvelo a través del proxy del panel o ábrelo en el navegador.';
+  }
+
+  @override
+  String viewerBlockedMsgPlain(String service) {
+    return '$service no se puede mostrar dentro de la app. Ábrelo en tu navegador.';
+  }
+
+  @override
+  String viewerUnreachable(String service) {
+    return '$service no responde';
+  }
+
+  @override
+  String viewerUnavailable(String service) {
+    return '$service no está disponible';
+  }
+
+  @override
+  String get viewerUnavailableMsg => 'No se puede cargar en este momento. Vuelve a intentarlo en un rato.';
+
+  @override
+  String viewerSlowTitle(String service) {
+    return '$service está tardando';
+  }
+
+  @override
+  String viewerSlowMsg(String service) {
+    return 'Si sigue en blanco, puede que $service no permita mostrarse dentro de la app. Puedes abrirlo en tu navegador.';
+  }
+
+  @override
+  String get viewerSlowDetails =>
+      'Las páginas enviadas con X-Frame-Options o una política frame-ancestors quedan en blanco en un marco. Sirve el servicio a través del proxy del panel (/svc/<id>/) para integrarlo.';
+
+  @override
+  String get viewerKeepWaiting => 'Seguir esperando';
+
+  @override
+  String couldNotOpenService(String service) {
+    return 'No se pudo abrir $service';
+  }
+
+  @override
+  String serviceUrlField(String service) {
+    return 'URL de $service';
+  }
 
   @override
   String cameraDefaultName(int n) {

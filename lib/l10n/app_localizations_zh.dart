@@ -572,6 +572,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String servicesApiNoStatus(String platform, String reason) {
+    return '$platform-api 未提供服务状态（$reason），因此通过检测每个服务的端口获取状态。';
+  }
+
+  @override
   String get servicesTitle => '服务';
 
   @override
@@ -958,6 +963,103 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dashboardsUnavailableMsg => '目前无法加载图表。请稍后再试。';
+
+  @override
+  String get viewerClose => '返回服务';
+
+  @override
+  String viewerLoading(String service) {
+    return '正在加载 $service…';
+  }
+
+  @override
+  String viewerBlankHint(String service) {
+    return '空白？$service 可能不允许在应用内显示。';
+  }
+
+  @override
+  String get viewerDismissHint => '关闭';
+
+  @override
+  String openService(String service) {
+    return '打开 $service';
+  }
+
+  @override
+  String viewerDownTitle(String service) {
+    return '$service 已停止';
+  }
+
+  @override
+  String get viewerDownMsg => '它的容器没有运行。请在“服务”标签页中启动或重启它，然后重试。';
+
+  @override
+  String get viewerDownMsgPlain => '它现在没有运行。请稍后再试。';
+
+  @override
+  String viewerUnsupportedMsg(String service) {
+    return 'Flutter 的 WebView 支持 Android、iOS 和 macOS。在此平台上，$service 会在默认浏览器中打开。';
+  }
+
+  @override
+  String viewerBlockedTitle(String service) {
+    return '无法在此处显示 $service';
+  }
+
+  @override
+  String viewerBlockedMsg(String service) {
+    return '$service 不允许在其他网站内显示。请通过仪表板的代理（同源）提供它，或在浏览器中打开。';
+  }
+
+  @override
+  String viewerInsecureMsg(String service) {
+    return '仪表板使用 HTTPS，而 $service 仅使用 HTTP，因此浏览器不会在此显示它。请通过仪表板的代理提供它，或在浏览器中打开。';
+  }
+
+  @override
+  String viewerBlockedMsgPlain(String service) {
+    return '$service 无法在应用内显示。请改在浏览器中打开。';
+  }
+
+  @override
+  String viewerUnreachable(String service) {
+    return '无法访问 $service';
+  }
+
+  @override
+  String viewerUnavailable(String service) {
+    return '$service 不可用';
+  }
+
+  @override
+  String get viewerUnavailableMsg => '现在无法加载。请稍后再试。';
+
+  @override
+  String viewerSlowTitle(String service) {
+    return '$service 加载较慢';
+  }
+
+  @override
+  String viewerSlowMsg(String service) {
+    return '如果一直空白，$service 可能不允许在应用内显示。你可以在浏览器中打开它。';
+  }
+
+  @override
+  String get viewerSlowDetails =>
+      '带有 X-Frame-Options 或 frame-ancestors 策略的页面在框架中显示为空白。要嵌入它，请通过仪表板的代理（/svc/<id>/）提供该服务。';
+
+  @override
+  String get viewerKeepWaiting => '继续等待';
+
+  @override
+  String couldNotOpenService(String service) {
+    return '无法打开 $service';
+  }
+
+  @override
+  String serviceUrlField(String service) {
+    return '$service 的 URL';
+  }
 
   @override
   String cameraDefaultName(int n) {

@@ -27,20 +27,21 @@ class TargetStatus {
 /// nobody has watched for [keep] is forgotten, so a large fleet's statuses
 /// don't pile up.
 class StatusMonitor extends ChangeNotifier {
-  StatusMonitor({
-    Future<ServiceReport> Function(StatusTarget)? check,
-    DateTime Function()? clock,
-    this.keep = const Duration(minutes: 10),
-  }) : _check = check ?? _checkServices,
-       _now = clock ?? DateTime.now;
+  StatusMonitor({this._check, this.probeUri, DateTime Function()? clock, this.keep = const Duration(minutes: 10)})
+    : _now = clock ?? DateTime.now;
 
-  static Future<ServiceReport> _checkServices(StatusTarget t) =>
-      checkServices(t.api, (d) => Uri.parse('http://${t.host}:${d.port}${d.path}'));
+  /// Where a service is probed when p4n4-api can't say, e.g. a proxied
+  /// `/svc/node-red/` whose port isn't published. Null (or null for a
+  /// service) probes its port on the target's host.
+  Uri? Function(StatusTarget, ServiceDef)? probeUri;
+
+  Future<ServiceReport> _checkServices(StatusTarget t) =>
+      checkServices(t.api, (d) => probeUri?.call(t, d) ?? Uri.parse('http://${t.host}:${d.port}${d.path}'));
 
   /// How often due targets are looked for; bounds how late a check can be.
   static const tick = Duration(seconds: 5);
 
-  final Future<ServiceReport> Function(StatusTarget) _check;
+  final Future<ServiceReport> Function(StatusTarget)? _check;
   final DateTime Function() _now;
   final Duration keep;
 
@@ -116,7 +117,7 @@ class StatusMonitor extends ChangeNotifier {
     _status[t] = TargetStatus(report: previous?.report, checkedAt: previous?.checkedAt, checking: true);
     _notify();
     try {
-      final report = await _check(t);
+      final report = await (_check ?? _checkServices)(t);
       _status[t] = TargetStatus(report: report, checkedAt: _now());
     } catch (_) {
       // checkServices already falls back to probes; keep the last report.

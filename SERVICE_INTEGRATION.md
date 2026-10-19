@@ -523,6 +523,59 @@ To show the dashboard itself on the Services tab and Home, add a `ServiceDef('Da
 
 ---
 
+## Embedded services (Services tab viewer)
+
+The Services tab opens each service's web app inside the dashboard instead of the browser. This extends the Grafana embedding (Phase 1, gap #2) to every web app in the catalog, using the same viewer.
+
+**App side.** `ServiceViewer` (`lib/widgets/service_viewer.dart`) takes a URL and a title. On web it uses `HtmlIFrame` (`lib/platform/html_view_web.dart`), which reports each load as a `FrameLoad`: shown, blocked or opaque. On Android, iOS and macOS it uses `webview_flutter`. On Windows and Linux it offers *Open in browser*. The Grafana tab is a thin wrapper around it. `ServiceDef.embed` marks which catalog entries get the viewer: Grafana, Node-RED, InfluxDB, n8n and Swagger UI. Ollama, Letta, p4n4-api and the inference runner are APIs, and MQTT is TCP. `ServiceDef.sameOriginOnly` marks n8n.
+
+`AppSettings.serviceUri` resolves where each one opens, first match wins:
+
+1. Settings → Endpoints (this device; `serviceUrls`, cleared by *Reset connection*)
+2. `.p4n4.json` `dashboard.services`
+3. `config.json` `serviceUrls`
+4. The brand's `serviceUrls`
+5. Its port on the host. p4n4-api (at `/health`: it has no page at its root) and Swagger UI use p4n4-api's base URL instead.
+
+**Proxy side.** nginx serves each embeddable app on the dashboard's origin, so it works over HTTPS (no mixed content) and with n8n, which refuses other origins' frames. Every route is opt-in via `.env`:
+
+| Route | Upstream (dashboard `.env`) | App default (`config.json`) | The service must know its path |
+|-------|-----------------------------|-----------------------------|--------------------------------|
+| `/grafana/` | `GRAFANA_UPSTREAM` | `DASHBOARD_GRAFANA_BASE` | IoT `.env` `GRAFANA_SUB_PATH=/grafana/` (path passed through) |
+| `/svc/node-red/` | `NODE_RED_UPSTREAM` | `DASHBOARD_NODE_RED_BASE` | IoT `.env` `NODE_RED_ADMIN_ROOT=/svc/node-red/` (path passed through) |
+| `/svc/n8n/` | `N8N_UPSTREAM` | `DASHBOARD_N8N_BASE` | AI `.env` `N8N_PATH=/svc/n8n/`. n8n links to the path but serves from its root, so nginx strips it (checked with n8n 2.41.6) |
+| `/swagger-ui`, `/openapi.json` | `P4N4_API_UPSTREAM` (always) | follows `DASHBOARD_API_BASE` | nothing |
+
+InfluxDB 2's UI can't serve from a sub path, so it has no route and always loads directly (plain HTTP only). The routes share `docker/nginx/embed_proxy.conf`, which:
+
+- keeps the browser's `Host` and sets `X-Forwarded-Host`/`-Proto` (Caddy's `https` passes through), since Grafana and n8n check Origin;
+- passes `Upgrade`/`Connection` for WebSockets (Grafana Live, Node-RED's `/comms`, n8n's `/rest/push`);
+- drops basic auth credentials and `X-Upstream-Authorization` (the p4n4-api token). A service's own bearer token passes;
+- replaces the service's `X-Frame-Options` with `SAMEORIGIN` and adds `Content-Security-Policy: frame-ancestors 'self'`. Only the dashboard can frame these pages, never other sites. A service's own `frame-ancestors` isn't removed;
+- adds `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin` only when the service sends none, so a page never gets two (n8n keeps its stricter `no-referrer`);
+- leaves out the dashboard's CSP: the services need their own scripts (Swagger UI's come from a CDN).
+
+**CSP.** `frame-src` used to allow any `http:`/`https:` page. It now allows `'self'`, plus the direct origin of each embeddable service that isn't proxied, plus `DASHBOARD_FRAME_ORIGINS`. The direct origin is `DASHBOARD_HOST`, or nginx's `$host`, with the service's port. `docker/nginx/19-frame-src.envsh` computes the list at start and logs it. Entries that aren't origins are ignored. `frame-ancestors 'self'` still keeps the dashboard itself out of other sites' frames.
+
+**Detecting a refused frame.** A same-origin page that the browser refused leaves an unreadable error page in the frame, and the viewer reports it as blocked. From another origin a refusal looks like any page, so the viewer adds a dismissible "Blank?" hint after it loads. For n8n it doesn't try a cross-origin frame at all. On an HTTPS page it doesn't try a plain-HTTP address either (mixed content, which browsers block without a word; `localhost` and loopback are exempt) and says to proxy it or open it in the browser. A page that doesn't load within 15 s gets a "may block embedding" panel, with *Open in browser*, *Try again* and *Keep waiting*. Native web views load pages top-level, where framing headers don't apply.
+
+**Security trade-off.** A proxied page runs with the dashboard's origin. Its scripts can read the dashboard's `localStorage`, which on web includes settings and the refresh token. They can also call `/api/` as the signed-in user. Grafana on `/grafana/` already had this exposure. Proxy only services that are as trusted as the dashboard. A cross-origin frame (direct ports) doesn't have this exposure, but it needs plain HTTP and the service's own consent to be framed. With `DASHBOARD_BASIC_AUTH` on, Node-RED's editor sends its own token as `Authorization: Bearer`, which replaces the browser's basic auth credentials on those requests. So under `/svc/node-red/`, a request with a bearer token skips basic auth and Node-RED's `adminAuth` (always on in the IoT stack) checks it; its login (`auth/token`, any case, trailing slash or not) still needs basic auth, so Node-RED's password can't be tried without it. The rest of what a bearer request reaches without basic auth is what Node-RED serves to anyone: the editor's static files and its login prompt, the same as on its own published port (`NODE_RED_BIND`).
+
+**Status probes.** When p4n4-api can't report status, the app probes each web app (and p4n4-api) where it opens (its URL from the list above), so a proxied service whose port isn't published still counts as up. A probe the browser would block as mixed content isn't sent, and that service's status shows as unknown rather than offline. When p4n4-api answers without status (Docker access off, the daemon down), the Services tab says so with the API's reason, rather than that it can't reach the API.
+
+**Grafana's theme.** The app opens Grafana with `?theme=light|dark`, which Grafana applies only on a full page load. Its sign-in loses it: the redirect to its login page drops it, and after signing in it loads its home without it. The viewer's `keepQuery` loads the app's URL again when a page lands without it, once per page (the login page itself stays in the user's own theme). It works where the app can read the page's address: Grafana through `/grafana/` on web, and the native web views; a cross-origin Grafana frame keeps the user's theme until it's reopened.
+
+**Dev server.** `web_dev_config.yaml` has the same routes. Flutter's proxy (shelf_proxy) passes no WebSockets and rewrites no headers. Same-origin pages still frame.
+
+**Checked (2026-10-18).** Against the built web app behind this nginx config, with no CSP violations:
+
+- Chromium and Firefox, over HTTP and behind `make up-tls`'s Caddy with a LAN-style name (internal CA): Grafana 13.0 through `/grafana/` (sign-in inside the frame, Grafana Live over `ws`/`wss`), Node-RED 5.0 through `/svc/node-red/` (`NODE_RED_ADMIN_ROOT`, the editor's login, its `/comms` socket), Swagger UI on the same origin, and InfluxDB directly over HTTP. Over HTTPS, InfluxDB gets the mixed-content explanation and no probe is sent.
+- Chromium: n8n 2.41.6 through `/svc/n8n/`, including its push WebSocket after sign-in.
+- Credential stripping and the framing headers, with a header-echo upstream.
+- Node-RED with `DASHBOARD_BASIC_AUTH` on, in Chromium and Firefox: basic auth, then the editor's login, its socket, reading and deploying flows with its token; a made-up token is refused by Node-RED, and every spelling of the login path (case, trailing slash, `//`, `./`, `x/../`, percent-encoding) still asks for basic auth.
+
+Not checked: Safari and the native web views.
+
 ## Suggested rollout order
 
 Order matters: the lib and CLI need a published image to point at.

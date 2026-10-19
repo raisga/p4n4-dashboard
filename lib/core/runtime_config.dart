@@ -18,7 +18,8 @@ const devProxyDefaults = <String, dynamic>{'apiBase': '/'};
 /// served next to the app (the container renders it from env vars):
 ///
 /// ```json
-/// {"defaults": {"host": "", "apiBase": "/", "grafanaBase": "/grafana/"}}
+/// {"defaults": {"host": "", "apiBase": "/", "grafanaBase": "/grafana/",
+///   "serviceUrls": {"node-red": "/svc/node-red/"}}}
 /// ```
 ///
 /// They sit between the brand's defaults and what the user saved. A missing
@@ -43,13 +44,23 @@ Future<Map<String, Object>> loadRuntimeDefaults(Uri page, {http.Client? client})
 }
 
 /// [raw] `config.json` defaults made concrete for [page]: an empty or missing
-/// `host` becomes the page's host, and relative URLs resolve against the page.
-/// Values that aren't strings or booleans are dropped.
+/// `host` becomes the page's host, and relative URLs resolve against the page,
+/// `serviceUrls` included (empty ones are dropped: the container renders one
+/// per proxy route, set or not). Other values that aren't strings or
+/// booleans are dropped.
 Map<String, Object> runtimeDefaults(Map<String, dynamic> raw, Uri page) {
   final out = <String, Object>{
     for (final MapEntry(:key, :value) in raw.entries)
       if (value is String || value is bool) key: value as Object,
   };
+  if (raw['serviceUrls'] case final Map urls) {
+    final resolved = {
+      for (final MapEntry(:key, :value) in urls.entries)
+        if (key is String && value is String && value.trim().isNotEmpty)
+          key: Uri.parse(value.trim()).hasScheme ? value.trim() : page.resolve(value.trim()).toString(),
+    };
+    if (resolved.isNotEmpty) out['serviceUrls'] = resolved;
+  }
   if ((out['host'] as String? ?? '').isEmpty) {
     out.remove('host');
     if (page.host.isNotEmpty) out['host'] = page.host;

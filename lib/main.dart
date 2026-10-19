@@ -152,6 +152,7 @@ class _DashboardAppState extends State<DashboardApp> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _incidents ??= IncidentLog(_status, SettingsScope.of(context));
+    _status.probeUri ??= SettingsScope.of(context).probeUriOf;
   }
 
   @override

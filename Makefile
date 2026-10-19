@@ -68,7 +68,7 @@ endif
 check:
 	dart format --output=none --set-exit-if-changed lib test tool
 	flutter analyze
-	! grep -rn "import 'dart:io'" lib/
+	! grep -rn "import 'dart:io'" lib/ | grep -v '^lib/platform/[a-z_]*_io\.dart:'
 	flutter test
 
 # ------------------------------------------------------------------------------

@@ -3,26 +3,86 @@ import 'dart:js_interop';
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
+import 'frame_load.dart';
 import 'video_clock.dart';
 
 /// [uri] in a borderless `<iframe>` filling its box. Give it a new key to
-/// reload. The page must allow framing (Grafana: `GF_SECURITY_ALLOW_EMBEDDING`).
-class HtmlIFrame extends StatelessWidget {
-  const HtmlIFrame({super.key, required this.uri});
+/// reload. The page must allow framing (Grafana: `GF_SECURITY_ALLOW_EMBEDDING`;
+/// pages served through the dashboard's proxy are same-origin).
+///
+/// [title] names the frame for screen readers. Moving keyboard focus onto the
+/// view (Tab from the toolbar) moves it into the page; Shift+Tab from the
+/// page's first control leaves it again.
+class HtmlIFrame extends StatefulWidget {
+  const HtmlIFrame({super.key, required this.uri, this.title, this.onLoad, this.onPage});
 
   final Uri uri;
+  final String? title;
+
+  /// Each time a page loads in the frame (see [FrameLoad]).
+  final ValueChanged<FrameLoad>? onLoad;
+
+  /// Where each page that loads is, after [onLoad], when it can be read (same
+  /// origin, http or https).
+  final ValueChanged<Uri>? onPage;
 
   @override
-  Widget build(BuildContext context) => HtmlElementView.fromTagName(
-    tagName: 'iframe',
-    onElementCreated: (element) {
-      (element as web.HTMLIFrameElement)
-        ..src = uri.toString()
-        ..style.border = 'none'
-        ..style.width = '100%'
-        ..style.height = '100%';
+  State<HtmlIFrame> createState() => _HtmlIFrameState();
+}
+
+class _HtmlIFrameState extends State<HtmlIFrame> {
+  web.HTMLIFrameElement? _frame;
+
+  void _loaded() {
+    final frame = _frame;
+    if (frame == null) return;
+    final load = frameLoadOf(frame, widget.uri);
+    widget.onLoad?.call(load);
+    if (framePageOf(frame) case final at?) widget.onPage?.call(at);
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    onFocusChange: (focused) {
+      if (focused) _frame?.focus();
     },
+    child: Semantics(
+      container: true,
+      label: widget.title,
+      child: HtmlElementView.fromTagName(
+        tagName: 'iframe',
+        onElementCreated: (element) {
+          final frame = _frame = element as web.HTMLIFrameElement;
+          frame
+            ..title = widget.title ?? ''
+            ..tabIndex = 0
+            ..onload = ((web.Event _) => _loaded()).toJS
+            ..src = widget.uri.toString()
+            ..style.border = 'none'
+            ..style.width = '100%'
+            ..style.height = '100%';
+        },
+      ),
+    ),
   );
+}
+
+/// What [frame]'s load event says about the page at [uri] in it. Only a
+/// same-origin page can be read; one the browser refused to frame leaves its
+/// (unreadable) error page behind, which from another origin looks the same
+/// as any page.
+FrameLoad frameLoadOf(web.HTMLIFrameElement frame, Uri uri) {
+  if (frame.contentDocument != null) return FrameLoad.shown;
+  final sameOrigin = (uri.isScheme('http') || uri.isScheme('https')) && uri.origin == web.window.location.origin;
+  return sameOrigin ? FrameLoad.blocked : FrameLoad.opaque;
+}
+
+/// Where the page in [frame] is, when it can be read: same origin, http or
+/// https (not the `about:blank` a new frame starts with).
+Uri? framePageOf(web.HTMLIFrameElement frame) {
+  if (frame.contentDocument == null) return null;
+  final at = Uri.tryParse(frame.contentWindow?.location.href ?? '');
+  return at != null && (at.isScheme('http') || at.isScheme('https')) ? at : null;
 }
 
 /// [uri] in an `<img>` scaled to fit. Browsers render MJPEG

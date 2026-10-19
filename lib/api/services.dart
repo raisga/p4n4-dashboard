@@ -8,7 +8,17 @@ import '../platform/probe.dart';
 import 'api_error.dart';
 
 class ServiceDef {
-  const ServiceDef(this.name, this.desc, this.port, this.icon, {this.path = '', this.tcpOnly = false});
+  const ServiceDef(
+    this.name,
+    this.desc,
+    this.port,
+    this.icon, {
+    this.path = '',
+    this.tcpOnly = false,
+    this.embed = false,
+    this.sameOriginOnly = false,
+    this.onApi = false,
+  });
 
   /// Catalog name; also used to match the Compose service. A leading "p4n4"
   /// is replaced by the brand's platform name for display (see [label]).
@@ -18,6 +28,23 @@ class ServiceDef {
   final String path;
   final IconData icon;
   final bool tcpOnly;
+
+  /// A web app people use, which the Services tab opens in its embedded
+  /// viewer. API-only services (Ollama, Letta, p4n4-api, the inference
+  /// runner) and TCP brokers only open in the browser, if at all.
+  final bool embed;
+
+  /// Refuses frames from other origins (`X-Frame-Options: SAMEORIGIN`, as
+  /// n8n sends): on web it embeds only through the dashboard's proxy.
+  final bool sameOriginOnly;
+
+  /// Served by p4n4-api, so it follows the API's base URL (p4n4-api itself,
+  /// Swagger UI).
+  final bool onApi;
+
+  /// Stable id: lowercase, spaces as dashes (`node-red`, `swagger-ui`). Keys
+  /// the per-service URL overrides and matches the Compose service.
+  String get id => name.toLowerCase().replaceAll(' ', '-');
 
   String label(String platform) => name.replaceFirst('p4n4', platform);
 }
@@ -36,21 +63,37 @@ class StackDef {
 /// Service catalog shown in the Services tab.
 final stacks = [
   StackDef('IoT Stack', 'iot', (c) => c.blue, [
-    ServiceDef('Grafana', 'Dashboards & Visualization', 3000, Icons.show_chart),
-    ServiceDef('Node-RED', 'Flow Automation', 1880, Icons.account_tree_outlined),
-    ServiceDef('InfluxDB', 'Time-Series DB', 8086, Icons.storage_outlined),
+    ServiceDef('Grafana', 'Dashboards & Visualization', 3000, Icons.show_chart, embed: true),
+    ServiceDef('Node-RED', 'Flow Automation', 1880, Icons.account_tree_outlined, embed: true),
+    ServiceDef('InfluxDB', 'Time-Series DB', 8086, Icons.storage_outlined, embed: true),
     ServiceDef('MQTT', 'Message Broker', 1883, Icons.wifi_tethering, tcpOnly: true),
   ]),
   StackDef('AI Stack', 'ai', (c) => c.amber, [
     ServiceDef('Ollama', 'Local LLM Inference', 11434, Icons.psychology_outlined),
     ServiceDef('Letta', 'Stateful AI Agents', 8283, Icons.smart_toy_outlined),
-    ServiceDef('n8n', 'Workflow Automation', 5678, Icons.hub_outlined),
+    ServiceDef('n8n', 'Workflow Automation', 5678, Icons.hub_outlined, embed: true, sameOriginOnly: true),
     // The edge inference runner: the ai stack's ei-runner profile (it was the edge stack)
     ServiceDef('EI Runner', 'Edge Impulse Inference', 8080, Icons.memory),
   ]),
   StackDef('API Gateway', 'api', (c) => c.text, [
-    ServiceDef('p4n4-api', 'REST Gateway — unified entry point for all stacks', 8000, Icons.api),
-    ServiceDef('Swagger UI', 'Interactive API docs & explorer', 8000, Icons.menu_book_outlined, path: '/swagger-ui'),
+    // It has no page at its root: open (and probe) its health check
+    ServiceDef(
+      'p4n4-api',
+      'REST Gateway — unified entry point for all stacks',
+      8000,
+      Icons.api,
+      path: '/health',
+      onApi: true,
+    ),
+    ServiceDef(
+      'Swagger UI',
+      'Interactive API docs & explorer',
+      8000,
+      Icons.menu_book_outlined,
+      path: '/swagger-ui',
+      embed: true,
+      onApi: true,
+    ),
   ]),
 ];
 
@@ -119,7 +162,7 @@ Future<Map<String, ComposeService>> fetchComposeStatus(Uri apiBase) async {
 
 /// Maps a catalog entry to its Compose service name(s).
 ComposeService? statusFor(ServiceDef def, Map<String, ComposeService> status) {
-  final key = def.name.toLowerCase().replaceAll(' ', '-');
+  final key = def.id;
   final aliases =
       {
         'mqtt': ['mosquitto', 'mqtt'],
@@ -137,13 +180,18 @@ ComposeService? statusFor(ServiceDef def, Map<String, ComposeService> status) {
 
 /// Status of every HTTP catalog entry on one host.
 class ServiceReport {
-  const ServiceReport(this.up, {required this.viaApi, this.detail = const {}});
+  const ServiceReport(this.up, {required this.viaApi, this.detail = const {}, this.apiProblem});
 
   /// `null` when p4n4-api answered but has no matching Compose service.
   final Map<ServiceDef, bool?> up;
 
   /// Whether the status came from p4n4-api rather than port probes.
   final bool viaApi;
+
+  /// When p4n4-api answered but without status (Docker access off, the daemon
+  /// down), what it said; null when it came from the API or the API couldn't
+  /// be reached.
+  final String? apiProblem;
 
   /// What p4n4-api says about each entry's Compose service (image, uptime,
   /// health); empty from port probes.
@@ -162,8 +210,19 @@ class ServiceReport {
   }
 }
 
+/// Whether a browser on [page] (default: this page) refuses [uri] as mixed
+/// content: a plain-HTTP address from an HTTPS page. The device itself
+/// (`localhost`, loopback addresses) is exempt, as browsers trust it.
+bool blockedAsMixedContent(Uri uri, [Uri? page]) {
+  page ??= Uri.base;
+  if (!page.isScheme('https') || !uri.isScheme('http')) return false;
+  final host = uri.host.toLowerCase();
+  return !(host == 'localhost' || host.endsWith('.localhost') || host == '::1' || host.startsWith('127.'));
+}
+
 /// Asks p4n4-api at [api] for status and falls back to probing each service's
-/// port, built by [urlFor], when the API is unreachable.
+/// port, built by [urlFor], when the API is unreachable. A probe the browser
+/// would block as mixed content says nothing, so that service is unknown.
 Future<ServiceReport> checkServices(Uri api, Uri Function(ServiceDef) urlFor) async {
   final defs = [for (final st in stacks) ...st.services.where((d) => !d.tcpOnly)];
   try {
@@ -174,8 +233,17 @@ Future<ServiceReport> checkServices(Uri api, Uri Function(ServiceDef) urlFor) as
       viaApi: true,
       detail: {for (final MapEntry(:key, :value) in found.entries) key: ?value},
     );
-  } catch (_) {
-    final up = await Future.wait(defs.map((d) => probeHttp(urlFor(d))));
-    return ServiceReport(Map.fromIterables(defs, up), viaApi: false);
+  } catch (e) {
+    final up = await Future.wait(
+      defs.map((d) async {
+        final url = urlFor(d);
+        return blockedAsMixedContent(url) ? null : await probeHttp(url);
+      }),
+    );
+    return ServiceReport(
+      Map.fromIterables(defs, up),
+      viaApi: false,
+      apiProblem: e is ApiException && e.statusCode != null ? e.message : null,
+    );
   }
 }

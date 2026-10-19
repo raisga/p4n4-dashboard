@@ -14,8 +14,10 @@ import 'status_monitor.dart';
 /// The manifest's optional `dashboard` block tunes the dashboard per project:
 /// `grafana_path` is the Grafana page to open, `tabs` lists the tabs the
 /// project can serve (the others are hidden while connected), `cameras`
-/// lists the streams the Video tab shows (see [ProjectCamera]), and `chats`
-/// says it has messaging chats for admins to manage.
+/// lists the streams the Video tab shows (see [ProjectCamera]), `services`
+/// maps catalog ids to the URL the Services tab opens each at (`{"node-red":
+/// "https://edge.lan/svc/node-red/"}`), and `chats` says it has messaging
+/// chats for admins to manage.
 class ProjectInfo {
   const ProjectInfo({
     required this.name,
@@ -25,6 +27,7 @@ class ProjectInfo {
     this.grafanaPath,
     this.tabs,
     this.cameras = const [],
+    this.serviceUrls = const {},
     this.hasChats = false,
   });
 
@@ -43,6 +46,10 @@ class ProjectInfo {
   /// The project's cameras, in display order; empty when it lists none.
   final List<ProjectCamera> cameras;
 
+  /// Where the Services tab opens each service, by catalog id
+  /// ([ServiceDef.id]), ahead of the deployment's defaults.
+  final Map<String, String> serviceUrls;
+
   /// Whether it has messaging chats (`dashboard.chats`, e.g. a Telegram bot)
   /// that admins link and unlink in Settings → Chats.
   final bool hasChats;
@@ -55,7 +62,10 @@ class ProjectInfo {
       suffix == 'api' || layers.isEmpty || layers.contains(suffix) || (suffix == 'ai' && layers.contains('edge'));
 
   /// Settings defaults the project supplies, ahead of the brand's (see [AppSettings.project]).
-  Map<String, Object> get defaults => {'grafanaPath': ?grafanaPath};
+  Map<String, Object> get defaults => {
+    'grafanaPath': ?grafanaPath,
+    if (serviceUrls.isNotEmpty) 'serviceUrls': serviceUrls,
+  };
 
   /// Lenient: a malformed `dashboard` block is ignored rather than failing the
   /// connection. `p4n4 validate` reports it.
@@ -76,6 +86,11 @@ class ProjectInfo {
         if (dashboard['cameras'] case final List list)
           for (final c in list.whereType<Map>()) ?ProjectCamera.fromJson(c.cast<String, dynamic>()),
       ],
+      serviceUrls: {
+        if (dashboard['services'] case final Map services)
+          for (final MapEntry(:key, :value) in services.entries)
+            if (key is String && value is String && value.trim().isNotEmpty) key: value.trim(),
+      },
       hasChats: dashboard['chats'] is Map,
     );
   }

@@ -53,15 +53,21 @@ LABEL org.opencontainers.image.title="p4n4-dashboard" \
 # /etc/nginx/templates/*.template, replacing only variables that are set).
 ENV P4N4_API_UPSTREAM=http://host.docker.internal:8000 \
     GRAFANA_UPSTREAM="" \
+    NODE_RED_UPSTREAM="" \
+    N8N_UPSTREAM="" \
     DASHBOARD_BASIC_AUTH="" \
     DASHBOARD_HOST="" \
     DASHBOARD_API_BASE=/ \
-    DASHBOARD_GRAFANA_BASE=
+    DASHBOARD_GRAFANA_BASE= \
+    DASHBOARD_NODE_RED_BASE= \
+    DASHBOARD_N8N_BASE= \
+    DASHBOARD_FRAME_ORIGINS="" \
+    DASHBOARD_FRAME_SRC=""
 COPY --from=build /src/build/web /usr/share/nginx/html
 COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
-COPY docker/nginx/proxy_common.conf docker/nginx/security_headers.conf /etc/nginx/
-# Executable in the repository, so the entrypoint sources it (no RUN needed).
-COPY docker/nginx/18-upstream-hosts.envsh docker/nginx/19-basic-auth.envsh /docker-entrypoint.d/
+COPY docker/nginx/proxy_common.conf docker/nginx/embed_proxy.conf docker/nginx/security_headers.conf /etc/nginx/
+# Executable in the repository, so the entrypoint sources them (no RUN needed).
+COPY docker/nginx/18-upstream-hosts.envsh docker/nginx/19-basic-auth.envsh docker/nginx/19-frame-src.envsh /docker-entrypoint.d/
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1

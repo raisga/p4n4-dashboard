@@ -223,6 +223,22 @@ void main() {
     expect(report.detail.keys.map((d) => d.name), isNot(contains('Ollama')), reason: 'not in Compose: no detail');
   });
 
+  test('p4n4-api without status says why; one that can\'t be reached says nothing', () async {
+    const off = 'Docker is unavailable: Docker access is disabled (P4N4_API_DOCKER=off).';
+    final noStatus = await http.runWithClient(
+      () => checkServices(_api, (d) => Uri.parse('http://pi:${d.port}')),
+      () => MockClient(
+        (r) async => r.url.path == '/api/v1/stacks' ? _error(503, 'unavailable', off) : http.Response('', 200),
+      ),
+    );
+    expect((noStatus.viaApi, noStatus.apiProblem, noStatus.online), (false, off, noStatus.up.length));
+    final unreachable = await http.runWithClient(
+      () => checkServices(_api, (d) => Uri.parse('http://pi:${d.port}')),
+      () => MockClient((r) async => throw http.ClientException('Connection refused', r.url)),
+    );
+    expect((unreachable.viaApi, unreachable.apiProblem, unreachable.online), (false, null, 0));
+  });
+
   group('devices', () {
     final device = {
       'id': 'env-01',

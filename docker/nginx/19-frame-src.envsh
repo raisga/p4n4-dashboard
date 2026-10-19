@@ -1,0 +1,50 @@
+#!/bin/sh
+# Sourced by the nginx image's entrypoint before the config template is
+# rendered. Sets DASHBOARD_FRAME_SRC: the origins, besides this one, that the
+# dashboard's CSP lets it frame (frame-src, security_headers.conf). Those are
+# the embeddable services the app opens directly rather than through this
+# proxy, at DASHBOARD_HOST, or at the host the page came from (nginx's $host,
+# left for nginx to fill in), plus DASHBOARD_FRAME_ORIGINS.
+
+host=${DASHBOARD_HOST:-'$host'}
+if ! printf '%s' "$host" | grep -Eq '^(\$host|[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])$'; then
+    echo "19-frame-src.envsh: DASHBOARD_HOST '$host' isn't a host name or address; framing only this origin" >&2
+    host=
+fi
+
+# The origin the app frames a service from, given its base URL setting and
+# its port: a path is this origin (nothing to add), a URL its own origin, and
+# no setting the port on the host.
+frame_origin() {
+    case "$1" in
+        "") [ -z "$host" ] || echo "http://$host:$2" ;;
+        http://* | https://*) printf '%s\n' "$1" | sed -E 's#^(https?://[^/]+).*#\1#' ;;
+    esac
+}
+
+src="$(frame_origin "${DASHBOARD_GRAFANA_BASE:-}" 3000)"
+src="$src $(frame_origin "${DASHBOARD_NODE_RED_BASE:-}" 1880)"
+# InfluxDB's UI has no proxy route: always direct.
+[ -z "$host" ] || src="$src http://$host:8086"
+# n8n refuses other origins' frames: the app only frames it through the
+# proxy (DASHBOARD_N8N_BASE), or from an origin given in full.
+case "${DASHBOARD_N8N_BASE:-}" in http://* | https://*) src="$src $(frame_origin "$DASHBOARD_N8N_BASE" 5678)" ;; esac
+# Swagger UI is under p4n4-api's base URL.
+src="$src $(frame_origin "${DASHBOARD_API_BASE:-}" 8000)"
+
+# Extra origins, e.g. a Grafana on another host set in Settings → Endpoints.
+# Origins only (scheme://host[:port]): anything else would change the policy.
+for o in ${DASHBOARD_FRAME_ORIGINS:-}; do
+    if printf '%s' "$o" | grep -Eq '^https?://[A-Za-z0-9.-]+(:[0-9]+)?$|^https?://\[[0-9A-Fa-f:.]+\](:[0-9]+)?$'; then
+        src="$src $o"
+    else
+        echo "19-frame-src.envsh: ignoring DASHBOARD_FRAME_ORIGINS entry '$o' (not an origin)" >&2
+    fi
+done
+
+# One of each, in order.
+DASHBOARD_FRAME_SRC=$(printf '%s\n' $src | awk 'NF && !seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
+export DASHBOARD_FRAME_SRC
+echo "19-frame-src.envsh: frame-src 'self' $DASHBOARD_FRAME_SRC"
+unset -f frame_origin
+unset host src o

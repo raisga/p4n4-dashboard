@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/services.dart' show ServiceDef, stacks;
 import '../api/view_settings.dart';
 import '../core/brand.dart';
 import '../core/format.dart';
@@ -82,6 +83,7 @@ List<_Category> _categories(BuildContext context) {
     if (brand.tabs.contains(DashTab.edge)) l.sectionEdgeMetrics,
     if (brand.tabs.contains(DashTab.grafana)) l.sectionGrafana,
     if (brand.tabs.contains(DashTab.video)) l.sectionVideo,
+    if (brand.tabs.contains(DashTab.services)) l.navServices,
   ];
   final all = [
     _Category(
@@ -175,6 +177,8 @@ List<_Category> _categories(BuildContext context) {
               if (session.isAdmin) l.kioskMode,
             ],
             if (brand.tabs.contains(DashTab.video) && session.isAdmin) l.videoDemoSwitch,
+            if (brand.tabs.contains(DashTab.services))
+              for (final def in _urlServices(s)) l.serviceUrlField(def.label(brand.platform)),
           ],
           build: (_) => const _EndpointsPage(),
         ),
@@ -1609,6 +1613,24 @@ class _EndpointsPage extends StatelessWidget {
               if (admin) _SwitchTile(title: l.kioskMode, value: s.grafanaKiosk, onChanged: (v) => s.grafanaKiosk = v),
             ],
           ),
+        if (brand.tabs.contains(DashTab.services) && _urlServices(s).isNotEmpty)
+          _Group(
+            title: l.navServices,
+            children: [
+              _Padded(
+                children: [
+                  // Empty: the project's or the deployment's URL, else the port on the host (the hint).
+                  for (final def in _urlServices(s))
+                    _Field(
+                      l.serviceUrlField(def.label(brand.platform)),
+                      s.serviceUrls[def.id] ?? '',
+                      (v) => s.setServiceUrl(def, v),
+                      hint: s.defaultServiceUri(def).toString(),
+                    ),
+                ],
+              ),
+            ],
+          ),
         if (brand.tabs.contains(DashTab.video))
           _Group(
             title: l.sectionVideo,
@@ -1630,6 +1652,14 @@ class _EndpointsPage extends StatelessWidget {
     );
   }
 }
+
+/// The services whose URL Settings → Endpoints sets: the web apps the Services
+/// tab opens, in the project's stacks. Grafana has its own group.
+List<ServiceDef> _urlServices(AppSettings s) => [
+  for (final stack in stacks.where(s.showsStack))
+    for (final def in stack.services)
+      if (def.embed && def.id != 'grafana') def,
+];
 
 /// A camera in Settings: its name, and its URL in small type.
 class _CameraRow extends StatelessWidget {

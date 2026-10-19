@@ -34,9 +34,10 @@ jobs:
         run: dart format --output=none --set-exit-if-changed lib test tool
       - run: flutter analyze
       # Shared code must compile for the web: platform code goes behind
-      # conditional imports in lib/platform/ instead.
+      # conditional imports in lib/platform/ instead, where only the native
+      # side (*_io.dart) may use dart:io.
       - name: No dart:io in lib/
-        run: "! grep -rn \"import 'dart:io'\" lib/"
+        run: "! grep -rn \"import 'dart:io'\" lib/ | grep -v '^lib/platform/[a-z_]*_io\\.dart:'"
       - run: flutter test
       # The web implementations (lib/platform/*_web.dart), in Chrome.
       - run: flutter test --platform chrome test/web

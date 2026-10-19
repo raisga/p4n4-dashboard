@@ -572,6 +572,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String servicesApiNoStatus(String platform, String reason) {
+    return '$platform-api からサービスの状態を取得できないため（$reason）、各サービスのポートを確認して状態を取得しています。';
+  }
+
+  @override
   String get servicesTitle => 'サービス';
 
   @override
@@ -959,6 +964,103 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dashboardsUnavailableMsg => '現在グラフを読み込めません。しばらくしてからもう一度お試しください。';
+
+  @override
+  String get viewerClose => 'サービスに戻る';
+
+  @override
+  String viewerLoading(String service) {
+    return '$service を読み込み中…';
+  }
+
+  @override
+  String viewerBlankHint(String service) {
+    return '空白ですか？$service はアプリ内での表示を許可していない可能性があります。';
+  }
+
+  @override
+  String get viewerDismissHint => '閉じる';
+
+  @override
+  String openService(String service) {
+    return '$service を開く';
+  }
+
+  @override
+  String viewerDownTitle(String service) {
+    return '$service は停止中です';
+  }
+
+  @override
+  String get viewerDownMsg => 'コンテナが動いていません。サービスタブから起動または再起動して、もう一度お試しください。';
+
+  @override
+  String get viewerDownMsgPlain => '現在動いていません。しばらくしてからもう一度お試しください。';
+
+  @override
+  String viewerUnsupportedMsg(String service) {
+    return 'Flutter の WebView は Android、iOS、macOS に対応しています。このプラットフォームでは $service は既定のブラウザで開きます。';
+  }
+
+  @override
+  String viewerBlockedTitle(String service) {
+    return 'ここでは $service を表示できません';
+  }
+
+  @override
+  String viewerBlockedMsg(String service) {
+    return '$service は他のサイト内での表示を許可していません。ダッシュボードのプロキシ経由（同一オリジン）で配信するか、ブラウザで開いてください。';
+  }
+
+  @override
+  String viewerInsecureMsg(String service) {
+    return 'ダッシュボードは HTTPS、$service は HTTP のみのため、ブラウザーはここに表示しません。ダッシュボードのプロキシ経由で配信するか、ブラウザで開いてください。';
+  }
+
+  @override
+  String viewerBlockedMsgPlain(String service) {
+    return '$service はアプリ内に表示できません。ブラウザで開いてください。';
+  }
+
+  @override
+  String viewerUnreachable(String service) {
+    return '$service が応答しません';
+  }
+
+  @override
+  String viewerUnavailable(String service) {
+    return '$service は利用できません';
+  }
+
+  @override
+  String get viewerUnavailableMsg => '現在読み込めません。しばらくしてからもう一度お試しください。';
+
+  @override
+  String viewerSlowTitle(String service) {
+    return '$service の読み込みに時間がかかっています';
+  }
+
+  @override
+  String viewerSlowMsg(String service) {
+    return '空白のままなら、$service はアプリ内での表示を許可していない可能性があります。ブラウザで開くこともできます。';
+  }
+
+  @override
+  String get viewerSlowDetails =>
+      'X-Frame-Options や frame-ancestors ポリシー付きのページはフレーム内で空白になります。埋め込むには、ダッシュボードのプロキシ（/svc/<id>/）経由でサービスを配信してください。';
+
+  @override
+  String get viewerKeepWaiting => '待ち続ける';
+
+  @override
+  String couldNotOpenService(String service) {
+    return '$service を開けませんでした';
+  }
+
+  @override
+  String serviceUrlField(String service) {
+    return '$service の URL';
+  }
 
   @override
   String cameraDefaultName(int n) {

@@ -1,12 +1,13 @@
 # p4n4-dashboard as a p4n4 service: the web build behind nginx on port 8088,
-# proxying p4n4-api (and optionally Grafana) so the browser talks to one origin.
+# proxying p4n4-api (and optionally Grafana, Node-RED and n8n) so the browser
+# talks to one origin.
 # Image-only, so p4n4 projects can use this file as is.
 #
 #   cp .env.example .env && docker compose up -d     # http://<host>:8088
 #   make up-local                                    # build the image from source instead
 services:
   dashboard:
-    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.4.0}
+    image: ghcr.io/raisga/p4n4-dashboard:${DASHBOARD_VERSION:-1.5.0}
     container_name: p4n4-dashboard
     restart: ${RESTART_POLICY:-unless-stopped}
     ports:
@@ -15,6 +16,11 @@ services:
       P4N4_API_UPSTREAM: ${P4N4_API_UPSTREAM:-http://host.docker.internal:8000}
       GRAFANA_UPSTREAM: ${GRAFANA_UPSTREAM:-}
       DASHBOARD_GRAFANA_BASE: ${DASHBOARD_GRAFANA_BASE:-}
+      NODE_RED_UPSTREAM: ${NODE_RED_UPSTREAM:-}
+      DASHBOARD_NODE_RED_BASE: ${DASHBOARD_NODE_RED_BASE:-}
+      N8N_UPSTREAM: ${N8N_UPSTREAM:-}
+      DASHBOARD_N8N_BASE: ${DASHBOARD_N8N_BASE:-}
+      DASHBOARD_FRAME_ORIGINS: ${DASHBOARD_FRAME_ORIGINS:-}
       DASHBOARD_HOST: ${DASHBOARD_HOST:-}
       DASHBOARD_BASIC_AUTH: ${DASHBOARD_BASIC_AUTH:-}
     extra_hosts:

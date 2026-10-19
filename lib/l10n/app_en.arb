@@ -426,6 +426,17 @@
       }
     }
   },
+  "servicesApiNoStatus": "{platform}-api has no service status ({reason}), so status comes from checking each service's port.",
+  "@servicesApiNoStatus": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "servicesTitle": "Services",
   "servicesSubtitle": "The apps running on {host}. Open one to use it directly.",
   "@servicesSubtitle": {
@@ -729,6 +740,133 @@
   "grafanaUnreachable": "Grafana unreachable",
   "dashboardsUnavailable": "Charts unavailable",
   "dashboardsUnavailableMsg": "Charts can't be loaded right now. Try again in a little while.",
+  "viewerClose": "Back to services",
+  "viewerLoading": "Loading {service}…",
+  "@viewerLoading": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerBlankHint": "Blank? {service} may not allow being shown inside the app.",
+  "@viewerBlankHint": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerDismissHint": "Dismiss",
+  "openService": "Open {service}",
+  "@openService": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerDownTitle": "{service} is down",
+  "@viewerDownTitle": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerDownMsg": "Its container isn't running. Start or restart it from the Services tab, then try again.",
+  "viewerDownMsgPlain": "It isn't running right now. Try again in a little while.",
+  "viewerUnsupportedMsg": "Flutter's WebView supports Android, iOS and macOS. On this platform {service} opens in your default browser.",
+  "@viewerUnsupportedMsg": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerBlockedTitle": "Can't show {service} here",
+  "@viewerBlockedTitle": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerBlockedMsg": "{service} doesn't allow being shown inside another site. Serve it through the dashboard's proxy (same origin), or open it in the browser.",
+  "@viewerBlockedMsg": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerInsecureMsg": "The dashboard is on HTTPS and {service} only on plain HTTP, so the browser won't show it here. Serve it through the dashboard's proxy, or open it in the browser.",
+  "@viewerInsecureMsg": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerBlockedMsgPlain": "{service} can't be shown inside the app. Open it in your browser instead.",
+  "@viewerBlockedMsgPlain": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerUnreachable": "{service} unreachable",
+  "@viewerUnreachable": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerUnavailable": "{service} isn't available",
+  "@viewerUnavailable": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerUnavailableMsg": "It can't be loaded right now. Try again in a little while.",
+  "viewerSlowTitle": "{service} is taking a while",
+  "@viewerSlowTitle": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerSlowMsg": "If it stays blank, {service} may not allow being shown inside the app. You can open it in your browser.",
+  "@viewerSlowMsg": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerSlowDetails": "Pages sent with X-Frame-Options or a frame-ancestors policy stay blank in a frame. Serve the service through the dashboard's proxy (/svc/<id>/) to embed it.",
+  "viewerKeepWaiting": "Keep waiting",
+  "couldNotOpenService": "Couldn't open {service}",
+  "@couldNotOpenService": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "serviceUrlField": "{service} URL",
+  "@serviceUrlField": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
   "cameraDefaultName": "Camera {n}",
   "@cameraDefaultName": {
     "placeholders": {

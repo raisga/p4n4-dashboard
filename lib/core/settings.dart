@@ -10,7 +10,7 @@ import '../api/camera.dart';
 import '../api/fleet.dart';
 import '../api/metrics_monitor.dart' show MetricsSource;
 import '../api/project.dart';
-import '../api/services.dart' show StackDef;
+import '../api/services.dart' show ServiceDef, StackDef;
 import '../api/status_monitor.dart';
 import '../api/view_settings.dart' show DashboardViewSettings, ViewPrefs, saveViewSettings;
 import '../api/views.dart';
@@ -31,6 +31,7 @@ const profileKeys = {
   'grafanaBase',
   'grafanaPath',
   'grafanaKiosk',
+  'serviceUrls',
   'videoUrl',
   'cameras',
   'videoDemo',
@@ -42,7 +43,15 @@ const profileKeys = {
 
 /// Profile keys that say where the services are, cleared by
 /// [AppSettings.resetConnection].
-const connectionKeys = {'host', 'apiBase', 'edgeMetricsUrl', 'grafanaBase', 'grafanaPath', 'grafanaKiosk'};
+const connectionKeys = {
+  'host',
+  'apiBase',
+  'edgeMetricsUrl',
+  'grafanaBase',
+  'grafanaPath',
+  'grafanaKiosk',
+  'serviceUrls',
+};
 
 /// Profile keys whose values are credentials: kept in the platform's secure
 /// storage ([SecretStore]) instead of shared_preferences.
@@ -430,16 +439,75 @@ class AppSettings extends ChangeNotifier {
 
   Uri get grafanaUri => grafanaUriFor(Role.admin);
 
+  /// Grafana's home: [grafanaBase], else port 3000 on the host.
+  Uri get grafanaHome => grafanaBase.isNotEmpty ? baseUri(grafanaBase) : url(3000, '/');
+
   /// The Grafana page [view] opens: its own (Settings → Views), else the
   /// deployment's. Normies always get kiosk mode: Grafana's menus aren't theirs.
   Uri grafanaUriFor(Role view) {
-    final base = grafanaBase.isNotEmpty ? baseUri(grafanaBase) : url(3000, '/');
+    final base = grafanaHome;
     final path = prefsFor(view).grafanaPath ?? grafanaPath;
     // Relative to the base, so a proxy prefix (/grafana/) is kept.
     final u = base.resolve(path.replaceFirst(RegExp('^/+'), ''));
     if (!grafanaKiosk && view != Role.normie) return u;
     return u.replace(queryParameters: {...u.queryParameters, 'kiosk': '1'});
   }
+
+  // Services opened from the Services tab
+
+  /// URLs set on this device for the services the Services tab opens (Settings
+  /// → Endpoints), by [ServiceDef.id]. Grafana keeps its own [grafanaBase].
+  Map<String, String> get serviceUrls => _urlMap(deployment.values['serviceUrls']);
+
+  /// Sets (or, when empty, clears) [def]'s URL on this device.
+  Future<void> setServiceUrl(ServiceDef def, String url) async {
+    final urls = {...serviceUrls};
+    url.trim().isEmpty ? urls.remove(def.id) : urls[def.id] = url.trim();
+    urls.isEmpty ? deployment.values.remove('serviceUrls') : deployment.values['serviceUrls'] = urls;
+    await _saveDeployments();
+    notifyListeners();
+  }
+
+  /// [def]'s URL when this device sets none: the project's (`.p4n4.json`
+  /// `dashboard.services`), else the deployment's (`config.json`
+  /// `serviceUrls`, e.g. a proxied `/svc/node-red/`) or the brand's, else its
+  /// port on the host (Swagger UI: under p4n4-api's base URL).
+  Uri defaultServiceUri(ServiceDef def) {
+    final given = _urlMap(_project?.defaults['serviceUrls'])[def.id] ?? _urlMap(_defaults['serviceUrls'])[def.id];
+    if (given != null) return pageUri(given);
+    if (def.onApi) return apiUri.resolve(def.path.replaceFirst(RegExp('^/+'), ''));
+    return url(def.port, def.path);
+  }
+
+  /// Where [def] opens, embedded or in the browser: the URL set on this
+  /// device, else [defaultServiceUri]. Grafana opens at [grafanaHome] for
+  /// admins and power users, and at the view's own page, in kiosk mode, for
+  /// normies (see [grafanaUriFor]).
+  Uri serviceUri(ServiceDef def, {Role view = Role.admin}) {
+    if (def.id == 'grafana') return view.technical ? grafanaHome : grafanaUriFor(view);
+    final own = serviceUrls[def.id];
+    return own != null ? pageUri(own) : defaultServiceUri(def);
+  }
+
+  /// Where [StatusMonitor] probes [def] for [t] when p4n4-api can't say: on
+  /// the connected deployment, the address a web app or p4n4-api opens at
+  /// (it may be proxied, with no port published); else null, its port on the
+  /// host.
+  Uri? probeUriOf(StatusTarget t, ServiceDef def) =>
+      t == statusTarget && (def.embed || def.onApi) ? serviceUri(def) : null;
+
+  /// A full URL as given, or a path resolved against the page (web, behind a proxy).
+  static Uri pageUri(String value) {
+    final uri = Uri.parse(value.trim());
+    return uri.hasScheme ? uri : Uri.base.resolveUri(uri);
+  }
+
+  /// Service id → URL, keeping only non-empty strings.
+  static Map<String, String> _urlMap(Object? raw) => {
+    if (raw is Map)
+      for (final MapEntry(:key, :value) in raw.entries)
+        if (key is String && value is String && value.trim().isNotEmpty) key: value.trim(),
+  };
 
   // Video
 

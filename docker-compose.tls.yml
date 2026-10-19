@@ -1,7 +1,8 @@
 # Optional HTTPS front end (Caddy) for p4n4-dashboard:
 #   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
-# Serve Grafana through the dashboard too (GRAFANA_UPSTREAM, DASHBOARD_GRAFANA_BASE
-# in .env), or browsers block its http:// frame on the https:// page.
+# Serve Grafana, Node-RED and n8n through the dashboard too (GRAFANA_UPSTREAM,
+# NODE_RED_UPSTREAM, N8N_UPSTREAM and their DASHBOARD_*_BASE in .env), or
+# browsers block their http:// frames on the https:// page.
 services:
   dashboard:
     # Only Caddy talks to it now

@@ -1119,6 +1119,12 @@ abstract class AppLocalizations {
   /// **'Can\'t reach {platform}-api, so status comes from checking each service\'s port.'**
   String servicesApiUnreachable(String platform);
 
+  /// No description provided for @servicesApiNoStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'{platform}-api has no service status ({reason}), so status comes from checking each service\'s port.'**
+  String servicesApiNoStatus(String platform, String reason);
+
   /// No description provided for @servicesTitle.
   ///
   /// In en, this message translates to:
@@ -1802,6 +1808,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Charts can\'t be loaded right now. Try again in a little while.'**
   String get dashboardsUnavailableMsg;
+
+  /// No description provided for @viewerClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to services'**
+  String get viewerClose;
+
+  /// No description provided for @viewerLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading {service}…'**
+  String viewerLoading(String service);
+
+  /// No description provided for @viewerBlankHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank? {service} may not allow being shown inside the app.'**
+  String viewerBlankHint(String service);
+
+  /// No description provided for @viewerDismissHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get viewerDismissHint;
+
+  /// No description provided for @openService.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {service}'**
+  String openService(String service);
+
+  /// No description provided for @viewerDownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} is down'**
+  String viewerDownTitle(String service);
+
+  /// No description provided for @viewerDownMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Its container isn\'t running. Start or restart it from the Services tab, then try again.'**
+  String get viewerDownMsg;
+
+  /// No description provided for @viewerDownMsgPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'It isn\'t running right now. Try again in a little while.'**
+  String get viewerDownMsgPlain;
+
+  /// No description provided for @viewerUnsupportedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Flutter\'s WebView supports Android, iOS and macOS. On this platform {service} opens in your default browser.'**
+  String viewerUnsupportedMsg(String service);
+
+  /// No description provided for @viewerBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t show {service} here'**
+  String viewerBlockedTitle(String service);
+
+  /// No description provided for @viewerBlockedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} doesn\'t allow being shown inside another site. Serve it through the dashboard\'s proxy (same origin), or open it in the browser.'**
+  String viewerBlockedMsg(String service);
+
+  /// No description provided for @viewerInsecureMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'The dashboard is on HTTPS and {service} only on plain HTTP, so the browser won\'t show it here. Serve it through the dashboard\'s proxy, or open it in the browser.'**
+  String viewerInsecureMsg(String service);
+
+  /// No description provided for @viewerBlockedMsgPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} can\'t be shown inside the app. Open it in your browser instead.'**
+  String viewerBlockedMsgPlain(String service);
+
+  /// No description provided for @viewerUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} unreachable'**
+  String viewerUnreachable(String service);
+
+  /// No description provided for @viewerUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} isn\'t available'**
+  String viewerUnavailable(String service);
+
+  /// No description provided for @viewerUnavailableMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'It can\'t be loaded right now. Try again in a little while.'**
+  String get viewerUnavailableMsg;
+
+  /// No description provided for @viewerSlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} is taking a while'**
+  String viewerSlowTitle(String service);
+
+  /// No description provided for @viewerSlowMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'If it stays blank, {service} may not allow being shown inside the app. You can open it in your browser.'**
+  String viewerSlowMsg(String service);
+
+  /// No description provided for @viewerSlowDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages sent with X-Frame-Options or a frame-ancestors policy stay blank in a frame. Serve the service through the dashboard\'s proxy (/svc/<id>/) to embed it.'**
+  String get viewerSlowDetails;
+
+  /// No description provided for @viewerKeepWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep waiting'**
+  String get viewerKeepWaiting;
+
+  /// No description provided for @couldNotOpenService.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open {service}'**
+  String couldNotOpenService(String service);
+
+  /// No description provided for @serviceUrlField.
+  ///
+  /// In en, this message translates to:
+  /// **'{service} URL'**
+  String serviceUrlField(String service);
 
   /// No description provided for @cameraDefaultName.
   ///

@@ -13,10 +13,16 @@ import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../pages/logs_page.dart';
 import '../widgets/common.dart';
+import '../widgets/service_viewer.dart';
+import 'grafana_tab.dart' show grafanaKeepQuery, themedGrafanaUri;
 
 /// Service launcher with live Compose status from p4n4-api. Admins can also
 /// start, restart and stop stacks; viewers (if an admin gives them this tab)
 /// see only the apps they can open, without hosts or ports.
+///
+/// Services with a web app ([ServiceDef.embed]) open in the [ServiceViewer]:
+/// in place of the cards on wide screens, on a page of their own on phones.
+/// The others, and Open in browser on any card, go to the browser.
 class ServicesTab extends StatefulWidget {
   const ServicesTab({super.key, required this.active});
 
@@ -32,6 +38,9 @@ class _ServicesTabState extends State<ServicesTab> {
 
   late StatusMonitor _monitor;
   late StatusTarget _target;
+
+  /// Open in place of the cards (wide screens).
+  ServiceDef? _viewing;
 
   /// Shown while visible; the shared [StatusMonitor] does the polling.
   @override
@@ -59,6 +68,28 @@ class _ServicesTabState extends State<ServicesTab> {
 
   Future<void> _refresh() => _monitor.refresh(_target);
 
+  /// In the viewer if it has a web app (beside the navigation on wide screens,
+  /// on its own page on phones), else in the browser.
+  void _open(ServiceDef def) {
+    if (!def.embed) {
+      openServiceExternally(context, def);
+    } else if (MediaQuery.sizeOf(context).width >= 800) {
+      setState(() => _viewing = def);
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => Scaffold(
+            body: SafeArea(
+              child: Builder(
+                builder: (context) => serviceViewerFor(context, def, onClose: () => Navigator.pop(context)),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   static Health _healthOf(ServiceDef def, ServiceReport? r) => switch (r?.up[def]) {
     _ when r == null => Health.pending,
     true => Health.up,
@@ -68,6 +99,17 @@ class _ServicesTabState extends State<ServicesTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_viewing case final def?) {
+      void close() => setState(() => _viewing = null);
+      // Back (Android, Escape on the desktop) returns to the cards first.
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) close();
+        },
+        child: serviceViewerFor(context, def, onClose: close),
+      );
+    }
     final settings = SettingsScope.of(context);
     final status = StatusScope.of(context).statusOf(_target);
     final technical = SessionScope.of(context).isTechnical;
@@ -84,7 +126,11 @@ class _ServicesTabState extends State<ServicesTab> {
         if (technical) ...[
           const SizedBox(height: 8),
           Text(switch (viaApi) {
-            false => l.servicesApiUnreachable(brand.platform),
+            false => switch (status.report?.apiProblem) {
+              // Inside parentheses: without the API's own full stop
+              final reason? => l.servicesApiNoStatus(brand.platform, reason.replaceFirst(RegExp(r'\.$'), '')),
+              null => l.servicesApiUnreachable(brand.platform),
+            },
             true => l.servicesLiveFrom(settings.apiUri.authority),
             null => l.servicesContacting(settings.apiUri.authority),
           }, style: p4.body(size: 13, color: viaApi == false ? p4.warn : p4.muted)),
@@ -138,6 +184,7 @@ class _ServicesTabState extends State<ServicesTab> {
                 technical: technical,
                 detail: technical ? report?.detail[svc] : null,
                 onRestarted: _refresh,
+                onOpen: () => _open(svc),
               ),
           ],
         ),
@@ -250,6 +297,7 @@ class _ServiceCard extends StatelessWidget {
     required this.technical,
     this.detail,
     required this.onRestarted,
+    required this.onOpen,
   });
 
   final ServiceDef def;
@@ -262,12 +310,8 @@ class _ServiceCard extends StatelessWidget {
   final ComposeService? detail;
   final Future<void> Function() onRestarted;
 
-  Future<void> _open(BuildContext context) async {
-    final uri = settings.url(def.port, def.path);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.couldNotOpen('$uri'))));
-    }
-  }
+  /// In the viewer, or the browser (see [_ServicesTabState._open]).
+  final VoidCallback onOpen;
 
   /// Restarts just this service, after asking: it's gone for everyone meanwhile.
   Future<void> _restart(BuildContext context, ComposeService svc, String name) async {
@@ -333,7 +377,7 @@ class _ServiceCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: def.tcpOnly ? null : () => _open(context),
+        onTap: def.tcpOnly ? null : onOpen,
         hoverColor: p4.bg3,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -424,7 +468,7 @@ class _ServiceCard extends StatelessWidget {
                   Expanded(
                     child: technical
                         ? Text(
-                            '${settings.host}:${def.port}${def.path}',
+                            _address(settings.serviceUri(def)),
                             overflow: TextOverflow.ellipsis,
                             style: p4.mono(size: 12, spacing: 0),
                           )
@@ -432,18 +476,29 @@ class _ServiceCard extends StatelessWidget {
                   ),
                   if (def.tcpOnly)
                     TagBadge(l.tcpOnly)
-                  else
+                  else ...[
+                    // The viewer's way out to the browser, from the card itself.
+                    if (def.embed)
+                      IconButton(
+                        tooltip: l.openInBrowser,
+                        onPressed: () => openServiceExternally(context, def),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                        icon: Icon(Icons.open_in_new, size: 16, color: p4.muted),
+                      ),
                     FilledButton.tonalIcon(
-                      onPressed: () => _open(context),
+                      onPressed: onOpen,
                       style: FilledButton.styleFrom(
                         minimumSize: const Size(0, 34),
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         backgroundColor: p4.accent.withValues(alpha: 0.14),
                         foregroundColor: p4.accent,
                       ),
-                      icon: const Icon(Icons.open_in_new, size: 16),
+                      icon: Icon(def.embed ? Icons.web_outlined : Icons.open_in_new, size: 16),
                       label: Text(l.open),
                     ),
+                  ],
                 ],
               ),
             ],
@@ -452,4 +507,45 @@ class _ServiceCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// `host:port/path` for the card, or the whole URL for one on a proxy path.
+String _address(Uri uri) => uri.hasPort ? '${uri.host}:${uri.port}${uri.path == '/' ? '' : uri.path}' : '$uri';
+
+/// Where [def] opens for [context]'s view: Grafana in the app's theme, the
+/// others at their URL (Settings → Endpoints, the project's or the port).
+Uri serviceUriFor(BuildContext context, ServiceDef def) {
+  final uri = SettingsScope.of(context).serviceUri(def, view: SessionScope.of(context).role ?? Role.normie);
+  return def.id == 'grafana' ? themedGrafanaUri(uri, Theme.of(context).brightness) : uri;
+}
+
+/// Opens [def] in the browser; says so if it can't, without the URL for normies.
+Future<void> openServiceExternally(BuildContext context, ServiceDef def) async {
+  final l = context.l10n;
+  final uri = serviceUriFor(context, def);
+  final name = def.label(BrandScope.of(context).platform);
+  final technical = SessionScope.of(context).isTechnical;
+  final messenger = ScaffoldMessenger.of(context);
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false)) {
+    messenger.showSnackBar(SnackBar(content: Text(technical ? l.couldNotOpen('$uri') : l.couldNotOpenService(name))));
+  }
+}
+
+/// [def] in a [ServiceViewer] with its live status, for the Services tab or
+/// its own page.
+Widget serviceViewerFor(BuildContext context, ServiceDef def, {required VoidCallback onClose}) {
+  final settings = SettingsScope.of(context);
+  final monitor = StatusScope.of(context);
+  final target = settings.statusTarget;
+  return ServiceViewer(
+    uri: serviceUriFor(context, def),
+    title: def.label(BrandScope.of(context).platform),
+    icon: def.icon,
+    health: _ServicesTabState._healthOf(def, monitor.statusOf(target).report),
+    technical: SessionScope.of(context).isTechnical,
+    sameOriginOnly: def.sameOriginOnly,
+    keepQuery: def.id == 'grafana' ? grafanaKeepQuery : const {},
+    onClose: onClose,
+    onRetry: () => monitor.refresh(target),
+  );
 }

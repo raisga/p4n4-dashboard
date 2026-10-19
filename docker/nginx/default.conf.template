@@ -1,5 +1,6 @@
 # Rendered at container start: ${VARS} below are the image's env vars
-# (P4N4_API_UPSTREAM, GRAFANA_UPSTREAM, DASHBOARD_*).
+# (P4N4_API_UPSTREAM, GRAFANA_UPSTREAM, NODE_RED_UPSTREAM, N8N_UPSTREAM,
+# DASHBOARD_*; DASHBOARD_FRAME_SRC comes from 19-frame-src.envsh).
 #
 # Ollama and Letta aren't proxied: the assistant goes through p4n4-api, which
 # requires sign-in and decides who may use which model. nginx's own $variables are left alone because no env var has
@@ -19,10 +20,47 @@ map $http_x_upstream_authorization $upstream_authorization {
     default     $http_x_upstream_authorization;
 }
 
-# WebSocket upgrades (Grafana Live)
+# Basic auth for /svc/node-red/. Once signed in, Node-RED's editor sends its
+# own token as "Authorization: Bearer", which takes the place of the browser's
+# basic auth credentials: those requests skip basic auth ("off"), and Node-RED
+# (adminAuth, always on in the IoT stack) checks the token. Its login
+# (auth/token) keeps basic auth, so its password can't be tried without it;
+# Express matches routes ignoring case and a trailing slash, and so does this.
+map "$uri|$http_authorization" $node_red_auth_realm {
+    ~*^/svc/node-red/auth/token/?\|  "${DASHBOARD_AUTH_REALM}";
+    ~*\|bearer\s                    off;
+    default                         "${DASHBOARD_AUTH_REALM}";
+}
+
+# For the embedded services (embed_proxy.conf): these headers only when the
+# service doesn't send its own, so a page never gets two.
+map $upstream_http_x_content_type_options $embed_nosniff {
+    ""      nosniff;
+    default "";
+}
+map $upstream_http_referrer_policy $embed_referrer_policy {
+    ""      same-origin;
+    default "";
+}
+
+# WebSocket upgrades (Grafana Live, Node-RED, n8n)
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ""      "";
+}
+
+# The scheme the browser used: https behind the TLS front end (Caddy says so).
+map $http_x_forwarded_proto $forwarded_proto {
+    ""      $scheme;
+    default $http_x_forwarded_proto;
+}
+
+# Where the app may frame services from, besides this origin (the CSP's
+# frame-src, security_headers.conf): each embeddable service's own origin
+# (DASHBOARD_HOST, else the host the page came from, as $host), unless it's
+# proxied here, plus DASHBOARD_FRAME_ORIGINS.
+map $host $dashboard_frame_src {
+    default "${DASHBOARD_FRAME_SRC}";
 }
 
 server {
@@ -53,7 +91,7 @@ server {
         default_type application/json;
         add_header Cache-Control "no-store" always;
         include /etc/nginx/security_headers.conf;
-        return 200 '{"defaults":{"host":"${DASHBOARD_HOST}","apiBase":"${DASHBOARD_API_BASE}","grafanaBase":"${DASHBOARD_GRAFANA_BASE}"}}';
+        return 200 '{"defaults":{"host":"${DASHBOARD_HOST}","apiBase":"${DASHBOARD_API_BASE}","grafanaBase":"${DASHBOARD_GRAFANA_BASE}","serviceUrls":{"node-red":"${DASHBOARD_NODE_RED_BASE}","n8n":"${DASHBOARD_N8N_BASE}"}}}';
     }
 
     # p4n4-api keeps its own /api/v1 and /health paths.
@@ -81,18 +119,48 @@ server {
             return 404;
         }
         proxy_pass $grafana;
-        # Grafana's own headers, not the dashboard's CSP (security_headers.conf)
-        add_header X-Content-Type-Options nosniff always;
-        proxy_http_version 1.1;
-        # Grafana checks Origin against Host (CSRF), so keep the browser's Host
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Authorization $upstream_authorization;
-        proxy_set_header X-Upstream-Authorization "";
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-        proxy_read_timeout 300s;
+        include /etc/nginx/embed_proxy.conf;
+    }
+
+    # Optional: the Services tab's web apps on this origin, at /svc/<id>/, so
+    # the viewer works over HTTPS and with services that refuse other sites'
+    # frames (n8n). Each is off (404) until its upstream is set, and must know
+    # its path:
+    #   Node-RED  NODE_RED_UPSTREAM, NODE_RED_ADMIN_ROOT=/svc/node-red/ (IoT .env);
+    #             it serves from the path, passed through unchanged
+    #   n8n       N8N_UPSTREAM, N8N_PATH=/svc/n8n/ (AI .env); it links to the
+    #             path but serves from its root, so the path is stripped
+    # InfluxDB's UI can't serve from a sub path, so it isn't proxied.
+    location /svc/node-red/ {
+        auth_basic $node_red_auth_realm;
+        set $node_red "${NODE_RED_UPSTREAM}";
+        if ($node_red = "") {
+            return 404;
+        }
+        proxy_pass $node_red;
+        include /etc/nginx/embed_proxy.conf;
+    }
+    location /svc/n8n/ {
+        set $n8n "${N8N_UPSTREAM}";
+        if ($n8n = "") {
+            return 404;
+        }
+        rewrite ^/svc/n8n/(.*)$ /$1 break;
+        proxy_pass $n8n;
+        include /etc/nginx/embed_proxy.conf;
+    }
+
+    # Swagger UI and the schema it loads, from p4n4-api: the Services tab
+    # opens it under the API's base URL, on this origin when that's here.
+    location /swagger-ui {
+        set $api ${P4N4_API_UPSTREAM};
+        proxy_pass $api;
+        include /etc/nginx/embed_proxy.conf;
+    }
+    location = /openapi.json {
+        set $api ${P4N4_API_UPSTREAM};
+        proxy_pass $api;
+        include /etc/nginx/embed_proxy.conf;
     }
 
     # A brand's demo cameras (brand.json video.demoCameras, "demo/<file>"):

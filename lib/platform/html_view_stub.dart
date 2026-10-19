@@ -1,12 +1,16 @@
 import 'package:flutter/widgets.dart';
 
+import 'frame_load.dart';
 import 'video_clock.dart';
 
 /// Web only; see `html_view_web.dart`.
 class HtmlIFrame extends StatelessWidget {
-  const HtmlIFrame({super.key, required this.uri});
+  const HtmlIFrame({super.key, required this.uri, this.title, this.onLoad, this.onPage});
 
   final Uri uri;
+  final String? title;
+  final ValueChanged<FrameLoad>? onLoad;
+  final ValueChanged<Uri>? onPage;
 
   @override
   Widget build(BuildContext context) => throw UnsupportedError('HtmlIFrame is web-only');
