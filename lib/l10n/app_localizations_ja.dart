@@ -1392,6 +1392,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get feedEmptyMsg => 'イベントやアラートは発生するとここに表示されます。';
 
   @override
+  String get feedWaiting => 'カメラを待っています';
+
+  @override
+  String get feedWaitingMsg => 'カメラのクリップに関するアラートは、その場面が再生されるとここに表示されます。';
+
+  @override
+  String get momentHeld => 'その場面で一時停止中';
+
+  @override
+  String get momentReplaying => 'リプレイ中';
+
+  @override
+  String get momentReplay => 'リプレイ';
+
+  @override
+  String get momentLive => 'ライブに戻る';
+
+  @override
   String get feedNotSetUp => 'アクティビティなし';
 
   @override

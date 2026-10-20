@@ -29,10 +29,25 @@ enum DashTab {
 enum TourStep { welcome, navigation, theme, settings, signOut }
 
 class BrandLink {
-  const BrandLink(this.label, this.url);
+  const BrandLink(this.labels, this.urls);
 
-  final String label;
-  final Uri url;
+  /// By language code (`*`: every language); see [brandText].
+  final Map<String, String> labels;
+  final Map<String, Uri> urls;
+
+  String get label => brandText(labels, 'en')!;
+  Uri get url => brandText(urls, 'en')!;
+  String labelIn(String language) => brandText(labels, language)!;
+  Uri urlIn(String language) => brandText(urls, language)!;
+}
+
+/// A brand's [texts] (or files, or links) by language code, in [language] (a
+/// code such as `es`, or a locale name such as `pt_BR`): that language's, else
+/// the one for every language (`*`), else English, else any. Null when empty.
+T? brandText<T>(Map<String, T> texts, String language) {
+  if (texts.isEmpty) return null;
+  final code = language.split(RegExp('[_-]')).first.toLowerCase();
+  return texts[language] ?? texts[code] ?? texts['*'] ?? texts['en'] ?? texts.values.first;
 }
 
 /// Who people can contact when something's wrong, from brand.json `support`:
@@ -81,11 +96,11 @@ class BrandSupport {
 class Brand {
   const Brand({
     required this.id,
-    required this.appName,
+    required this.appNames,
     required this.wordmark,
     required this.wordmarkSuffix,
     required this.platform,
-    required this.tagline,
+    this.taglines = const {},
     required this.displayFont,
     required this.monoFont,
     required this.light,
@@ -97,16 +112,27 @@ class Brand {
     this.tour = const {},
     this.assistantSuggestions = const {},
     this.demoCameras = const [],
+    this.demoCameraNames = const {},
+    this.demoCameraCredits = const {},
     this.demoCredits = const {},
-    this.logo,
-    this.logoDark,
+    this.logos = const {},
+    this.logosDark = const {},
     this.vision = VisionStyle.standard,
   });
 
   final String id;
 
-  /// Window/task-switcher title, e.g. "p4n4 dashboard".
-  final String appName;
+  /// Window/task-switcher title, e.g. "p4n4 dashboard", by language code
+  /// (brand.json `appName`: text, or {language: text}); see [appNameIn].
+  final Map<String, String> appNames;
+
+  /// [appNames] in the brand's own language (its `locale` default, else English).
+  String get appName => appNameIn(_language);
+
+  String appNameIn(String language) => brandText(appNames, language) ?? '';
+
+  /// What the dashboard says when it doesn't know the reader's language: the brand's default `locale`.
+  String get _language => defaults['locale'] is String ? defaults['locale'] as String : 'en';
 
   /// App-bar wordmark: [wordmark] in the accent colour + muted [wordmarkSuffix].
   final String wordmark;
@@ -114,7 +140,11 @@ class Brand {
 
   /// Replaces "p4n4" in stack and service names (`<platform>-iot`, `<platform>-api`).
   final String platform;
-  final String tagline;
+
+  /// Under the wordmark on sign-in and in Settings → About, by language code.
+  final Map<String, String> taglines;
+
+  String taglineIn(String language) => brandText(taglines, language) ?? '';
 
   /// Google Fonts family names from brand.json `fonts`. The app renders them
   /// through [P4Colors.displayFamily] and [P4Colors.monoFamily].
@@ -157,15 +187,25 @@ class Brand {
   /// resolved against [page] (the web app's address; null on native, where
   /// they're left out). Ids get a `demo-` prefix, so they never collide with
   /// the deployment's own cameras.
-  List<Camera> demoCamerasOn(Uri? page) => [
+  /// [language]: the names' (brand.json `name`: text, or {language: text}).
+  List<Camera> demoCamerasOn(Uri? page, {String? language}) => [
     for (final c in demoCameras)
       if (Camera.parseUrl(c.url) != null || page != null)
         Camera(
           id: 'demo-${c.id}',
-          name: c.name,
+          name: brandText(demoCameraNames[c.id] ?? const {}, language ?? _language) ?? c.name,
+          credit: brandText(demoCameraCredits[c.id] ?? const {}, language ?? _language),
           url: Camera.parseUrl(c.url) != null ? c.url : page!.resolve(c.url).toString(),
         ),
   ];
+
+  /// Each demo camera's name by language code, by its id.
+  final Map<String, Map<String, String>> demoCameraNames;
+
+  /// A demo camera's credit (whose footage, its licence) by language code, by
+  /// its id, from brand.json `video.demoCameras[].credit`: drawn over its
+  /// video, as an open licence like CC BY asks, beside [demoCredits]' caption.
+  final Map<String, Map<String, String>> demoCameraCredits;
 
   /// The credit line under [demoCameras], per language code (`*` for every
   /// language), from brand.json `video.demoCredits`.
@@ -177,17 +217,19 @@ class Brand {
   /// How the Video tab's vision overlay looks, from brand.json `video.overlay`.
   final VisionStyle vision;
 
-  /// Asset path of an app-bar logo that replaces the text wordmark: the one
-  /// for light mode, and for both when the brand has no [logoDark].
-  final String? logo;
+  /// Asset paths of an app-bar logo that replaces the text wordmark, by
+  /// language code (a logo with words in it has one per language): the ones
+  /// for light mode, and for both when the brand has no [logosDark].
+  final Map<String, String> logos;
 
-  /// Asset path of the logo for dark mode, from brand.json
+  /// Asset paths of the logo for dark mode, from brand.json
   /// `logo: {"light": …, "dark": …}`, so a logo drawn for one background
-  /// stays visible on the other. Null: [logo] in both.
-  final String? logoDark;
+  /// stays visible on the other. Empty: [logos] in both.
+  final Map<String, String> logosDark;
 
-  /// The logo for a [dark] or light background, if the brand has one.
-  String? logoFor({required bool dark}) => dark ? logoDark ?? logo : logo;
+  /// The logo for a [dark] or light background in [language], if the brand has one.
+  String? logoFor({required bool dark, String? language}) =>
+      brandText(dark && logosDark.isNotEmpty ? logosDark : logos, language ?? _language);
 
   static const assetDir = 'assets/brand';
 
@@ -220,11 +262,14 @@ class Brand {
     final unknown = tabNames.where((n) => !DashTab.values.any((t) => t.name == n));
     if (unknown.isNotEmpty) throw FormatException('Unknown tabs in brand.json: ${unknown.join(', ')}');
     if (tabs.isEmpty) throw const FormatException('brand.json must enable at least one tab');
+    // A file (or {language: file}), or one for each background
     final (logo, logoDark) = switch (j['logo']) {
-      null => (null, null),
-      String file => (file, null),
-      {'light': final String light, 'dark': final String dark} => (light, dark),
-      _ => throw const FormatException('brand.json logo must be a file, or {"light": file, "dark": file}'),
+      null => (const <String, String>{}, const <String, String>{}),
+      {'light': final light, 'dark': final dark} => (_texts(light, 'logo.light'), _texts(dark, 'logo.dark')),
+      Map m when m.containsKey('light') || m.containsKey('dark') => throw const FormatException(
+        'brand.json logo must be a file, or {"light": file, "dark": file} (each a file or {language: file})',
+      ),
+      final other => (_texts(other, 'logo'), const <String, String>{}),
     };
     final video = switch (j['video']) {
       null => const <String, dynamic>{},
@@ -234,11 +279,14 @@ class Brand {
 
     return Brand(
       id: j['id'] as String,
-      appName: j['appName'] as String,
+      appNames: switch (_texts(j['appName'], 'appName')) {
+        final names when names.isNotEmpty => names,
+        _ => throw const FormatException('brand.json appName is required'),
+      },
       wordmark: (j['wordmark'] as Map)['text'] as String,
       wordmarkSuffix: ((j['wordmark'] as Map)['suffix'] ?? '') as String,
       platform: (j['platform'] ?? 'p4n4') as String,
-      tagline: (j['tagline'] ?? '') as String,
+      taglines: _texts(j['tagline'], 'tagline'),
       displayFont: displayFont,
       monoFont: monoFont,
       light: P4Colors.light.withBrand(_colors(colors['light'])),
@@ -246,16 +294,27 @@ class Brand {
       tabs: tabs,
       links: [
         for (final l in (j['links'] as List?) ?? const [])
-          BrandLink((l as Map)['label'] as String, Uri.parse(l['url'] as String)),
+          BrandLink(_texts((l as Map)['label'], 'links.label'), {
+            for (final MapEntry(:key, :value) in _texts(l['url'], 'links.url').entries) key: Uri.parse(value),
+          }),
       ],
       defaults: ((j['defaults'] as Map?) ?? const {}).cast<String, Object>(),
       support: BrandSupport.fromJson(j['support']),
       tour: _tour(j['tour']),
       assistantSuggestions: _suggestions(((j['assistant'] as Map?) ?? const {})['suggestions']),
       demoCameras: _demoCameras(video['demoCameras']),
+      demoCameraNames: {
+        for (final c in (video['demoCameras'] as List?) ?? const [])
+          if (c case {'id': final String id, 'name': final Map _}) id: _texts(c['name'], 'video.demoCameras.name'),
+      },
+      demoCameraCredits: {
+        for (final c in (video['demoCameras'] as List?) ?? const [])
+          if (c case {'id': final String id, 'credit': final Object credit})
+            id: _texts(credit, 'video.demoCameras.credit'),
+      },
       demoCredits: _texts(video['demoCredits'], 'video.demoCredits'),
-      logo: logo == null ? null : '$assetDir/$logo',
-      logoDark: logoDark == null ? null : '$assetDir/$logoDark',
+      logos: {for (final MapEntry(:key, :value) in logo.entries) key: '$assetDir/$value'},
+      logosDark: {for (final MapEntry(:key, :value) in logoDark.entries) key: '$assetDir/$value'},
       vision: VisionStyle.fromJson(video['overlay']),
     );
   }
@@ -295,12 +354,13 @@ class Brand {
         _ => throw const FormatException('brand.json video.demoCameras must be a list'),
       })
         switch (c) {
-          {'id': final String id, 'name': final String name, 'url': final String url}
+          {'id': final String id, 'name': final Object name, 'url': final String url}
               when id.isNotEmpty &&
-                  name.isNotEmpty &&
+                  _texts(name, 'video.demoCameras.name').values.every((n) => n.isNotEmpty) &&
+                  _texts(name, 'video.demoCameras.name').isNotEmpty &&
                   url.trim().isNotEmpty &&
                   (Camera.parseUrl(url) != null || !Uri.parse(url).hasScheme) =>
-            Camera(id: id, name: name, url: url.trim()),
+            Camera(id: id, name: brandText(_texts(name, 'video.demoCameras.name'), 'en')!, url: url.trim()),
           _ => throw FormatException(
             'brand.json video.demoCameras: $c needs an id, a name and an http(s) url or a path',
           ),

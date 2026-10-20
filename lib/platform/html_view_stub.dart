@@ -30,11 +30,20 @@ class HtmlImage extends StatelessWidget {
 
 /// Web only; see `html_view_web.dart`.
 class HtmlVideo extends StatelessWidget {
-  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError, this.onClock});
+  const HtmlVideo({
+    super.key,
+    required this.uri,
+    this.playing = true,
+    this.onPlaying,
+    this.onLoaded,
+    this.onError,
+    this.onClock,
+  });
 
   final Uri uri;
   final bool playing;
   final VoidCallback? onPlaying;
+  final VoidCallback? onLoaded;
   final VoidCallback? onError;
   final ValueChanged<VideoClock>? onClock;
 

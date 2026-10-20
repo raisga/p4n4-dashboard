@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../api/feed.dart';
 import '../api/vision.dart' show VisionTone;
 import '../platform/chime.dart';
+import 'feed_moments.dart';
 
 /// Something that asks a person to look, shown as a toast on every tab: an
 /// alert the vision overlay raised from what's on a camera, or a new one in
@@ -19,6 +20,7 @@ class AlertNotice {
     this.detail,
     this.camera,
     this.fromFeed = false,
+    this.moment,
   });
 
   final String id;
@@ -41,6 +43,9 @@ class AlertNotice {
 
   /// From the feed: opens the Feed when there's no camera to show.
   final bool fromFeed;
+
+  /// The clip's moment it's about, if a measured clip links it: opens there.
+  final FeedMoment? moment;
 }
 
 /// The alerts on screen, newest first: raising one shows it for a while
@@ -140,11 +145,12 @@ class AlertScope extends InheritedWidget {
 /// Polls the project's feed while the Feed tab may be closed, and raises a
 /// toast for each alert that arrives waiting for review: the edge's inference,
 /// as its uplink posts it. What's there when it starts is old news: only what
-/// appears after counts.
+/// appears after counts. An alert a camera's clip is about ([skip]) toasts when
+/// its moment plays instead (HomeShell), in the words kept here ([item]).
 class FeedAlertWatcher {
   /// Every 5 s by default, as often as the edge's uplink posts: an alert
   /// toasts within about 10 s of the device writing it.
-  FeedAlertWatcher(this.api, this.center, {this.interval = const Duration(seconds: 5)}) {
+  FeedAlertWatcher(this.api, this.center, {this.interval = const Duration(seconds: 5), this.skip, this.lang}) {
     _poll();
     _timer = Timer.periodic(interval, (_) => _poll());
   }
@@ -152,8 +158,18 @@ class FeedAlertWatcher {
   final FeedApi api;
   final AlertCenter center;
   final Duration interval;
+
+  /// Alerts not to toast on arrival.
+  final bool Function(FeedItem item)? skip;
+
+  /// The reader's language, read at each poll, so the toasts' text follows the dashboard's.
+  final String? Function()? lang;
   late final Timer _timer;
   Set<String>? _seen;
+  final _items = <String, FeedItem>{};
+
+  /// [id] as the latest poll found it, if it was among the newest.
+  FeedItem? item(String id) => _items[id];
   var _busy = false;
   var _closed = false;
 
@@ -161,14 +177,17 @@ class FeedAlertWatcher {
     if (_busy || _closed) return;
     _busy = true;
     try {
-      final page = await api.page(limit: 20);
+      final page = await api.page(limit: 20, lang: lang?.call());
       if (_closed) return;
       final seen = _seen;
       _seen = {...?seen, for (final i in page.items) i.id};
+      _items
+        ..clear()
+        ..addAll({for (final i in page.items) i.id: i});
       if (seen == null) return;
       // Oldest first, so the newest ends up on top.
       for (final item in page.items.reversed) {
-        if (seen.contains(item.id) || !item.alert || !item.pending) continue;
+        if (seen.contains(item.id) || !item.alert || !item.pending || (skip?.call(item) ?? false)) continue;
         center.raise(
           AlertNotice(
             id: 'feed:${item.id}',

@@ -138,8 +138,9 @@ class Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     final p4 = context.p4;
     final brand = BrandScope.of(context);
-    if (brand.logoFor(dark: p4.isDark) case final logo?) {
-      return Image.asset(logo, height: size * 1.4, semanticLabel: brand.appName);
+    final language = Localizations.localeOf(context).languageCode;
+    if (brand.logoFor(dark: p4.isDark, language: language) case final logo?) {
+      return Image.asset(logo, height: size * 1.4, semanticLabel: brand.appNameIn(language));
     }
     return Text.rich(
       TextSpan(

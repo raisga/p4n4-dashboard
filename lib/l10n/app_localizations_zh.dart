@@ -1391,6 +1391,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get feedEmptyMsg => '事件和警报发生时会显示在这里。';
 
   @override
+  String get feedWaiting => '正在等待摄像头';
+
+  @override
+  String get feedWaitingMsg => '摄像头片段相关的警报会在其时刻播放时显示在这里。';
+
+  @override
+  String get momentHeld => '已暂停在该时刻';
+
+  @override
+  String get momentReplaying => '正在回放';
+
+  @override
+  String get momentReplay => '回放';
+
+  @override
+  String get momentLive => '返回直播';
+
+  @override
   String get feedNotSetUp => '没有动态';
 
   @override

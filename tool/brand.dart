@@ -250,29 +250,72 @@ Map<String, dynamic> _validate(Directory dir) {
     return null;
   }
 
+  // The dashboard's languages: one ARB file each in lib/l10n/.
+  final languages = [
+    for (final f in Directory('${_root.path}/lib/l10n').listSync())
+      if (RegExp(r'app_(\w+)\.arb$').firstMatch(f.path) case final m?) m[1]!,
+  ];
+
+  /// Text for every language, or {language code: text} (a file name or a URL, too): what [v] says per
+  /// language (`*` for text for every one), empty when it's null; errors for anything else.
+  Map<String, String> texts(Object? v, String path) {
+    if (v == null) return const {};
+    if (v is String) {
+      if (v.trim().isEmpty) errors.add('$path must not be empty');
+      return {'*': v};
+    }
+    if (v is! Map || v.isEmpty) {
+      errors.add('$path must be text, or an object of language code → text');
+      return const {};
+    }
+    for (final MapEntry(key: lang, value: text) in v.entries) {
+      if (lang != '*' && !languages.contains(lang)) {
+        errors.add('$path.$lang is not a dashboard language (valid: ${languages.join(', ')}, or *)');
+      }
+      if (text is! String || text.trim().isEmpty) errors.add('$path.$lang must be a non-empty string');
+    }
+    return {for (final MapEntry(:key, :value) in v.entries) '$key': '$value'};
+  }
+
   if (installed && j['id'] != folder) errors.add('id must be "$folder" (the folder name)');
   if (j['id'] is! String || !RegExp(r'^[a-z0-9]+(-[a-z0-9]+)*$').hasMatch(j['id'] as String)) {
     errors.add('id must be lowercase letters, digits and dashes');
   } else if (!installed && j['id'] == _defaultBrand) {
     errors.add('id "$_defaultBrand" is reserved for the built-in brand');
   }
-  str(j, 'appName', '');
+  if (texts(j['appName'], 'appName').isEmpty && j['appName'] == null) errors.add('appName is required');
+  texts(j['tagline'], 'tagline');
+  for (final (i, link) in ((j['links'] as List?) ?? const []).indexed) {
+    if (link is! Map) {
+      errors.add('links[$i] must be {"label": …, "url": …}');
+      continue;
+    }
+    if (texts(link['label'], 'links[$i].label').isEmpty) errors.add('links[$i] needs a label');
+    final urls = texts(link['url'], 'links[$i].url');
+    if (urls.isEmpty) errors.add('links[$i] needs a url');
+    for (final url in urls.values) {
+      if (!RegExp(r'^https?://\S+$').hasMatch(url.trim())) errors.add('links[$i].url "$url" must be an http(s) URL');
+    }
+  }
   final wordmark = j['wordmark'];
   wordmark is Map ? str(wordmark, 'text', 'wordmark') : errors.add('wordmark must be an object');
 
-  // One file for both modes, or one per mode (a white logo is invisible on the light theme)
+  // One file for both modes, or one per mode (a white logo is invisible on the light theme); each a file, or
+  // {language: file} for a logo with words in it
   final logos = switch (j['logo']) {
     null => const <String, Object?>{},
-    final String file => {'logo': file},
-    {'light': final String light, 'dark': final String dark} && final Map m when m.length == 2 => {
+    {'light': final light, 'dark': final dark} && final Map m when m.length == 2 => {
       'logo.light': light,
       'logo.dark': dark,
     },
-    _ => null,
+    final Map m when m.containsKey('light') || m.containsKey('dark') => null,
+    final other => {'logo': other},
   };
   if (logos == null) errors.add('logo must be a file, or {"light": file, "dark": file}');
   for (final MapEntry(:key, :value) in (logos ?? const {}).entries) {
-    if (!File('${dir.path}/$value').existsSync()) errors.add('$key "$value" not found');
+    for (final file in texts(value, key).values) {
+      if (!File('${dir.path}/$file').existsSync()) errors.add('$key "$file" not found');
+    }
   }
 
   // Without a list a brand gets every tab but the opt-in feed (lib/core/brand.dart DashTab.defaults)
@@ -284,11 +327,6 @@ Map<String, dynamic> _validate(Directory dir) {
 
   final tour = j['tour'];
   if (tour != null && tour is! Map) errors.add('tour must be an object');
-  // The dashboard's languages: one ARB file each in lib/l10n/.
-  final languages = [
-    for (final f in Directory('${_root.path}/lib/l10n').listSync())
-      if (RegExp(r'app_(\w+)\.arb$').firstMatch(f.path) case final m?) m[1]!,
-  ];
   for (final MapEntry(:key, :value) in ((tour as Map?) ?? const {}).entries) {
     if (!_tourSteps.contains(key)) {
       errors.add('unknown tour step "$key" (valid: ${_tourSteps.join(', ')})');
@@ -353,8 +391,12 @@ Map<String, dynamic> _validate(Directory dir) {
   final ids = <Object?>{};
   for (final (i, c) in ((demo as List?) ?? const []).indexed) {
     final url = c is Map ? c['url'] : null;
-    if (c is! Map || [c['id'], c['name'], url].any((v) => v is! String || v.trim().isEmpty)) {
-      errors.add('video.demoCameras[$i] needs an id, a name and a url');
+    if (c is! Map ||
+        [c['id'], url].any((v) => v is! String || v.trim().isEmpty) ||
+        texts(c['name'], 'video.demoCameras[$i].name').isEmpty) {
+      errors.add('video.demoCameras[$i] needs an id, a name (or {language: name}) and a url');
+    } else if (c['credit'] != null && texts(c['credit'], 'video.demoCameras[$i].credit').isEmpty) {
+      errors.add('video.demoCameras[$i].credit must not be empty');
     } else if (!ids.add(c['id'])) {
       errors.add('video.demoCameras[$i]: id "${c['id']}" is used twice');
     } else if (Uri.tryParse(url as String) case final u
@@ -626,8 +668,8 @@ String _lightColor(Map<String, dynamic> brand, String token) {
 
 /// Page title, home-screen name, description and colors of the web build.
 void _patchWeb(Map<String, dynamic> brand, String displayName) {
-  final appName = brand['appName'] as String;
-  final tagline = (brand['tagline'] as String?)?.trim() ?? '';
+  final appName = _text(brand, brand['appName']) ?? '';
+  final tagline = _text(brand, brand['tagline'])?.trim() ?? '';
   final description = tagline.isEmpty ? appName : tagline;
   _patch('web/index.html', [
     (RegExp(r'<title>[^<]*</title>'), '<title>${_xml(appName)}</title>'),
@@ -643,6 +685,14 @@ void _patchWeb(Map<String, dynamic> brand, String displayName) {
     (RegExp(r'"theme_color": "[^"]*"'), field('theme_color', _lightColor(brand, 'accent'))),
     (RegExp(r'"background_color": "[^"]*"'), field('background_color', _lightColor(brand, 'bg'))),
   ]);
+}
+
+/// A brand text ([value]: text, or {language: text}) in the brand's own language (its `locale` default), for
+/// what has room for one language only (the web page's title).
+String? _text(Map<String, dynamic> brand, Object? value) {
+  if (value is! Map) return value as String?;
+  final locale = (brand['defaults'] as Map?)?['locale'];
+  return (value[locale] ?? value['*'] ?? value['en'] ?? value.values.firstOrNull) as String?;
 }
 
 void _patch(String path, List<(RegExp, String)> edits, {bool quiet = false}) {

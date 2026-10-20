@@ -100,7 +100,7 @@ String tourText(BuildContext context, TourStep step) {
   final brand = BrandScope.of(context);
   return brand.tourText(step, Localizations.localeOf(context).languageCode) ??
       switch (step) {
-        TourStep.welcome => l.tourWelcome(brand.appName),
+        TourStep.welcome => l.tourWelcome(brand.appNameIn(Localizations.localeOf(context).languageCode)),
         TourStep.navigation => l.tourNavigation,
         TourStep.theme => l.tourTheme,
         TourStep.settings => l.tourSettings,

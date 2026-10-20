@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../api/feed.dart';
+import '../core/feed_moments.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -20,10 +21,15 @@ enum _Filter { all, alerts, pending }
 /// p4n4-api): what happened, and what asks a person to do something. Operators
 /// and admins act on alerts (attend, dismiss); viewers only read. An item opens
 /// in full ([FeedItemPage]), with its picture when it has one.
+///
+/// While the cameras play clips whose moments are about feed items
+/// ([moments]), those items show up as their moment plays, newest first, at
+/// the time it played, and open on it instead of their picture.
 class FeedTab extends StatefulWidget {
-  const FeedTab({super.key, required this.active});
+  const FeedTab({super.key, required this.active, this.moments});
 
   final bool active;
+  final FeedMoments? moments;
 
   @override
   State<FeedTab> createState() => _FeedTabState();
@@ -34,6 +40,7 @@ class _FeedTabState extends State<FeedTab> {
   AppLocalizations get l => context.l10n;
 
   FeedApi? _api;
+  String? _lang;
   FeedPage? _first;
   final _older = <FeedItem>[];
   Object? _olderCursor;
@@ -48,6 +55,15 @@ class _FeedTabState extends State<FeedTab> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final api = SettingsScope.of(context).apiUri;
+    // The feed's own text is in the dashboard's language: a new language reads it again.
+    final lang = l.localeName;
+    if (lang != _lang && _api != null && api == _api!.api) {
+      _lang = lang;
+      _older.clear();
+      _olderCursor = null;
+      _refresh();
+    }
+    _lang = lang;
     if (api != _api?.api) {
       _api = FeedApi(api);
       _first = null;
@@ -60,15 +76,30 @@ class _FeedTabState extends State<FeedTab> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.moments?.addListener(_played);
+  }
+
+  @override
   void didUpdateWidget(FeedTab old) {
     super.didUpdateWidget(old);
+    if (old.moments != widget.moments) {
+      old.moments?.removeListener(_played);
+      widget.moments?.addListener(_played);
+    }
     _schedule();
   }
 
   @override
   void dispose() {
+    widget.moments?.removeListener(_played);
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _played() {
+    if (mounted) setState(() {});
   }
 
   void _schedule() {
@@ -86,7 +117,7 @@ class _FeedTabState extends State<FeedTab> {
     if (api == null || _loading) return;
     setState(() => _loading = true);
     try {
-      final page = await api.page(limit: _pageSize);
+      final page = await api.page(limit: _pageSize, lang: _lang);
       if (!mounted || api != _api) return;
       setState(() {
         _first = page;
@@ -105,7 +136,7 @@ class _FeedTabState extends State<FeedTab> {
     if (api == null || cursor == null || _loadingOlder) return;
     setState(() => _loadingOlder = true);
     try {
-      final page = await api.page(limit: _pageSize, before: cursor);
+      final page = await api.page(limit: _pageSize, before: cursor, lang: _lang);
       if (!mounted || api != _api) return;
       setState(() {
         _older.addAll(page.items);
@@ -121,7 +152,7 @@ class _FeedTabState extends State<FeedTab> {
   Future<void> _act(FeedItem item, FeedAction action) async {
     setState(() => _acting.add(item.id));
     try {
-      await _api!.act(item.id, action.id);
+      await _api!.act(item.id, action.id, lang: _lang);
       _older.removeWhere((i) => i.id == item.id);
       await _refresh();
     } catch (e) {
@@ -133,7 +164,7 @@ class _FeedTabState extends State<FeedTab> {
 
   /// For [FeedItemPage]: the action, then the feed as it is now (this tab's filter).
   Future<List<FeedItem>> _actAndRefresh(FeedItem item, FeedAction action) async {
-    await _api!.act(item.id, action.id);
+    await _api!.act(item.id, action.id, lang: _lang);
     _older.removeWhere((i) => i.id == item.id);
     await _refresh();
     return _items;
@@ -149,6 +180,7 @@ class _FeedTabState extends State<FeedTab> {
           index: items.indexWhere((i) => i.id == item.id).clamp(0, items.length - 1),
           canAct: _first?.canAct ?? false,
           act: _actAndRefresh,
+          moments: widget.moments,
         ),
       ),
     );
@@ -157,10 +189,12 @@ class _FeedTabState extends State<FeedTab> {
   void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   List<FeedItem> get _items {
+    final moments = widget.moments;
     final seen = <String>{};
-    return [
+    final items = [
       for (final i in [...?_first?.items, ..._older])
         if (seen.add(i.id) &&
+            (moments?.shows(i.id) ?? true) &&
             switch (_filter) {
               _Filter.all => true,
               _Filter.alerts => i.alert,
@@ -168,6 +202,15 @@ class _FeedTabState extends State<FeedTab> {
             })
           i,
     ];
+    if (moments == null || !moments.active) return items;
+    // Newest first, an item a clip is about by when its moment last played; the same time, as the feed had them.
+    final order = {for (final (n, i) in items.indexed) i.id: n};
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    DateTime when(FeedItem i) => moments[i.id]?.seen ?? i.time ?? epoch;
+    return items..sort((a, b) {
+      final by = when(b).compareTo(when(a));
+      return by != 0 ? by : order[a.id]!.compareTo(order[b.id]!);
+    });
   }
 
   @override
@@ -224,12 +267,17 @@ class _FeedTabState extends State<FeedTab> {
           ],
         ),
         const SizedBox(height: 16),
-        if (items.isEmpty)
+        if (items.isEmpty && (widget.moments?.active ?? false))
+          EmptyState(icon: Icons.videocam_outlined, title: l.feedWaiting, message: l.feedWaitingMsg)
+        else if (items.isEmpty)
           EmptyState(icon: Icons.dynamic_feed_outlined, title: l.feedEmpty, message: l.feedEmptyMsg)
         else
           for (final item in items) ...[
             _FeedCard(
+              // By item: the list reorders as the clips' moments play, and a card keeps its own picture
+              key: ValueKey(item.id),
               item: item,
+              played: widget.moments?[item.id]?.seen,
               api: _api!,
               canAct: page.canAct,
               busy: _acting.contains(item.id),
@@ -253,7 +301,9 @@ class _FeedTabState extends State<FeedTab> {
 
 class _FeedCard extends StatelessWidget {
   const _FeedCard({
+    super.key,
     required this.item,
+    this.played,
     required this.api,
     required this.canAct,
     required this.busy,
@@ -262,6 +312,9 @@ class _FeedCard extends StatelessWidget {
   });
 
   final FeedItem item;
+
+  /// When its moment last played on a camera, if a clip is about it: shown as its time.
+  final DateTime? played;
   final FeedApi api;
   final bool canAct;
   final bool busy;
@@ -273,9 +326,9 @@ class _FeedCard extends StatelessWidget {
     final p4 = context.p4;
     final l = context.l10n;
     final tone = feedTone(context, item.tone);
-    final when = feedWhen(context, item.time);
+    final when = feedWhen(context, played ?? item.time);
     final status = feedStatus(context, item.status);
-    final meta = [?when, ...item.meta.values];
+    final meta = [?when, ...item.shownFacts];
 
     return Panel(
       accent: item.alert ? tone : null,
@@ -303,6 +356,7 @@ class _FeedCard extends StatelessWidget {
               if (status != null) ...[const SizedBox(width: 10), TagBadge(status.$1, color: status.$2)],
               // The evidence of what's still to review, at a glance (the rest on opening them)
               if (item.image && item.pending) ...[const SizedBox(width: 12), _Thumbnail(api: api, itemId: item.id)],
+              if (played != null) ...[const SizedBox(width: 12), Icon(Icons.videocam_outlined, size: 18, color: tone)],
             ],
           ),
           if (item.detail != null) ...[

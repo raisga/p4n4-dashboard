@@ -225,7 +225,18 @@ class VisionObject {
 
 /// What the model said someone was doing.
 class VisionBehavior {
-  const VisionBehavior({required this.track, required this.behavior, required this.confidence, this.zone, this.key});
+  const VisionBehavior({
+    required this.track,
+    required this.behavior,
+    required this.confidence,
+    this.zone,
+    this.key,
+    this.start,
+    this.end,
+    this.feed,
+    this.focus = const [],
+    this.focusKinds = const [],
+  });
 
   final int track;
   final String behavior;
@@ -236,6 +247,19 @@ class VisionBehavior {
 
   /// This occurrence: the same window in the clip's next loop is a new one.
   final String? key;
+
+  /// A recording's window, in seconds into the clip; null for a live verdict.
+  final double? start, end;
+
+  /// The feed item this moment is about (its id), when the recording links one.
+  final String? feed;
+
+  /// The tracks it's about (e.g. a foul's offender and victim, or who's near
+  /// the ball), for a closer look; empty when the recording names none.
+  final List<int> focus;
+
+  /// The kinds of object it's about too ([VisionBundle.objects], e.g. the ball).
+  final List<int> focusKinds;
 }
 
 /// What's on screen at one instant: the boxes, and what the person the
@@ -310,15 +334,20 @@ class VisionRecording {
       ],
       segments: [
         for (final s in (j['behaviors'] as List?) ?? const [])
-          if (s case [final num start, final num end, final num id, final String behavior, final num c])
+          if (s case [final num start, final num end, final num id, final String behavior, final num c, ...])
             (
               start: start.toDouble(),
               end: end.toDouble(),
               track: id.toInt(),
               behavior: behavior,
               confidence: c.toDouble(),
+              // An optional 6th: the feed item the moment is about; a 7th, the tracks it's about; an 8th, the
+              // kinds of object it's about
+              feed: s.length > 5 && s[5] is String ? s[5] as String : null,
+              focus: _ints(s.length > 6 ? s[6] : null),
+              focusKinds: _ints(s.length > 7 ? s[7] : null),
             ),
-      ],
+      ]..sort((a, b) => a.start.compareTo(b.start)),
     );
   }
 
@@ -332,7 +361,34 @@ class VisionRecording {
   /// `(t, objects)`, in order of t: sampled on their own clock, so a sample
   /// with none means the detector saw none then.
   final List<(double, List<VisionObject>)> objects;
-  final List<({double start, double end, int track, String behavior, double confidence})> segments;
+  final List<
+    ({
+      double start,
+      double end,
+      int track,
+      String behavior,
+      double confidence,
+      String? feed,
+      List<int> focus,
+      List<int> focusKinds,
+    })
+  >
+  segments;
+
+  static List<int> _ints(Object? raw) => raw is List ? [...raw.whereType<num>().map((n) => n.toInt())] : const [];
+
+  /// The feed items its moments are about.
+  Set<String> get feedItems => {for (final s in segments) ?s.feed};
+
+  /// The kinds ([VisionBundle.objects]) its people and objects are, worked out once: what a key to its colours lists.
+  Set<int> get kinds => _kinds[this] ??= {
+    for (final (_, boxes) in samples)
+      for (final b in boxes) ?b.kind,
+    for (final (_, found) in objects)
+      for (final o in found) o.kind,
+  };
+
+  static final _kinds = Expando<Set<int>>();
 
   /// A box the detector lost for a frame or two (someone turns, a rack hides
   /// them) is held over a gap this long, as the edge's tracker does. Past it
@@ -417,10 +473,22 @@ class VisionRecording {
     return best;
   }
 
+  /// The behaviour going on at [at]: of those that are, the one that started last, so a moment that starts
+  /// while another goes on is an occurrence of its own.
   VisionBehavior? _behaviorAt(double at, int pass) {
-    for (final s in segments) {
+    for (final s in segments.reversed) {
       if (at >= s.start && at < s.end) {
-        return VisionBehavior(track: s.track, behavior: s.behavior, confidence: s.confidence, key: '$pass|${s.start}');
+        return VisionBehavior(
+          track: s.track,
+          behavior: s.behavior,
+          confidence: s.confidence,
+          key: '$pass|${s.start}',
+          start: s.start,
+          end: s.end,
+          feed: s.feed,
+          focus: s.focus,
+          focusKinds: s.focusKinds,
+        );
       }
     }
     return null;

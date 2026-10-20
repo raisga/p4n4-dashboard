@@ -2523,6 +2523,42 @@ abstract class AppLocalizations {
   /// **'Events and alerts show up here as they happen.'**
   String get feedEmptyMsg;
 
+  /// No description provided for @feedWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the cameras'**
+  String get feedWaiting;
+
+  /// No description provided for @feedWaitingMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts about the clips on the cameras show up here as their moment plays.'**
+  String get feedWaitingMsg;
+
+  /// No description provided for @momentHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused on the moment'**
+  String get momentHeld;
+
+  /// No description provided for @momentReplaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaying'**
+  String get momentReplaying;
+
+  /// No description provided for @momentReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay'**
+  String get momentReplay;
+
+  /// No description provided for @momentLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to live'**
+  String get momentLive;
+
   /// No description provided for @feedNotSetUp.
   ///
   /// In en, this message translates to:

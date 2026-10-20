@@ -12,10 +12,12 @@ import 'package:p4n4_dashboard/api/vision_live.dart';
 import 'package:p4n4_dashboard/api/vision_recorded.dart';
 import 'package:p4n4_dashboard/core/alerts.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
+import 'package:p4n4_dashboard/core/feed_moments.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:p4n4_dashboard/l10n/app_localizations.dart';
 import 'package:p4n4_dashboard/tabs/video_tab.dart' show alertCamera;
 import 'package:p4n4_dashboard/widgets/alert_toasts.dart';
+import 'package:p4n4_dashboard/widgets/moment_view.dart' show momentCrop;
 import 'package:p4n4_dashboard/widgets/vision_overlay.dart';
 
 /// A boutique's overlay, as a project's vision file holds it.
@@ -246,6 +248,104 @@ void main() {
       expect(first.key, isNot(second.key));
       expect(rec.sceneAt(4.9).behavior!.key, first.key);
     });
+
+    test('the kinds a camera shows, for its key: its people\'s and its objects\'', () {
+      final r = VisionRecording.fromJson({
+        'duration': 2,
+        'boxes': [
+          [
+            0,
+            [
+              [1, 0, 0, 0.1, 0.1, 0.9, 4],
+              [2, 0, 0, 0.1, 0.1, 0.9],
+            ],
+          ],
+        ],
+        'objects': [
+          [
+            0,
+            [
+              [6, 0, 0, 0.1, 0.1, 0.5],
+            ],
+          ],
+        ],
+      });
+      expect(r.kinds, {4, 6});
+    });
+
+    test('a moment may name the feed item it is about', () {
+      final linked = VisionRecording.fromJson({
+        'duration': 20,
+        'behaviors': [
+          [2.0, 5.5, -1, 'goal', 1.0, 'site:AL-1'],
+          [8, 9, 3, 'ball_out', 0.5],
+        ],
+      });
+      final goal = linked.behaviorAt(22.5)!;
+      expect((goal.behavior, goal.start, goal.end, goal.feed), ('goal', 2.0, 5.5, 'site:AL-1'));
+      expect(goal.focus, isEmpty);
+      final focused = VisionRecording.fromJson({
+        'duration': 9,
+        'behaviors': [
+          [
+            1,
+            4,
+            7,
+            'foul_contact',
+            0.6,
+            null,
+            [7, 9],
+          ],
+        ],
+      });
+      expect(focused.behaviorAt(2)!.feed, isNull);
+      expect(focused.behaviorAt(2)!.focus, [7, 9]);
+      expect(linked.behaviorAt(8.5)!.feed, isNull);
+      expect(linked.feedItems, {'site:AL-1'});
+      final overlapping = VisionRecording.fromJson({
+        'duration': 20,
+        'behaviors': [
+          [2.0, 8.0, -1, 'foul_contact', 1.0, 'a'],
+          [3.0, 8.0, -1, 'identity', 1.0, 'b'],
+        ],
+      });
+      expect(
+        [
+          for (final t in [2.5, 3.5, 7.9]) overlapping.behaviorAt(t)!.feed,
+        ],
+        ['a', 'b', 'b'],
+      );
+      expect(rec.feedItems, isEmpty);
+    });
+  });
+
+  group('momentCrop', () {
+    const frame = Size(1280, 720);
+    VisionBox box(int track, double x, double y, {double w = 0.03, double h = 0.1}) =>
+        VisionBox(track, Rect.fromLTWH(x, y, w, h), 0.9);
+
+    test('the players it names, with room around them, at 4:3, inside the frame', () {
+      final crop = momentCrop([box(1, 0.5, 0.4), box(2, 0.55, 0.42), box(3, 0.1, 0.1)], [1, 2], frame)!;
+      expect(crop.contains(const Offset(0.52, 0.45)), isTrue);
+      expect(crop.contains(const Offset(0.1, 0.1)), isFalse);
+      expect(crop.width * frame.width / (crop.height * frame.height), closeTo(4 / 3, 1e-6));
+      // A far player: no closer than 0.18 of the frame's height
+      expect(momentCrop([box(1, 0.5, 0.4)], [1], frame)!.height, closeTo(0.18, 1e-6));
+      final edge = momentCrop([box(1, 0.98, 0.0)], [1], frame)!;
+      expect(edge.right, closeTo(1, 1e-9));
+      expect(edge.top, 0);
+    });
+
+    test('none on screen, or players already big in the frame: no close-up', () {
+      expect(momentCrop([box(3, 0.1, 0.1)], [1], frame), isNull);
+      // The ball it's about, on its own
+      final ball = [VisionObject(6, const Rect.fromLTWH(0.6, 0.5, 0.01, 0.015), 1)];
+      final onBall = momentCrop(const [], const [], frame, objects: ball, kinds: [6])!;
+      expect(onBall.contains(const Offset(0.605, 0.507)), isTrue);
+      expect(momentCrop(const [], const [], frame, objects: ball, kinds: [2]), isNull);
+      expect(momentCrop([box(1, 0.3, 0.3, w: 0.1, h: 0.5)], [1], frame), isNull);
+      expect(momentCrop([box(1, 0.3, 0.3, w: 0.05, h: 0.25)], [1], frame), isNotNull);
+    });
   });
 
   group('RecordedVision', () {
@@ -289,6 +389,25 @@ void main() {
       expect(r.secondsOf(clip.id), 0);
     });
 
+    test('the feed items the followed clips are about', () {
+      final bundle = VisionBundle.fromJson({
+        'cameras': {
+          'cam-01': {
+            'recording': {
+              'duration': 10,
+              'behaviors': [
+                [1, 2, -1, 'goal', 1.0, 'site:AL-1'],
+              ],
+            },
+          },
+        },
+      });
+      final r = recorded([])..follow([clip], bundle);
+      expect(r.feedItems, {'site:AL-1'});
+      r.follow([], bundle);
+      expect(r.feedItems, isEmpty);
+    });
+
     test('follows only video files the project measured', () {
       final seen = <(Camera, VisionBehavior)>[];
       final r = recorded(seen)
@@ -302,6 +421,29 @@ void main() {
       expect(seen, isEmpty);
       r.follow([clip], null);
       expect(r.secondsOf(clip.id), isNull);
+    });
+  });
+
+  group('FeedMoments', () {
+    const cam = Camera(id: 'demo-cam-01', name: 'Racks', url: 'http://edge/clips/cam-01.mp4');
+
+    test('a linked item shows once its moment has played; one no clip links to always', () {
+      var now = DateTime(2026);
+      final m = FeedMoments(now: () => now);
+      addTearDown(m.dispose);
+      var changes = 0;
+      m.addListener(() => changes++);
+      expect((m.active, m.shows('a')), (false, true));
+      m.link({'a', 'b'});
+      expect((m.active, m.shows('a'), m.shows('c')), (true, false, true));
+      now = DateTime(2026, 1, 1, 0, 0, 5);
+      final played = m.played('a', cam, 2, 5.5);
+      expect((m.shows('a'), m['a'], played.seen), (true, played, now));
+      // The same links: nothing changes. Unlinked: forgotten.
+      m.link({'a', 'b'});
+      m.link({'b'});
+      expect((m['a'], m.shows('a')), (null, true));
+      expect(changes, 3);
     });
   });
 
@@ -484,6 +626,31 @@ void main() {
         (n.id, n.code, n.camera, n.tone, n.fromFeed),
         ('feed:new', 'A4', 'boutique-cam-04', VisionTone.review, true),
       );
+    });
+
+    test('keeps the newest items; what a clip is about is not toasted on arrival', () async {
+      var items = <Map<String, Object?>>[];
+      final client = MockClient(
+        (_) async => http.Response(jsonEncode({'items': items}), 200, headers: {'content-type': 'application/json'}),
+      );
+      final center = AlertCenter(chime: () async {});
+      addTearDown(center.dispose);
+      late FeedAlertWatcher watcher;
+      await http.runWithClient(() async {
+        watcher = FeedAlertWatcher(
+          FeedApi(Uri.parse('http://api/')),
+          center,
+          interval: const Duration(milliseconds: 20),
+          skip: (i) => i.id == 'clip',
+        );
+        addTearDown(watcher.dispose);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        items = [item('clip'), item('new')];
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      }, () => client);
+      expect(center.shown.map((n) => n.id), ['feed:new']);
+      expect(watcher.item('clip')?.subtitle, 'Fitting rooms');
+      expect(watcher.item('gone'), isNull);
     });
   });
 

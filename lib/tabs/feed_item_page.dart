@@ -4,10 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/feed.dart';
+import '../core/feed_moments.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
+import '../widgets/moment_view.dart';
 
 /// Posts [action] on [item], refreshes the feed and returns its items as they are now.
 typedef FeedActor = Future<List<FeedItem>> Function(FeedItem item, FeedAction action);
@@ -16,6 +18,8 @@ typedef FeedActor = Future<List<FeedItem>> Function(FeedItem item, FeedAction ac
 /// screen allows, what it says, its link, and its actions. Made for reviewing alerts one after
 /// another from the keyboard: 1–9 take the actions in order, J and K (or the arrows) move to the
 /// next and previous item, Esc goes back. After an action it moves on to the next item to review.
+/// An item a camera's clip is about ([moments]) shows that moment in place of its picture
+/// ([MomentView]): the clip held where it starts, which plays again on request.
 class FeedItemPage extends StatefulWidget {
   const FeedItemPage({
     super.key,
@@ -24,6 +28,7 @@ class FeedItemPage extends StatefulWidget {
     required this.index,
     required this.canAct,
     required this.act,
+    this.moments,
   });
 
   final FeedApi api;
@@ -31,6 +36,7 @@ class FeedItemPage extends StatefulWidget {
   final int index;
   final bool canAct;
   final FeedActor act;
+  final FeedMoments? moments;
 
   @override
   State<FeedItemPage> createState() => _FeedItemPageState();
@@ -92,7 +98,13 @@ class _FeedItemPageState extends State<FeedItemPage> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final item = _item;
-    final details = _Details(item: item, canAct: widget.canAct, busy: _busy, onAction: _act);
+    final details = _Details(
+      item: item,
+      played: widget.moments?[item.id]?.seen,
+      canAct: widget.canAct,
+      busy: _busy,
+      onAction: _act,
+    );
     return CallbackShortcuts(
       bindings: _keys,
       child: Focus(
@@ -116,7 +128,14 @@ class _FeedItemPageState extends State<FeedItemPage> {
           ),
           body: LayoutBuilder(
             builder: (context, box) {
-              final picture = item.image ? _Evidence(key: ValueKey(item.id), api: widget.api, itemId: item.id) : null;
+              final picture = switch (widget.moments?[item.id]) {
+                final moment? => ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: MomentView(key: ValueKey(item.id), moment: moment),
+                ),
+                null when item.image => _Evidence(key: ValueKey(item.id), api: widget.api, itemId: item.id),
+                null => null,
+              };
               if (picture != null && box.maxWidth >= 900) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -138,7 +157,8 @@ class _FeedItemPageState extends State<FeedItemPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (picture != null) ...[
-                      SizedBox(height: (box.maxWidth - 32) * 9 / 16, child: picture),
+                      // A moment has its bar under the video
+                      SizedBox(height: (box.maxWidth - 32) * 9 / 16 + (picture is _Evidence ? 0 : 48), child: picture),
                       const SizedBox(height: 16),
                     ],
                     details,
@@ -154,9 +174,12 @@ class _FeedItemPageState extends State<FeedItemPage> {
 }
 
 class _Details extends StatelessWidget {
-  const _Details({required this.item, required this.canAct, required this.busy, required this.onAction});
+  const _Details({required this.item, this.played, required this.canAct, required this.busy, required this.onAction});
 
   final FeedItem item;
+
+  /// When its moment last played, if a clip is about it: shown as its time, as the list does.
+  final DateTime? played;
   final bool canAct;
   final bool busy;
   final ValueChanged<FeedAction> onAction;
@@ -192,7 +215,7 @@ class _Details extends StatelessWidget {
             SelectableText(item.detail!, style: p4.body(size: 15)),
           ],
           // When, and the item's own facts, as the card shows them
-          if ([?feedWhen(context, item.time), ...item.meta.values] case final facts when facts.isNotEmpty) ...[
+          if ([?feedWhen(context, played ?? item.time), ...item.shownFacts] case final facts when facts.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(facts.join(' · '), style: p4.mono(size: 12, color: p4.muted)),
           ],

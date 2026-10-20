@@ -50,6 +50,7 @@ class FeedItem {
     this.synthetic = false,
     this.image = false,
     this.link,
+    this.facts,
   });
 
   factory FeedItem.fromJson(Map<String, dynamic> j) => FeedItem(
@@ -73,6 +74,10 @@ class FeedItem {
     synthetic: j['synthetic'] == true,
     image: j['image'] == true,
     link: FeedLink.fromJson(j['link']),
+    facts: switch (j['facts']) {
+      final List l => [...l.whereType<String>()],
+      _ => null,
+    },
   );
 
   final String id;
@@ -99,6 +104,13 @@ class FeedItem {
   /// It has a picture (the evidence), at [FeedApi.image].
   final bool image;
   final FeedLink? link;
+
+  /// What the card says under it, for people to read (who reviewed it, say),
+  /// in place of [meta]'s values; null: [meta]'s values.
+  final List<String>? facts;
+
+  /// The line under an item: [facts], else [meta]'s values.
+  List<String> get shownFacts => facts ?? [...meta.values];
 
   bool get pending => status == 'pending_review';
 }
@@ -148,10 +160,11 @@ class FeedApi {
   final _images = <String, Future<Uint8List>>{};
   static const _keepImages = 60;
 
-  Future<FeedPage> page({int limit = 50, Object? before}) async {
+  /// [lang]: the reader's language (e.g. `es`), for the feed's own text.
+  Future<FeedPage> page({int limit = 50, Object? before, String? lang}) async {
     final url = api
         .resolve('api/v1/feed')
-        .replace(queryParameters: {'limit': '$limit', if (before != null) 'before': '$before'});
+        .replace(queryParameters: {'limit': '$limit', if (before != null) 'before': '$before', 'lang': ?lang});
     return FeedPage.fromJson(_body(await _guard(http.get(url).timeout(_timeout))));
   }
 
@@ -180,12 +193,13 @@ class FeedApi {
   }
 
   /// Operators and admins only; the API refuses anyone else.
-  Future<void> act(String itemId, String action) async {
+  Future<void> act(String itemId, String action, {String? lang}) async {
+    final url = api.resolve('api/v1/feed/${Uri.encodeComponent(itemId)}/action');
     _body(
       await _guard(
         http
             .post(
-              api.resolve('api/v1/feed/${Uri.encodeComponent(itemId)}/action'),
+              lang == null ? url : url.replace(queryParameters: {'lang': lang}),
               headers: const {'Content-Type': 'application/json'},
               body: jsonEncode({'action': action}),
             )

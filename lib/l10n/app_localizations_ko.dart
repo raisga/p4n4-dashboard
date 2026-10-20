@@ -1391,6 +1391,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String get feedEmptyMsg => '이벤트와 알림이 발생하면 여기에 표시됩니다.';
 
   @override
+  String get feedWaiting => '카메라를 기다리는 중';
+
+  @override
+  String get feedWaitingMsg => '카메라 클립에 관한 알림은 해당 순간이 재생될 때 여기에 표시됩니다.';
+
+  @override
+  String get momentHeld => '해당 순간에서 일시 정지됨';
+
+  @override
+  String get momentReplaying => '다시 보는 중';
+
+  @override
+  String get momentReplay => '다시 보기';
+
+  @override
+  String get momentLive => '실시간으로 돌아가기';
+
+  @override
   String get feedNotSetUp => '활동 없음';
 
   @override

@@ -2,12 +2,16 @@
 /// ([isVideo]), or one of this device's own cameras, `device:back` or
 /// `device:front` ([device]).
 class Camera {
-  const Camera({required this.id, required this.name, required this.url});
+  const Camera({required this.id, required this.name, required this.url, this.credit});
 
   /// Stable across renames and URL changes, so the viewer keeps its stream.
   final String id;
   final String name;
   final String url;
+
+  /// Whose footage it is, for a demo camera playing someone else's (the
+  /// author and licence an open licence asks to show): drawn over its video.
+  final String? credit;
 
   /// The parsed [url], or null if it isn't a usable http(s) URL.
   Uri? get uri => parseUrl(url);
@@ -38,7 +42,8 @@ class Camera {
     return const ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.m3u8'].any(path.endsWith);
   }
 
-  Camera copyWith({String? name, String? url}) => Camera(id: id, name: name ?? this.name, url: url ?? this.url);
+  Camera copyWith({String? name, String? url}) =>
+      Camera(id: id, name: name ?? this.name, url: url ?? this.url, credit: credit);
 
   Map<String, String> toJson() => {'id': id, 'name': name, 'url': url};
 

@@ -95,7 +95,7 @@ void main() {
     expect(brand.wordmarkSuffix, '');
     expect(brand.displayFont, 'Plus Jakarta Sans');
     expect(brand.tabs, DashTab.defaults);
-    expect(brand.logo, isNull);
+    expect(brand.logos, isEmpty);
     expect(brand.logoFor(dark: true), isNull);
   });
 
@@ -113,6 +113,51 @@ void main() {
     );
     expect(brand.logoFor(dark: false), 'assets/brand/logo-light.png');
     expect(brand.logoFor(dark: true), 'assets/brand/logo.png');
+  });
+
+  test('texts, links, camera names and logos in the reader\'s language', () {
+    final brand = Brand.fromJson(
+      _minimal({
+        'appName': {'es': 'Revisión', 'en': 'Review'},
+        'tagline': {'es': 'Consultivo', 'en': 'Advisory'},
+        'defaults': {'locale': 'es'},
+        'links': [
+          {
+            'label': {'es': 'Sala', 'en': 'Room'},
+            'url': {'es': 'https://x/review/?lang=es', 'en': 'https://x/review/?lang=en'},
+          },
+          {'label': 'IFAB', 'url': 'https://theifab.com'},
+        ],
+        'logo': {
+          'light': {'es': 'logo-light.png', 'en': 'logo-light.en.png'},
+          'dark': 'logo-dark.png',
+        },
+        'video': {
+          'demoCameras': [
+            {
+              'id': 'north',
+              'name': {'es': 'Arco norte', 'en': 'North goal'},
+              'url': 'demo/north.mp4',
+              'credit': {'es': 'Video: Canal · CC BY 3.0', 'en': 'Footage: Channel · CC BY 3.0'},
+            },
+          ],
+        },
+      }),
+    );
+    expect((brand.appNameIn('en'), brand.appNameIn('pt_BR'), brand.appName), ('Review', 'Review', 'Revisión'));
+    expect((brand.taglineIn('es'), brand.taglineIn('en')), ('Consultivo', 'Advisory'));
+    expect(brand.links.map((l) => l.labelIn('es')), ['Sala', 'IFAB']);
+    expect(brand.links.first.urlIn('en').query, 'lang=en');
+    expect(brand.links.last.labelIn('fr'), 'IFAB');
+    expect(brand.logoFor(dark: false, language: 'en'), 'assets/brand/logo-light.en.png');
+    expect(brand.logoFor(dark: false), 'assets/brand/logo-light.png');
+    expect(brand.logoFor(dark: true, language: 'en'), 'assets/brand/logo-dark.png');
+    final page = Uri.parse('https://x/');
+    expect(brand.demoCamerasOn(page, language: 'en').single.name, 'North goal');
+    expect(brand.demoCamerasOn(page).single.name, 'Arco norte');
+    expect(brand.demoCamerasOn(page, language: 'en').single.credit, 'Footage: Channel · CC BY 3.0');
+    expect(Brand.fromJson(_minimal({'appName': 'x'})).demoCamerasOn(page), isEmpty);
+    expect(() => Brand.fromJson(_minimal({'appName': {}})), throwsFormatException);
   });
 
   testWidgets('the wordmark shows the logo for the current mode', (tester) async {

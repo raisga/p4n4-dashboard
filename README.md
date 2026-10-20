@@ -234,7 +234,7 @@ The Feed tab (opt-in, `feed` in brand.json `tabs`) lists a project's live events
 }
 ```
 
-The upstream answers `GET <url>?limit=50&before=<next_before>` with:
+The upstream answers `GET <url>?limit=50&before=<next_before>&lang=<language>` with the text below (`lang` is the dashboard's language, e.g. `es`; an upstream may ignore it, or answer in it):
 
 ```json
 {
@@ -247,7 +247,8 @@ The upstream answers `GET <url>?limit=50&before=<next_before>` with:
       "tone": "info", "status": "pending_review",
       "actions": [{ "id": "attended", "label": "Attend" }, { "id": "dismissed", "label": "Dismiss" }],
       "meta": { "camera_id": "cam-04", "zone_id": "b-fitting" }, "synthetic": true,
-      "image": true, "link": { "label": "Open the clip", "url": "http://192.168.1.20:8090/clips/ALT-20261003-000001" }
+      "image": true, "link": { "label": "Open the clip", "url": "http://192.168.1.20:8090/clips/ALT-20261003-000001" },
+      "facts": ["Attended by ops"]
     }
   ],
   "counts": { "pending": 1 },
@@ -255,9 +256,11 @@ The upstream answers `GET <url>?limit=50&before=<next_before>` with:
 }
 ```
 
-Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended`, `confirmed` and `dismissed` are shown translated, other values as they are. An action posts `POST <url>/<id>/action` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
+Only `id` and `title` are required per item. `kind` is `alert` (for a person to review) or `event`; `tone` is `info`, `review` or `neutral`; `status` `pending_review`, `attended`, `confirmed` and `dismissed` are shown translated, other values as they are. `facts` is what the card says under the item, after its time (who reviewed it, say), for people to read; without it, the card lists `meta`'s values, which are otherwise for programs (`camera_id` names the camera a toast opens). An action posts `POST <url>/<id>/action?lang=<language>` with `{"action": "<id>", "by": "<username>"}`; p4n4-api lets only operators and admins do it, records it in the audit log, and leaves `actions` out of a normie's items.
 
 Tapping an item opens it in full, made for reviewing alerts one after another: its picture as large as the screen allows (pinch or scroll to zoom), everything it says, its link and its actions. The keyboard drives it: `1`, `2`… take the actions in order, `J`/`K` (or the arrows) move to the next or previous item, `Esc` goes back; after an action it moves on to the next item still to review. An item with `"image": true` has a picture (an alert's evidence, say): p4n4-api relays `GET <url>/<id>/image` (JPEG, PNG or WebP, up to 8 MB) with the feed's token, and pending alerts show it as a thumbnail in the list. `link` is a page about the item, such as the project's own review screen, opened in the browser; p4n4-api drops a link that isn't http(s).
+
+**Items the cameras' clips are about.** A demo can tie feed items to the clips its cameras loop: a recording's behaviour names the item's `id` ([Vision overlay](#vision-overlay)). While the Video tab plays such clips, the Feed tab shows those items only once their moment has played, at the top, with the time it played (a camera icon marks them), and moves each to the top again every time it comes round; it says it's waiting for the cameras until the first one does. Each toasts as its moment starts, in the item's own words, instead of when it's posted. Tapping the toast holds that camera on the moment; opening the item shows the moment in place of its picture. Either way the video is paused where the moment starts, with the overlay's boxes, and **Replay** plays it from 4 s before to its end, then holds it again (**Back to live** on the Video tab lets go). When the moment names the tracks it's about (and objects, such as the ball), a close-up of them sits in the top left corner, framed in red, at 4:3, about twice as close as the picture at most, and follows them through the replay (held for a second while the detector loses them; hidden when they're already big in the frame or off screen). It's a second copy of the video, held and replayed with the first and cut to the players, since a video can't be read back for its pixels on web. Items no clip names are listed as usual, and a view without the Video tab (or with the deployment's own cameras) gets the plain feed.
 
 ## Chats contract
 
@@ -314,14 +317,14 @@ A project can show what its vision model sees on the Video tab: a box on each pe
       "recording": {
         "duration": 15.0, "width": 480, "height": 270,
         "boxes": [[3.6, [[2, 0.35, 0.12, 0.67, 0.98, 0.91]]]],
-        "behaviors": [[3.5, 4.67, 2, "tries_on", 1.0]]
+        "behaviors": [[3.5, 4.67, 2, "tries_on", 1.0], [9.0, 14.0, -1, "tries_on", 1.0, "ALT-20261003-000001"]]
       }
     }
   }
 }
 ```
 
-- **Recorded**: a camera whose id has a `recording` and that plays a video file (a demo camera, or an MP4 in `dashboard.cameras`) gets its boxes and behaviours by the second of playback, so they follow the people in the clip. Its behaviours also run on a clock of their own from sign-in on, for anyone whose view has the Video tab: their alerts toast on every tab, whether or not that camera is on screen (or the tab paused), and the video jumps back in step with the clock when it plays. `boxes` are `[t, [[track, x1, y1, x2, y2, confidence], …]]`, normalised to the frame, with an optional 7th element, the person's kind (an index into `objects`, e.g. their team), which draws and names the box in that kind's colour; a box is interpolated between samples and held over gaps up to 0.4 s. `behaviors` are `[start, end, track, behaviour, confidence]` in seconds. An MJPEG stream has no playback position, so a recording isn't drawn over one.
+- **Recorded**: a camera whose id has a `recording` and that plays a video file (a demo camera, or an MP4 in `dashboard.cameras`) gets its boxes and behaviours by the second of playback, so they follow the people in the clip. Its behaviours also run on a clock of their own from sign-in on, for anyone whose view has the Video tab: their alerts toast on every tab, whether or not that camera is on screen (or the tab paused), and the video jumps back in step with the clock when it plays. `boxes` are `[t, [[track, x1, y1, x2, y2, confidence], …]]`, normalised to the frame, with an optional 7th element, the person's kind (an index into `objects`, e.g. their team), which draws and names the box in that kind's colour; a box is interpolated between samples and held over gaps up to 0.4 s. `behaviors` are `[start, end, track, behaviour, confidence]` in seconds, with an optional 6th element, the id of the [feed](#feed-contract) item the moment is about (where two overlap, the one that started last is the one going on), a 7th, the tracks it's about (e.g. a foul's offender and victim), and an 8th, the object kinds it's about too (e.g. the ball): a held moment shows those in a close-up. The feed item then shows up in the feed as the moment plays, and opens on it (see [Items the cameras' clips are about](#feed-contract)); its toast is the item's, not the rule's. An MJPEG stream has no playback position, so a recording isn't drawn over one.
 - **Live**: with `live` (a `ws(s)://` `url`, or a `port` and `path` on the connected host), the dashboard follows that WebSocket from sign-in on and draws over any camera it reports, MJPEG included. It expects two kinds of message: `{"type": "detection", "camera_id", "frame_width", "frame_height", "objects": [{"track_id", "confidence", "bbox": [x1, y1, x2, y2]}]}` in pixels (boxes without the frame size are not drawn), and `{"type": "verdict", "camera_id", "event_id", "track_id", "zone": {"id"}, "behavior": {"class", "confidence"}, "window": {"dwell_ms"}}`. Boxes go after 1.5 s without news and a verdict after its dwell (8 s at least). It reconnects on its own, backing off to 30 s. The browser connects straight to it, as it does to the cameras.
 - **Alerts**: the first rule whose `behaviors` has the behaviour, and whose `zones` (if any) include the verdict's zone or, for a recording, one of the camera's `zones`, wins. Labels are by language code, falling back to English, then Spanish. The same alert on the same camera toasts once a minute (a demo clip loops every few seconds), and its flag on the camera shows every time.
 

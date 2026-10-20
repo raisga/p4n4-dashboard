@@ -288,7 +288,7 @@ List<_Category> _categories(BuildContext context) {
       Icons.info_outline,
       l.sectionAbout,
       summary: '',
-      keywords: [l.licenses, for (final link in brand.links) link.label],
+      keywords: [l.licenses, for (final link in brand.links) link.labelIn(l.localeName)],
       build: (_) => const _AboutPage(),
     ),
   ];
@@ -2293,9 +2293,9 @@ class _AboutPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Wordmark(size: 22),
-                  if (brand.tagline.isNotEmpty) ...[
+                  if (brand.taglineIn(l.localeName) case final tagline when tagline.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(brand.tagline, style: p4.body(size: 13, color: p4.muted)),
+                    Text(tagline, style: p4.body(size: 13, color: p4.muted)),
                   ],
                 ],
               ),
@@ -2307,15 +2307,15 @@ class _AboutPage extends StatelessWidget {
             for (final link in brand.links)
               _Tile(
                 icon: Icons.open_in_new,
-                title: link.label,
-                onTap: () => launchUrl(link.url, mode: LaunchMode.externalApplication),
+                title: link.labelIn(l.localeName),
+                onTap: () => launchUrl(link.urlIn(l.localeName), mode: LaunchMode.externalApplication),
               ),
             // Fonts, Flutter and every package the app ships with.
             _Tile(
               icon: Icons.gavel_outlined,
               title: l.licenses,
               trailing: Icon(Icons.chevron_right, color: p4.muted),
-              onTap: () => showLicensePage(context: context, applicationName: brand.appName),
+              onTap: () => showLicensePage(context: context, applicationName: brand.appNameIn(l.localeName)),
             ),
           ],
         ),

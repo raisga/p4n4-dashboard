@@ -6,15 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:p4n4_dashboard/api/auth.dart' show AuthMode;
+import 'package:p4n4_dashboard/api/camera.dart';
 import 'package:p4n4_dashboard/api/feed.dart';
 import 'package:p4n4_dashboard/api/project.dart';
 import 'package:p4n4_dashboard/core/brand.dart';
+import 'package:p4n4_dashboard/core/feed_moments.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/session.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/core/theme.dart';
 import 'package:p4n4_dashboard/l10n/app_localizations.dart';
 import 'package:p4n4_dashboard/tabs/feed_tab.dart';
+import 'package:p4n4_dashboard/widgets/moment_view.dart';
 import 'package:p4n4_dashboard/widgets/rich_message.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -152,6 +155,26 @@ void main() {
       expect(page.items.last.alert, isFalse);
     });
 
+    test('in the reader\'s language; what an item says under it, else its meta', () async {
+      final asked = <Uri>[];
+      final page = await http.runWithClient(
+        () async {
+          await api.act('ALT-1', 'attended', lang: 'en');
+          return api.page(lang: 'es');
+        },
+        () => MockClient((r) async {
+          asked.add(r.url);
+          if (r.method == 'POST') return _json({'action': 'attended', 'item': {}});
+          final feed = _feed();
+          (feed['items'] as List).first['facts'] = ['Revisado por power', '“Claro”'];
+          return _json(feed);
+        }),
+      );
+      expect(asked.map((u) => u.queryParameters['lang']), ['en', 'es']);
+      expect(page.items.first.shownFacts, ['Revisado por power', '“Claro”']);
+      expect(page.items.last.shownFacts, isEmpty);
+    });
+
     test('acts with the action as the body', () async {
       late http.Request sent;
       await http.runWithClient(
@@ -207,8 +230,9 @@ void main() {
     Future<List<http.Request>> pump(
       WidgetTester tester,
       Role role,
-      Future<http.Response> Function(http.Request) handler,
-    ) async {
+      Future<http.Response> Function(http.Request) handler, {
+      FeedMoments? moments,
+    }) async {
       final requests = <http.Request>[];
       SharedPreferences.setMockInitialValues({'tourSeen': true, 'role': role.name, 'locale': 'en'});
       final brand = loadBrand('p4n4');
@@ -231,7 +255,7 @@ void main() {
                     localizationsDelegates: AppLocalizations.localizationsDelegates,
                     supportedLocales: AppLocalizations.supportedLocales,
                     locale: const Locale('en'),
-                    home: const Scaffold(body: FeedTab(active: false)),
+                    home: Scaffold(body: FeedTab(active: false, moments: moments)),
                   ),
                 ),
               ),
@@ -335,6 +359,31 @@ void main() {
       await tester.pump();
       expect(find.text('2 of 2'), findsOneWidget);
       expect(find.text('Takes garment'), findsWidgets);
+    });
+
+    testWidgets('what the clips are about shows up as it plays, newest first, and opens on its moment', (tester) async {
+      final moments = FeedMoments()..link({'ALT-20261003-000001', 'EVT-20261003-000007'});
+      addTearDown(moments.dispose);
+      await pump(tester, Role.power, (_) async => _json(_feed()), moments: moments);
+      expect(find.text('Waiting for the cameras'), findsOneWidget);
+      expect(find.text('Fitting room assistance'), findsNothing);
+
+      const cam = Camera(id: 'demo-boutique-cam-04', name: 'Fitting rooms', url: 'http://edge/clips/cam-04.mp4');
+      moments.played('ALT-20261003-000001', cam, 4, 9);
+      await tester.pump();
+      expect(find.text('Fitting room assistance'), findsOneWidget);
+      expect(find.text('Takes garment'), findsNothing);
+      moments.played('EVT-20261003-000007', cam, 12, 15);
+      await tester.pump();
+      final top = tester.getTopLeft(find.text('Takes garment')).dy;
+      expect(top, lessThan(tester.getTopLeft(find.text('Fitting room assistance')).dy));
+
+      await tester.tap(find.text('Fitting room assistance'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      final view = tester.widget<MomentView>(find.byType(MomentView));
+      expect((view.moment.item, view.moment.start), ('ALT-20261003-000001', 4.0));
+      expect(find.text('Replay'), findsOneWidget);
     });
 
     testWidgets('viewers open an item without its actions', (tester) async {

@@ -1413,6 +1413,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get feedEmptyMsg => 'Los eventos y las alertas aparecen aquí a medida que ocurren.';
 
   @override
+  String get feedWaiting => 'Esperando a las cámaras';
+
+  @override
+  String get feedWaitingMsg => 'Las alertas de los clips de las cámaras aparecen aquí cuando su momento se reproduce.';
+
+  @override
+  String get momentHeld => 'En pausa en el momento';
+
+  @override
+  String get momentReplaying => 'Repitiendo';
+
+  @override
+  String get momentReplay => 'Repetir';
+
+  @override
+  String get momentLive => 'Volver al directo';
+
+  @override
   String get feedNotSetUp => 'Sin actividad';
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:p4n4_dashboard/core/runtime_config.dart';
+import 'package:p4n4_dashboard/core/role.dart';
 import 'package:p4n4_dashboard/core/secrets.dart';
 import 'package:p4n4_dashboard/core/settings.dart';
 import 'package:p4n4_dashboard/widgets/mjpeg_view.dart';
@@ -94,6 +95,19 @@ void main() {
       s.grafanaKiosk = false;
       s.grafanaPath = '/';
       expect(s.grafanaUri, Uri.parse('https://edge.lan/grafana/'));
+    });
+
+    test('a Grafana page per language, unless this device set one', () async {
+      final s = await load({
+        'host': 'pi.lan',
+        'locale': 'es',
+        'grafanaPath': {'es': '/d/review/revision', 'en': '/d/review-en/review'},
+      });
+      expect(s.grafanaPath, '/d/review/revision');
+      expect(s.grafanaUriFor(Role.admin, language: 'en').path, '/d/review-en/review');
+      expect(s.grafanaPathIn('fr'), '/d/review-en/review');
+      s.grafanaPath = '/d/mine';
+      expect(s.grafanaUriFor(Role.admin, language: 'en').path, '/d/mine');
     });
 
     test('resetting the connection brings the defaults back, and keeps cameras', () async {

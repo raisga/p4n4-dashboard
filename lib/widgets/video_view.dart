@@ -18,11 +18,53 @@ bool get videoPlayerSupported =>
 /// Where playback is: seconds into the file, and the frame's size once known.
 typedef VideoPlayback = ({double seconds, Size? size});
 
+/// Whose footage a camera plays ([Camera.credit]), small in the corner of
+/// its picture, [bottom] above its foot (a grid tile's name bar).
+class VideoCredit extends StatelessWidget {
+  const VideoCredit(this.text, {super.key, this.bottom = 0});
+
+  final String text;
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    right: 8,
+    bottom: bottom + 8,
+    child: IgnorePointer(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          color: Colors.black54,
+          child: Text(
+            text,
+            textAlign: TextAlign.right,
+            style: context.p4.body(size: 10.5, color: P4Colors.dark.text),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A video held on one moment: paused [at] seconds into the file. Each bump of
+/// [replay] plays it again from [from] to [to], then holds it at [at] again.
+typedef VideoHold = ({double at, double from, double to, int replay});
+
 /// A video-file camera (MP4, WebM, HLS): played muted and on a loop, paused
 /// while not [active]. The counterpart of `MjpegView` for recorded or demo
 /// footage.
 class VideoView extends StatefulWidget {
-  const VideoView({super.key, required this.uri, this.active = true, this.overlay, this.syncTo});
+  const VideoView({
+    super.key,
+    required this.uri,
+    this.active = true,
+    this.overlay,
+    this.syncTo,
+    this.hold,
+    this.onReplayed,
+    this.chrome = true,
+  });
 
   final Uri uri;
 
@@ -39,6 +81,17 @@ class VideoView extends StatefulWidget {
   /// [VideoViewState.drift] away.
   final double? Function()? syncTo;
 
+  /// Holds playback on a moment instead (an alert's, opened from its toast or
+  /// the feed); [syncTo] doesn't apply while it's held.
+  final VideoHold? hold;
+
+  /// A replay of [hold] has reached its end, and the video holds again.
+  final VoidCallback? onReplayed;
+
+  /// Its badge, spinner and errors; false for a copy shown inside another
+  /// (a held moment's close-up), which is the picture alone.
+  final bool chrome;
+
   @override
   State<VideoView> createState() => VideoViewState();
 }
@@ -50,6 +103,12 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
   /// Web: bumped to recreate the `<video>`, which reloads it.
   int _load = 0;
   bool _playing = false;
+
+  /// Playing [VideoView.hold] again, until it reaches its end.
+  bool _replaying = false;
+
+  /// Whether the file should be playing now.
+  bool get _wantsPlay => widget.active && (widget.hold == null || _replaying);
 
   /// Web: reads the `<video>`'s own position.
   VideoClock? _clock;
@@ -83,11 +142,38 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uri != widget.uri) {
       reconnect();
-    } else if (oldWidget.active != widget.active) {
-      final c = _controller;
-      if (c != null && c.value.isInitialized) widget.active ? c.play() : c.pause();
+    } else {
+      _holdChanged(oldWidget.hold);
+      if (oldWidget.active != widget.active || oldWidget.hold != widget.hold) _applyPlay();
     }
     _follow();
+  }
+
+  /// Held on a new moment: there, paused. The same moment's [VideoHold.replay]
+  /// bumped: from its start, playing. Let go: back to playing.
+  void _holdChanged(VideoHold? old) {
+    final hold = widget.hold;
+    if (hold == old) return;
+    final same = old != null && hold != null && (old.at, old.from, old.to) == (hold.at, hold.from, hold.to);
+    _replaying = same && hold.replay != old.replay;
+    if (hold != null) _seek(_replaying ? hold.from : hold.at);
+  }
+
+  /// Plays or pauses the player as [_wantsPlay] says (web: the `<video>` follows its `playing`).
+  void _applyPlay() {
+    final c = _controller;
+    if (c != null && c.value.isInitialized) _wantsPlay ? c.play() : c.pause();
+  }
+
+  void _seek(double seconds) {
+    if (kIsWeb) {
+      _clock?.seek(seconds);
+    } else {
+      _controller?.seekTo(Duration(microseconds: (seconds * 1e6).round()));
+    }
+    _sinceSeek
+      ..reset()
+      ..start();
   }
 
   @override
@@ -100,7 +186,7 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
 
   /// Ticks only while there's something to keep in step and the video plays.
   void _follow() {
-    final follow = (widget.overlay != null || widget.syncTo != null) && widget.active;
+    final follow = (widget.overlay != null || widget.syncTo != null || widget.hold != null) && widget.active;
     if (follow && !_ticker.isActive) {
       _ticker.start();
     } else if (!follow && _ticker.isActive) {
@@ -113,6 +199,7 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
       final clock = _clock;
       if (clock == null || !_playing) return;
       _playback.value = (seconds: clock.seconds, size: clock.size);
+      if (widget.hold case final hold?) return _held(hold, clock.seconds);
       _sync(clock.seconds, clock.duration, clock.seek);
       return;
     }
@@ -128,6 +215,7 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
     final ahead = v.isPlaying ? _sinceReport.elapsedMicroseconds * v.playbackSpeed : 0;
     final seconds = (v.position.inMicroseconds + ahead) / 1e6;
     _playback.value = (seconds: seconds, size: v.size.isEmpty ? null : v.size);
+    if (widget.hold case final hold?) return _held(hold, seconds);
     if (v.isPlaying) {
       _sync(seconds, v.duration.inMicroseconds / 1e6, (s) => c.seekTo(Duration(microseconds: (s * 1e6).round())));
     }
@@ -145,6 +233,21 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
     _sinceSeek
       ..reset()
       ..start();
+  }
+
+  /// Keeps a held video on its moment, and ends a replay at the moment's end
+  /// (or if it went round the loop's seam).
+  void _held(VideoHold hold, double at) {
+    if (_sinceSeek.isRunning && _sinceSeek.elapsed < const Duration(milliseconds: 500)) return;
+    if (_replaying) {
+      if (at >= hold.from - drift && at < hold.to) return;
+      setState(() => _replaying = false);
+      _applyPlay();
+      _seek(hold.at);
+      widget.onReplayed?.call();
+    } else if ((at - hold.at).abs() > 0.25) {
+      _seek(hold.at);
+    }
   }
 
   /// Loads the file again from the start.
@@ -180,7 +283,11 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
       if (_controller != c) return;
       await c.setVolume(0);
       await c.setLooping(true);
-      if (widget.active) await c.play();
+      if (_wantsPlay) {
+        await c.play();
+      } else if (widget.hold case final hold?) {
+        _seek(hold.at);
+      }
     } catch (e) {
       if (_controller != c) return;
       _close();
@@ -200,13 +307,15 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
           HtmlVideo(
             key: ValueKey(_load),
             uri: widget.uri,
-            playing: widget.active,
-            onPlaying: () => setState(() {
-              _playing = true;
-              _error = null;
-            }),
+            playing: _wantsPlay,
+            onPlaying: _shown,
+            // A held video shows its frame without playing.
+            onLoaded: _shown,
             onError: () => setState(() => _error = l.cameraUnavailable),
-            onClock: (clock) => _clock = clock,
+            onClock: (clock) {
+              _clock = clock;
+              if (widget.hold case final hold?) _seek(hold.at);
+            },
           )
         else if (!videoPlayerSupported)
           _message(
@@ -226,9 +335,14 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
                   Center(
                     child: AspectRatio(aspectRatio: v.aspectRatio, child: VideoPlayer(c)),
                   )
-                else
+                else if (widget.chrome)
                   Center(child: CircularProgressIndicator(color: p4.accent)),
-                if (v.hasError) _failed(v.errorDescription ?? l.cameraUnavailable) else if (v.isInitialized) _badge(),
+                if (!widget.chrome)
+                  const SizedBox.shrink()
+                else if (v.hasError)
+                  _failed(v.errorDescription ?? l.cameraUnavailable)
+                else if (v.isInitialized)
+                  _badge(),
               ],
             ),
           ),
@@ -237,12 +351,22 @@ class VideoViewState extends State<VideoView> with SingleTickerProviderStateMixi
             valueListenable: _playback,
             builder: (context, playback, _) => playback == null ? const SizedBox.shrink() : overlay(context, playback),
           ),
-        if (kIsWeb && widget.active && !_playing && _error == null)
+        if (widget.chrome && kIsWeb && widget.active && !_playing && _error == null)
           Center(child: CircularProgressIndicator(color: p4.accent)),
-        if (_error != null) _failed('$_error') else if (kIsWeb && _playing) _badge(),
+        if (!widget.chrome)
+          const SizedBox.shrink()
+        else if (_error != null)
+          _failed('$_error')
+        else if (kIsWeb && _playing)
+          _badge(),
       ],
     );
   }
+
+  void _shown() => setState(() {
+    _playing = true;
+    _error = null;
+  });
 
   Widget _failed(String error) => _message(
     error,

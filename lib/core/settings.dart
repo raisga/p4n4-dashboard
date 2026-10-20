@@ -431,7 +431,27 @@ class AppSettings extends ChangeNotifier {
   String get grafanaBase => _str('grafanaBase', '');
   set grafanaBase(String v) => _set('grafanaBase', v.trim());
 
-  String get grafanaPath => _str('grafanaPath', '/');
+  /// The Grafana page: the one set on this device, else the project's or the
+  /// brand's default, which may be one page per language ({language: path},
+  /// e.g. a dashboard and its translation); here in the brand's own language,
+  /// see [grafanaPathIn].
+  String get grafanaPath => grafanaPathIn(null);
+
+  /// [grafanaPath] for a reader of [language] (a code such as `es`).
+  String grafanaPathIn(String? language) => switch (_raw('grafanaPath', null)) {
+    String v => v,
+    _ => switch (_project?.defaults['grafanaPath'] ?? _defaults['grafanaPath']) {
+      String v => v,
+      Map m => brandText(m.cast<String, String>(), language ?? _language) ?? '/',
+      _ => '/',
+    },
+  };
+
+  /// The brand's first-run language, for what can only be in one.
+  String get _language => switch (_defaults['locale']) {
+    String v => v,
+    _ => 'en',
+  };
   set grafanaPath(String v) => _set('grafanaPath', v.trim().isEmpty ? '/' : v.trim());
 
   bool get grafanaKiosk => _bool('grafanaKiosk', true);
@@ -443,10 +463,10 @@ class AppSettings extends ChangeNotifier {
   Uri get grafanaHome => grafanaBase.isNotEmpty ? baseUri(grafanaBase) : url(3000, '/');
 
   /// The Grafana page [view] opens: its own (Settings → Views), else the
-  /// deployment's. Normies always get kiosk mode: Grafana's menus aren't theirs.
-  Uri grafanaUriFor(Role view) {
+  /// deployment's, in [language]. Normies always get kiosk mode: Grafana's menus aren't theirs.
+  Uri grafanaUriFor(Role view, {String? language}) {
     final base = grafanaHome;
-    final path = prefsFor(view).grafanaPath ?? grafanaPath;
+    final path = prefsFor(view).grafanaPath ?? grafanaPathIn(language);
     // Relative to the base, so a proxy prefix (/grafana/) is kept.
     final u = base.resolve(path.replaceFirst(RegExp('^/+'), ''));
     if (!grafanaKiosk && view != Role.normie) return u;
@@ -483,8 +503,8 @@ class AppSettings extends ChangeNotifier {
   /// device, else [defaultServiceUri]. Grafana opens at [grafanaHome] for
   /// admins and power users, and at the view's own page, in kiosk mode, for
   /// normies (see [grafanaUriFor]).
-  Uri serviceUri(ServiceDef def, {Role view = Role.admin}) {
-    if (def.id == 'grafana') return view.technical ? grafanaHome : grafanaUriFor(view);
+  Uri serviceUri(ServiceDef def, {Role view = Role.admin, String? language}) {
+    if (def.id == 'grafana') return view.technical ? grafanaHome : grafanaUriFor(view, language: language);
     final own = serviceUrls[def.id];
     return own != null ? pageUri(own) : defaultServiceUri(def);
   }

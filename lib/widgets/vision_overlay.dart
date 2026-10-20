@@ -63,6 +63,7 @@ class VisionOverlay extends StatelessWidget {
     this.frame,
     this.detailed = false,
     this.bottomInset = 0,
+    this.kinds,
   });
 
   final VisionScene scene;
@@ -77,6 +78,9 @@ class VisionOverlay extends StatelessWidget {
 
   /// Space to leave at the bottom (the grid's caption bar).
   final double bottomInset;
+
+  /// The kinds this camera shows ([VisionRecording.kinds]), for the key; null: every kind the bundle has.
+  final Set<int>? kinds;
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +160,8 @@ class VisionOverlay extends StatelessWidget {
                   left: 10,
                   child: _Key([
                     (context.l10n.visionPerson, people),
-                    for (final (i, _) in bundle.objects.indexed) (bundle.objectLabel(i, lang), objectColor(i)),
+                    for (final (i, _) in bundle.objects.indexed)
+                      if (kinds?.contains(i) ?? true) (bundle.objectLabel(i, lang), objectColor(i)),
                   ]),
                 ),
               if (tone != null) Positioned.fill(child: _AlertRing(color: tone)),

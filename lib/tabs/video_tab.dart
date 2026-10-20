@@ -6,6 +6,7 @@ import '../api/vision.dart';
 import '../api/vision_live.dart';
 import '../api/vision_recorded.dart';
 import '../core/brand.dart';
+import '../core/feed_moments.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -13,16 +14,17 @@ import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/device_camera_view.dart';
 import '../widgets/mjpeg_view.dart';
+import '../widgets/moment_view.dart';
 import '../widgets/video_view.dart';
 import '../widgets/vision_overlay.dart';
 
 /// The cameras the Video tab shows: the deployment's, or while
 /// [AppSettings.videoDemo] is on, the brand's demo cameras
-/// ([Brand.demoCameras]), else the built-in [demoCameras]. For [view], only
-/// those an admin lets it see (Settings → Views).
-List<Camera> videoCameras(AppSettings s, Brand brand, {Role view = Role.admin}) {
+/// ([Brand.demoCameras], named in [language]), else the built-in [demoCameras].
+/// For [view], only those an admin lets it see (Settings → Views).
+List<Camera> videoCameras(AppSettings s, Brand brand, {Role view = Role.admin, String? language}) {
   final prefs = s.prefsFor(view);
-  final branded = brand.demoCamerasOn(kIsWeb ? Uri.base : null);
+  final branded = brand.demoCamerasOn(kIsWeb ? Uri.base : null, language: language);
   final all = !s.videoDemo ? s.cameras : (branded.isEmpty ? demoCameras : branded);
   return [
     for (final c in all)
@@ -39,6 +41,10 @@ String? alertCamera(String? id, List<Camera> cameras) {
   return ids.contains(id) ? id : (ids.contains('demo-$id') ? 'demo-$id' : null);
 }
 
+/// What the Video tab shows on its own when an alert's toast is tapped: the
+/// alert's [camera], held on the clip's [moment] the alert is about, if any.
+typedef VideoFocus = ({String camera, FeedMoment? moment});
+
 /// Live camera feeds from the edge device (MJPEG streams, JPEG snapshots or
 /// video files) or from the device the dashboard runs on (`device:back`,
 /// `device:front`): all of them in a grid ([AppSettings.videoGrid]), or one
@@ -51,7 +57,9 @@ String? alertCamera(String? id, List<Camera> cameras) {
 /// whose clock is [recorded]'s; on any camera, the [live] stream's. A
 /// behaviour that asks for an alert flags the camera. The toasts come from
 /// [recorded] and [live] themselves (HomeShell), so they come up on every
-/// tab, whether or not the camera is on screen.
+/// tab, whether or not the camera is on screen. Tapping a toast about a
+/// moment of a clip ([focus]) holds that camera on it ([MomentView]) until
+/// *Back to live*.
 class VideoTab extends StatefulWidget {
   const VideoTab({super.key, required this.active, this.live, this.recorded, this.focus});
 
@@ -64,7 +72,7 @@ class VideoTab extends StatefulWidget {
   final RecordedVision? recorded;
 
   /// A camera to show on its own (an alert's toast was tapped); taken and cleared.
-  final ValueNotifier<String?>? focus;
+  final ValueNotifier<VideoFocus?>? focus;
 
   @override
   State<VideoTab> createState() => _VideoTabState();
@@ -84,6 +92,9 @@ class _VideoTabState extends State<VideoTab> {
   bool? _grid;
   bool? _gridSetting;
   bool _paused = false;
+
+  /// The moment the selected camera is held on, from a toast; null: live.
+  FeedMoment? _moment;
 
   GlobalKey _key(Camera c) => _views.putIfAbsent(c.id, GlobalKey.new);
 
@@ -110,11 +121,12 @@ class _VideoTabState extends State<VideoTab> {
   }
 
   void _takeFocus() {
-    final id = widget.focus?.value;
-    if (id == null || !mounted) return;
+    final focus = widget.focus?.value;
+    if (focus == null || !mounted) return;
     widget.focus!.value = null;
     setState(() {
-      _selectedId = id;
+      _selectedId = focus.camera;
+      _moment = focus.moment;
       _grid = false;
     });
   }
@@ -164,7 +176,7 @@ class _VideoTabState extends State<VideoTab> {
     final session = SessionScope.of(context);
     final demo = s.videoDemo;
     final brand = BrandScope.of(context);
-    final cameras = videoCameras(s, brand, view: session.role ?? Role.normie);
+    final cameras = videoCameras(s, brand, view: session.role ?? Role.normie, language: l.localeName);
     final credits = brand.demoCamerasOn(kIsWeb ? Uri.base : null).isEmpty
         ? l.videoDemoCredits
         : brand.demoCreditsFor(l.localeName);
@@ -184,6 +196,7 @@ class _VideoTabState extends State<VideoTab> {
     }
     final grid = (_grid ?? s.videoGrid) && cameras.length > 1;
     final shown = grid ? cameras : [?selected];
+    final moment = !grid && _moment?.camera.id == selected?.id ? _moment : null;
 
     return Column(
       children: [
@@ -195,6 +208,12 @@ class _VideoTabState extends State<VideoTab> {
               Icon(Icons.videocam_outlined, color: p4.accent, size: 20),
               const SizedBox(width: 10),
               Expanded(child: _title(cameras, selected, grid, technical)),
+              if (moment != null)
+                TextButton.icon(
+                  onPressed: () => setState(() => _moment = null),
+                  icon: const Icon(Icons.sensors, size: 18),
+                  label: Text(l.momentLive),
+                ),
               if (shown.isNotEmpty) ...[
                 IconButton(
                   tooltip: _paused ? l.resumeTooltip : l.pauseTooltip,
@@ -210,7 +229,10 @@ class _VideoTabState extends State<VideoTab> {
               if (cameras.length > 1)
                 IconButton(
                   tooltip: grid ? l.singleCamera : l.allCameras,
-                  onPressed: () => setState(() => _grid = !grid),
+                  onPressed: () => setState(() {
+                    _grid = !grid;
+                    _moment = null;
+                  }),
                   icon: Icon(grid ? Icons.crop_square : Icons.grid_view, size: 20),
                 ),
               // Demo cameras are a setting: admins only.
@@ -247,6 +269,11 @@ class _VideoTabState extends State<VideoTab> {
               ],
             ),
             _ when grid => _gridView(cameras),
+            _ when moment != null => MomentView(
+              key: ValueKey((moment.item, moment.start)),
+              moment: moment,
+              active: widget.active && !_paused,
+            ),
             final c => _view(c),
           },
         ),
@@ -286,7 +313,10 @@ class _VideoTabState extends State<VideoTab> {
           underline: const SizedBox.shrink(),
           dropdownColor: p4.bg2,
           style: style.copyWith(color: p4.text),
-          onChanged: (id) => setState(() => _selectedId = id),
+          onChanged: (id) => setState(() {
+            _selectedId = id;
+            _moment = null;
+          }),
           items: [for (final c in cameras) DropdownMenuItem(value: c.id, child: Text(c.name))],
         ),
         if (url != null) ...[const SizedBox(width: 12), Expanded(child: url)],
@@ -301,7 +331,16 @@ class _VideoTabState extends State<VideoTab> {
     return (devices.where((c) => c.id == _selectedId).firstOrNull ?? devices.firstOrNull)?.id;
   }
 
+  /// [c]'s viewer, with its credit when it plays someone else's footage: on
+  /// its own, where there's room (a grid tile is too small to read one; the
+  /// caption under the grid names every source).
   Widget _view(Camera c, {String? liveDevice, bool inGrid = false}) {
+    final view = _viewer(c, liveDevice: liveDevice, inGrid: inGrid);
+    if (c.credit == null || inGrid) return view;
+    return Stack(fit: StackFit.expand, children: [view, VideoCredit(c.credit!)]);
+  }
+
+  Widget _viewer(Camera c, {String? liveDevice, bool inGrid = false}) {
     final s = SettingsScope.of(context);
     // An admin can turn the overlay off for a view (Settings → Views).
     final bundle = s.prefsFor(SessionScope.of(context).role ?? Role.normie).overlay ? s.vision : null;
@@ -311,6 +350,7 @@ class _VideoTabState extends State<VideoTab> {
     Widget overlay(VisionScene scene, Size? frame) => VisionOverlay(
       scene: scene,
       bundle: bundle!,
+      kinds: recording?.kinds,
       zones: vc?.zones ?? const [],
       frame: frame,
       detailed: !inGrid,
@@ -387,6 +427,7 @@ class _VideoTabState extends State<VideoTab> {
                       onTap: () => setState(() {
                         _selectedId = c.id;
                         _grid = false;
+                        _moment = null;
                       }),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

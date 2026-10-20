@@ -515,8 +515,11 @@ String _address(Uri uri) => uri.hasPort ? '${uri.host}:${uri.port}${uri.path == 
 /// Where [def] opens for [context]'s view: Grafana in the app's theme, the
 /// others at their URL (Settings → Endpoints, the project's or the port).
 Uri serviceUriFor(BuildContext context, ServiceDef def) {
-  final uri = SettingsScope.of(context).serviceUri(def, view: SessionScope.of(context).role ?? Role.normie);
-  return def.id == 'grafana' ? themedGrafanaUri(uri, Theme.of(context).brightness) : uri;
+  final uri = SettingsScope.of(context)
+      .serviceUri(def, view: SessionScope.of(context).role ?? Role.normie, language: context.l10n.localeName);
+  return def.id == 'grafana'
+      ? themedGrafanaUri(uri, Theme.of(context).brightness, language: context.l10n.localeName)
+      : uri;
 }
 
 /// Opens [def] in the browser; says so if it can't, without the URL for normies.

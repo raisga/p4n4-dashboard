@@ -7,15 +7,40 @@ import '../demo/demo_charts.dart';
 import '../l10n/l10n.dart';
 import '../widgets/service_viewer.dart';
 
-/// [uri] in the app's light or dark mode: Grafana's `theme` parameter
-/// overrides the signed-in user's own theme for that page load.
-/// [grafanaKeepQuery] keeps it across Grafana's sign-in.
-Uri themedGrafanaUri(Uri uri, Brightness brightness) =>
-    uri.replace(queryParameters: {...uri.queryParameters, 'theme': brightness.name});
+/// [uri] in the app's light or dark mode and, given one, its [language]:
+/// Grafana's `theme` and `lang` parameters override the signed-in user's own
+/// for that page load, so Grafana's menus and pickers speak the app's
+/// language. [grafanaKeepQuery] keeps them across Grafana's sign-in.
+Uri themedGrafanaUri(Uri uri, Brightness brightness, {String? language}) => uri.replace(
+  queryParameters: {
+    ...uri.queryParameters,
+    'theme': brightness.name,
+    if (language != null) 'lang': grafanaLanguage(language),
+  },
+);
+
+/// Grafana's name for a dashboard language (a code such as `es`, or a locale
+/// name such as `pt_BR`): its regional tags, which it requires.
+String grafanaLanguage(String language) {
+  final code = language.split(RegExp('[_-]')).first.toLowerCase();
+  return switch (code) {
+    'en' => 'en-US',
+    'es' => 'es-ES',
+    'fr' => 'fr-FR',
+    'de' => 'de-DE',
+    'it' => 'it-IT',
+    'nl' => 'nl-NL',
+    'pt' => 'pt-BR',
+    'ja' => 'ja-JP',
+    'ko' => 'ko-KR',
+    'zh' => 'zh-Hans',
+    _ => 'en-US',
+  };
+}
 
 /// [ServiceViewer.keepQuery] for Grafana: its sign-in lands on its home
-/// without `theme`, in the user's own theme.
-const grafanaKeepQuery = {'theme'};
+/// without `theme` and `lang`, in the user's own.
+const grafanaKeepQuery = {'theme', 'lang'};
 
 /// Embedded Grafana (kiosk mode by default), in the app's light or dark mode:
 /// the [ServiceViewer], at the view's own page if an admin set one (Settings
@@ -31,8 +56,9 @@ class GrafanaTab extends StatelessWidget {
     final technical = session.isTechnical;
     final l = context.l10n;
     final uri = themedGrafanaUri(
-      SettingsScope.of(context).grafanaUriFor(session.role ?? Role.normie),
+      SettingsScope.of(context).grafanaUriFor(session.role ?? Role.normie, language: l.localeName),
       Theme.of(context).brightness,
+      language: l.localeName,
     );
     // Grafana must allow framing (GF_SECURITY_ALLOW_EMBEDDING=true), or be
     // served through the dashboard's proxy (/grafana/); Open in browser still works.

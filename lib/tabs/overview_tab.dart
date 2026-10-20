@@ -145,7 +145,7 @@ class _OverviewTabState extends State<OverviewTab> {
       onRefresh: _refresh,
       children: [
         PageHeader(
-          title: brand.appName,
+          title: brand.appNameIn(l.localeName),
           subtitle: checkedAt == null ? null : l.summaryUpdated(context.formats.clock(checkedAt)),
           trailing: RefreshButton(busy: _loading, onPressed: _refresh),
         ),

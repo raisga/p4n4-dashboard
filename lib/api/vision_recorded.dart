@@ -58,6 +58,9 @@ class RecordedVision {
     }
   }
 
+  /// The feed items the followed cameras' clips have moments about.
+  Set<String> get feedItems => {for (final t in _tracks.values) ...t.recording.feedItems};
+
   /// Seconds into [camera]'s clip by its clock, if it's followed.
   double? secondsOf(String camera) {
     final t = _tracks[camera];

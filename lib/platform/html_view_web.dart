@@ -139,13 +139,24 @@ class _HtmlImageState extends State<HtmlImage> {
 /// HLS where the browser plays it). Like an `<img>`, it needs no CORS headers.
 /// [playing] pauses and resumes it in place; give it a new key to reload.
 class HtmlVideo extends StatefulWidget {
-  const HtmlVideo({super.key, required this.uri, this.playing = true, this.onPlaying, this.onError, this.onClock});
+  const HtmlVideo({
+    super.key,
+    required this.uri,
+    this.playing = true,
+    this.onPlaying,
+    this.onLoaded,
+    this.onError,
+    this.onClock,
+  });
 
   final Uri uri;
   final bool playing;
 
   /// Each time playback starts or resumes.
   final VoidCallback? onPlaying;
+
+  /// Once its first frame is there, playing or not.
+  final VoidCallback? onLoaded;
   final VoidCallback? onError;
 
   /// Once the `<video>` exists: reads where it is, for drawing over it.
@@ -196,6 +207,7 @@ class _HtmlVideoState extends State<HtmlVideo> {
         ..style.height = '100%'
         ..style.objectFit = 'contain'
         ..onplaying = ((web.Event _) => widget.onPlaying?.call()).toJS
+        ..onloadeddata = ((web.Event _) => widget.onLoaded?.call()).toJS
         ..onerror = ((web.Event _) => widget.onError?.call()).toJS
         ..src = widget.uri.toString();
       widget.onClock?.call(_ElementClock(video));

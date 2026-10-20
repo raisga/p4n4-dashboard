@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'api/auth.dart';
 import 'api/banner.dart';
+import 'api/camera.dart';
 import 'api/feed.dart';
 import 'api/metrics_monitor.dart';
 import 'api/project.dart';
@@ -19,6 +20,7 @@ import 'api/vision_recorded.dart';
 import 'core/alerts.dart';
 import 'core/brand.dart';
 import 'core/chat_history.dart';
+import 'core/feed_moments.dart';
 import 'core/incidents.dart';
 import 'core/runtime_config.dart';
 import 'core/session.dart';
@@ -178,7 +180,8 @@ class _DashboardAppState extends State<DashboardApp> {
     final (idleAfter, onIdle) = _idle(settings, session);
     final app = MaterialApp(
       navigatorKey: _navigator,
-      title: brand.appName,
+      // The window's title in the app's language
+      onGenerateTitle: (context) => brand.appNameIn(Localizations.localeOf(context).languageCode),
       debugShowCheckedModeBanner: false,
       theme: theme(brand.light),
       darkTheme: theme(brand.dark),
@@ -341,7 +344,10 @@ class _HomeShellState extends State<HomeShell> {
   ViewPrefs get _prefs => SettingsScope.of(context).prefsFor(SessionScope.of(context).role ?? Role.normie);
 
   /// A camera for the Video tab to show, when an alert's toast is tapped.
-  final _videoFocus = ValueNotifier<String?>(null);
+  final _videoFocus = ValueNotifier<VideoFocus?>(null);
+
+  /// When the feed items the clips are about last played (the Feed tab shows them as they do).
+  final _moments = FeedMoments();
 
   /// The project's live detections, while it streams any.
   LiveVision? _live;
@@ -383,14 +389,65 @@ class _HomeShellState extends State<HomeShell> {
     final brand = BrandScope.of(context);
     final screens = role == null ? const <Screen>[] : screensFor(role, brand, settings);
     // Alerts from the clips' recordings, for whoever can open their cameras.
-    (_recorded ??= RecordedVision(
-      onVerdict: (camera, behavior) => _visionAlert(settings, camera.id, behavior, name: camera.name, from: 'clip'),
-    )).follow(screens.contains(Screen.video) ? videoCameras(settings, brand, view: role!) : const [], vision);
+    final recorded = _recorded ??= RecordedVision(
+      onVerdict: (camera, behavior) => behavior.feed != null
+          ? _momentAlert(settings, camera, behavior)
+          : _visionAlert(settings, camera.id, behavior, name: camera.name, from: 'clip'),
+    );
+    recorded.follow(
+      screens.contains(Screen.video)
+          ? videoCameras(settings, brand, view: role!, language: context.l10n.localeName)
+          : const [],
+      vision,
+    );
+    _moments.link(recorded.feedItems);
     final api = screens.contains(Screen.feed) ? settings.apiUri : null;
     if (api != _feedAlerts?.api.api) {
       _feedAlerts?.dispose();
-      _feedAlerts = api == null ? null : FeedAlertWatcher(FeedApi(api), _alerts);
+      _feedAlerts = api == null
+          ? null
+          // What a clip is about toasts as it plays (_momentAlert), not as it's posted.
+          : FeedAlertWatcher(
+              FeedApi(api),
+              _alerts,
+              skip: (item) => _moments.linked.contains(item.id),
+              lang: () => mounted ? context.l10n.localeName : null,
+            );
     }
+  }
+
+  /// A clip's moment that a feed item is about has started playing: the Feed
+  /// tab shows the item from now on, and its toast, in the item's words once
+  /// the feed has it (else the vision rule's), opens on that moment.
+  void _momentAlert(AppSettings settings, Camera camera, VisionBehavior behavior) {
+    if (!mounted) return;
+    final start = behavior.start ?? 0;
+    final moment = _moments.played(
+      behavior.feed!,
+      camera,
+      start,
+      behavior.end ?? start,
+      focus: behavior.focus,
+      focusKinds: behavior.focusKinds,
+    );
+    final item = _feedAlerts?.item(moment.item);
+    if (item == null) {
+      return _visionAlert(settings, camera.id, behavior, name: camera.name, from: 'clip', moment: moment);
+    }
+    _alerts.raise(
+      AlertNotice(
+        id: 'moment:${moment.item}',
+        title: item.title,
+        tone: item.tone == FeedTone.review ? VisionTone.review : VisionTone.info,
+        code: item.badge,
+        where: item.subtitle,
+        detail: item.detail,
+        camera: camera.id,
+        fromFeed: true,
+        moment: moment,
+      ),
+      key: 'moment|${moment.item}',
+    );
   }
 
   /// A verdict that asks for an alert raises it, whichever tab is open: one
@@ -401,6 +458,7 @@ class _HomeShellState extends State<HomeShell> {
     VisionBehavior behavior, {
     String? name,
     String from = 'live',
+    FeedMoment? moment,
   }) {
     final bundle = settings.vision;
     if (bundle == null || !mounted) return;
@@ -418,8 +476,9 @@ class _HomeShellState extends State<HomeShell> {
         where: '$name · ${bundle.behaviorLabel(behavior.behavior, lang)}',
         detail: rule.suggestionIn(lang),
         camera: camera,
+        moment: moment,
       ),
-      key: '$camera|${rule.code}',
+      key: moment != null ? 'moment|${moment.item}' : '$camera|${rule.code}',
     );
   }
 
@@ -434,6 +493,7 @@ class _HomeShellState extends State<HomeShell> {
     _feedAlerts?.dispose();
     _alerts.dispose();
     _videoFocus.dispose();
+    _moments.dispose();
     super.dispose();
   }
 
@@ -473,7 +533,7 @@ class _HomeShellState extends State<HomeShell> {
     Screen.agent => AgentTab(history: _chat!, ask: _ask),
     Screen.grafana => const GrafanaTab(),
     Screen.video => VideoTab(active: active, live: _live, recorded: _recorded, focus: _videoFocus),
-    Screen.feed => FeedTab(active: active),
+    Screen.feed => FeedTab(active: active, moments: _moments),
   };
 
   @override
@@ -501,10 +561,10 @@ class _HomeShellState extends State<HomeShell> {
     // have (the Jetson's `cam-salon-01`): then it opens the feed.
     void openAlert(AlertNotice n) {
       final camera = all.contains(Screen.video)
-          ? alertCamera(n.camera, videoCameras(settings, brand, view: role))
+          ? alertCamera(n.camera, videoCameras(settings, brand, view: role, language: l.localeName))
           : null;
       if (camera != null) {
-        _videoFocus.value = camera;
+        _videoFocus.value = (camera: camera, moment: n.moment);
         open(Screen.video);
       } else if (n.fromFeed && all.contains(Screen.feed)) {
         open(Screen.feed);

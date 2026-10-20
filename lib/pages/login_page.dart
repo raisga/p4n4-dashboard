@@ -118,10 +118,10 @@ class _LoginPageState extends State<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Center(child: Wordmark(size: 30)),
-                  if (brand.tagline.isNotEmpty) ...[
+                  if (brand.taglineIn(context.l10n.localeName) case final tagline when tagline.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      brand.tagline,
+                      tagline,
                       textAlign: TextAlign.center,
                       style: p4.body(color: p4.muted),
                     ),
