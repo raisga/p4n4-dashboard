@@ -325,6 +325,18 @@ class DemoApi {
           ),
           r,
         );
+      case ['feed', final id, 'image'] when get:
+        final s = await store;
+        if (!s.items().any((i) => i.id == id && i.json['image'] == true)) return _empty(r, 404);
+        final res = await _loader.get(_page.resolve('demo/feed/${id.replaceAll(RegExp('[:/]'), '_')}.jpg'));
+        if (res.statusCode != 200) return _empty(r, 404);
+        return http.StreamedResponse(
+          Stream.value(res.bodyBytes),
+          200,
+          contentLength: res.bodyBytes.length,
+          request: r,
+          headers: const {'content-type': 'image/jpeg'},
+        );
       case ['feed', final id, 'action'] when post:
         if (!operator) return forbidden();
         final action = b['action'] as String;

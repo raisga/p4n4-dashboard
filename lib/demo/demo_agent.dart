@@ -42,6 +42,7 @@ class DemoAgent {
   };
 
   DemoReply answer(String question) {
+    if (store.answers.isNotEmpty) return _recorded(question);
     final q = _fold(question);
     bool has(List<String> words) => words.any(q.contains);
     final (tools, text) = switch (q) {
@@ -78,6 +79,24 @@ class DemoAgent {
       _ => (['get_store_summary'], _yesterday()),
     };
     return (steps: [for (final t in tools) (t, _labels[t]!)], text: text);
+  }
+
+  /// A project's recorded answer to [question], or the questions it has answers for.
+  DemoReply _recorded(String question) {
+    final a = store.answerTo(question);
+    if (a != null) return (steps: a.steps, text: a.text);
+    return (
+      steps: const <(String, Map<String, String>)>[],
+      text: [
+        _t(
+          'En esta demo respondo lo que se le preguntó al dispositivo del partido:',
+          'In this demo I answer what the match device was asked:',
+          "Dans cette démo, je réponds à ce qu'on a demandé à l'appareil du match :",
+        ),
+        '',
+        for (final a in store.answers) '- ${a.questions.first}',
+      ].join('\n'),
+    );
   }
 
   // ── the answers ──────────────────────────────────────────────────────────

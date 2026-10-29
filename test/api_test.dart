@@ -212,6 +212,27 @@ void main() {
       ]);
     });
 
+    test("the agent's suggested next questions reach onSuggestions, not the reply", () async {
+      final lines = [
+        {
+          'message': {'content': 'All on plan.'},
+        },
+        {
+          'message': {'content': ''},
+          'done': true,
+          'suggestions': ['Who is tiring?', '', 7, 'What should we tell the players?'],
+        },
+      ];
+      List<String>? asked;
+      final reply = await http.runWithClient(
+        () => api.send(AgentBackend.ollama, 'm', [ChatMessage('user', 'hi')], onSuggestions: (q) => asked = q).join(),
+        () => MockClient((_) async => http.Response(lines.map(jsonEncode).join('\n'), 200)),
+      );
+      expect(reply, 'All on plan.');
+      // Questions only: blanks and anything else dropped
+      expect(asked, ['Who is tiring?', 'What should we tell the players?']);
+    });
+
     test('Letta gets only the new message, with the system status', () async {
       late http.Request sent;
       final reply = await http.runWithClient(

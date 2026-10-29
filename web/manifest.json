@@ -1,11 +1,11 @@
 {
-    "name": "p4n4 dashboard",
-    "short_name": "p4n4 dashboard",
+    "name": "Pasiero Futbol",
+    "short_name": "Pasiero Futbol",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#FAFAF9",
-    "theme_color": "#C2410C",
-    "description": "raisga — open source platform",
+    "background_color": "#F8F1EF",
+    "theme_color": "#B5432A",
+    "description": "Match intelligence for the Premier League.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

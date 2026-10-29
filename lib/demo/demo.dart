@@ -13,3 +13,8 @@ const demoPassword = String.fromEnvironment('P4N4_DEMO_PASSWORD', defaultValue: 
 
 /// The demo's accounts, one per view: username → p4n4-api role.
 const demoAccounts = {'admin': 'admin', 'power': 'operator', 'normie': 'normie'};
+
+/// A page next to the app the Grafana tab shows instead of drawing the
+/// project's charts (`--dart-define=P4N4_DEMO_GRAFANA=grafana/`): a snapshot
+/// of its dashboards. It gets the app's `theme` (`light` or `dark`) and `lang`.
+const demoGrafana = String.fromEnvironment('P4N4_DEMO_GRAFANA');

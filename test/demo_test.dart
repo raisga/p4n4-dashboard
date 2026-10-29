@@ -192,6 +192,76 @@ void main() {
     expect(agent.answer('¿Hubo alertas de riesgo de pérdida?').text, contains('**8**'));
   });
 
+  group('a recorded project', () {
+    // Two recorded days that end today, alerts reviewed with the project's own
+    // actions, and the assistant's answers recorded.
+    Map<String, dynamic> recorded() => {
+      ..._fixture(),
+      'repeat': false,
+      'review': {
+        'pending': ['confirm', 'dismiss'],
+        'done': ['reopen'],
+        'status': {'confirm': 'confirmed', 'dismiss': 'dismissed', 'reopen': 'pending_review'},
+      },
+      'answers': [
+        {
+          'q': ['How are we doing?', '¿Cómo vamos?'],
+          'steps': [
+            [
+              'get_match',
+              {'en': 'the match'},
+            ],
+          ],
+          'text': 'Ahead **2-1**.',
+        },
+      ],
+      'days': [
+        {
+          'date': '2026-10-27',
+          'items': [
+            {'s': 3600, 'id': 'site:M1.dev.1', 'kind': 'alert', 'title': 'Line', 'image': true},
+          ],
+          'reviews': {
+            'site:M1.dev.1': [3700, 'confirmed'],
+          },
+        },
+        {
+          'date': '2026-10-28',
+          'items': [
+            {'s': 3600, 'id': 'site:M2.dev.1', 'kind': 'alert', 'title': 'Press'},
+          ],
+          'reviews': <String, Object>{},
+        },
+      ],
+    };
+    DemoStore recordedAt(DateTime now) => DemoStore(recorded(), clock: () => now);
+
+    test('ends today, keeps its ids and goes no further back', () {
+      final store = recordedAt(DateTime(2026, 12, 1, 12));
+      expect(store.items().map((i) => i.id), ['site:M2.dev.1', 'site:M1.dev.1']);
+      expect(store.dayFor(0).date, '2026-10-28');
+      expect(store.dayFor(5).date, '2026-10-27');
+    });
+
+    test("offers the project's actions and leaves their status", () {
+      final store = recordedAt(DateTime(2026, 12, 1, 12));
+      final pending = store.items().first.json;
+      expect([for (final a in pending['actions'] as List) (a as Map)['id']], ['confirm', 'dismiss']);
+      expect([for (final a in store.items().last.json['actions'] as List) (a as Map)['id']], ['reopen']);
+      expect(store.act('site:M2.dev.1', 'confirm'), isTrue);
+      expect(store.items().first.json['status'], 'confirmed');
+    });
+
+    test('the assistant gives the recorded answer, or says what it was asked', () {
+      final agent = DemoAgent(recordedAt(DateTime(2026, 12, 1, 12)));
+      expect(agent.answer('how are we DOING').text, 'Ahead **2-1**.');
+      expect(agent.answer('¿Cómo vamos, Pasiero?').steps.single.$1, 'get_match');
+      final other = agent.answer('Who won the league in 1998?');
+      expect(other.steps, isEmpty);
+      expect(other.text, contains('- How are we doing?'));
+    });
+  });
+
   test('charts count what has happened in the range', () {
     final store = storeAt(DateTime(2026, 10, 15, 12));
     final today = computeCharts(store, 'today')!;
@@ -262,6 +332,13 @@ void main() {
       final action = {'action': 'attended'};
       expect((await call('POST', 'api/v1/feed/$id/action', body: action, as: 'normie')).statusCode, 403);
       expect((await call('POST', 'api/v1/feed/$id/action', body: action, as: 'power')).statusCode, 200);
+    });
+
+    test("serves a feed item's picture from next to the app", () async {
+      final feed = json(await call('GET', 'api/v1/feed?limit=100', as: 'normie')) as Map;
+      final id = (feed['items'] as List).cast<Map>().first['id'];
+      // The fixture's items have no picture.
+      expect((await call('GET', 'api/v1/feed/$id/image', as: 'normie')).statusCode, 404);
     });
 
     test('pretends admin actions work, and logs them', () async {

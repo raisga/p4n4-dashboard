@@ -50,13 +50,15 @@ class GrafanaTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The demo build has no Grafana: it draws the project's charts itself.
-    if (demoMode) return const DemoChartsTab();
+    // The demo build has no Grafana: it shows the project's snapshot, or draws its charts itself.
+    if (demoMode && demoGrafana.isEmpty) return const DemoChartsTab();
     final session = SessionScope.of(context);
     final technical = session.isTechnical;
     final l = context.l10n;
     final uri = themedGrafanaUri(
-      SettingsScope.of(context).grafanaUriFor(session.role ?? Role.normie, language: l.localeName),
+      demoMode
+          ? Uri.base.resolve(demoGrafana)
+          : SettingsScope.of(context).grafanaUriFor(session.role ?? Role.normie, language: l.localeName),
       Theme.of(context).brightness,
       language: l.localeName,
     );

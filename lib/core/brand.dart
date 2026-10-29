@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../api/camera.dart';
+import 'role.dart';
 import 'theme.dart';
 
 /// Tabs a brand can enable, in their default display order (after Home).
@@ -111,6 +112,7 @@ class Brand {
     this.support,
     this.tour = const {},
     this.assistantSuggestions = const {},
+    this.assistantViewSuggestions = const {},
     this.demoCameras = const [],
     this.demoCameraNames = const {},
     this.demoCameraCredits = const {},
@@ -173,8 +175,17 @@ class Brand {
   /// Empty: the dashboard's own.
   final Map<String, List<String>> assistantSuggestions;
 
-  /// The brand's starter questions in [language], or null to use the dashboard's.
-  List<String>? suggestionsFor(String language) => assistantSuggestions[language] ?? assistantSuggestions['*'];
+  /// Questions for one view in place of [assistantSuggestions] (e.g. the
+  /// coaches' on the normie view, the analysts' on power), per view and then
+  /// per language code, from brand.json `assistant.suggestionsByView`.
+  final Map<Role, Map<String, List<String>>> assistantViewSuggestions;
+
+  /// The brand's starter questions in [language] for [view] (its own, else
+  /// every view's), or null to use the dashboard's.
+  List<String>? suggestionsFor(String language, {Role? view}) {
+    final own = assistantViewSuggestions[view];
+    return own?[language] ?? own?['*'] ?? assistantSuggestions[language] ?? assistantSuggestions['*'];
+  }
 
   /// The Video tab's demo cameras, from brand.json `video.demoCameras`, in
   /// place of the built-in [demoCameras] (camera.dart): each an http(s) `url`,
@@ -302,6 +313,11 @@ class Brand {
       support: BrandSupport.fromJson(j['support']),
       tour: _tour(j['tour']),
       assistantSuggestions: _suggestions(((j['assistant'] as Map?) ?? const {})['suggestions']),
+      assistantViewSuggestions: {
+        for (final MapEntry(:key, :value)
+            in ((((j['assistant'] as Map?) ?? const {})['suggestionsByView'] as Map?) ?? const {}).entries)
+          ?Role.named(key): _suggestions(value),
+      },
       demoCameras: _demoCameras(video['demoCameras']),
       demoCameraNames: {
         for (final c in (video['demoCameras'] as List?) ?? const [])

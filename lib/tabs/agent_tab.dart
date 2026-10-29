@@ -220,7 +220,13 @@ class _AgentTabState extends State<AgentTab> {
           config.backend,
           target,
           history,
-          system: _systemPrompt(SettingsScope.of(context)),
+          system: _systemPrompt(SettingsScope.of(context), SessionScope.of(context).role),
+          onSuggestions: (questions) {
+            reply.suggestions
+              ..clear()
+              ..addAll(questions);
+            widget.history.changed(save: false);
+          },
           onStep: (step) {
             if (!reply.steps.contains(step)) reply.steps.add(step);
             if (step.done) step.textAt = reply.content.trimRight().length;
@@ -262,9 +268,17 @@ class _AgentTabState extends State<AgentTab> {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.copied)));
   }
 
-  /// How to answer, per this device's answer style; null for the model's own way.
-  static String? _systemPrompt(AppSettings s) {
+  /// How to answer, per this device's answer style, and which view asks (so
+  /// an agent can answer a coach and an operator differently); null for the
+  /// model's own way.
+  static String? _systemPrompt(AppSettings s, Role? view) {
     const language = 'Reply in the language the user writes in.';
+    final asking = switch (view) {
+      Role.admin => "The person asking uses the dashboard's admin view.",
+      Role.power => "The person asking uses the dashboard's power user view.",
+      Role.normie => "The person asking uses the dashboard's viewer view.",
+      null => null,
+    };
     final style = switch (s.assistantStyle) {
       AssistantStyle.standard => null,
       AssistantStyle.brief => 'Answer briefly: two or three sentences at most, unless asked for more.',
@@ -273,7 +287,8 @@ class _AgentTabState extends State<AgentTab> {
         'Use plain, everyday words and avoid jargon; explain any technical term you cannot avoid.',
       AssistantStyle.custom => s.assistantCustomPrompt.isEmpty ? null : s.assistantCustomPrompt,
     };
-    return style == null ? null : '$style $language';
+    final text = [if (style != null) '$style $language', ?asking].join(' ');
+    return text.isEmpty ? null : text;
   }
 
   /// Picks the answer style; [AssistantStyle.custom] asks for its instructions first.
@@ -526,7 +541,7 @@ class _AgentTabState extends State<AgentTab> {
       actions: [
         // The brand's own questions for this deployment (brand.json assistant.suggestions), else ours
         for (final q
-            in BrandScope.of(context).suggestionsFor(l.localeName) ??
+            in BrandScope.of(context).suggestionsFor(l.localeName, view: SessionScope.of(context).role) ??
                 [l.assistantSuggestStatus, l.assistantSuggestDevice, l.assistantSuggestHelp])
           ActionChip(
             avatar: Icon(Icons.chat_bubble_outline, size: 16, color: p4.accent),
@@ -545,7 +560,7 @@ class _AgentTabState extends State<AgentTab> {
       final last = i == _messages.length - 1;
       final streaming = _busy && last;
       final m = _messages[i];
-      return _Bubble(
+      final bubble = _Bubble(
         m,
         streaming: streaming,
         started: streaming ? _started : null,
@@ -553,6 +568,29 @@ class _AgentTabState extends State<AgentTab> {
         onCopy: streaming || m.role == 'error' || m.content.isEmpty ? null : () => _copy(m.content),
         // The last answer (or failure) can be asked for again.
         onRetry: last && !_busy && m.role != 'user' && _target != null ? _retry : null,
+      );
+      // Under the latest answer, once it's done: the questions the agent suggests asking next
+      if (!last || _busy || m.role != 'assistant' || m.suggestions.isEmpty) return bubble;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bubble,
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final q in m.suggestions)
+                  ActionChip(
+                    avatar: Icon(Icons.subdirectory_arrow_right, size: 16, color: context.p4.accent),
+                    label: Text(q),
+                    onPressed: () => _send(q),
+                  ),
+              ],
+            ),
+          ),
+        ],
       );
     },
   );

@@ -356,6 +356,18 @@ Map<String, dynamic> _validate(Directory dir) {
   } else if (suggestions != null && !questions(suggestions)) {
     errors.add('assistant.suggestions must be a list of questions, or an object of language code → list');
   }
+  // The same, for one view: {view: list, or {language: list}}
+  final byView = assistant?['suggestionsByView'];
+  if (byView != null && byView is! Map) errors.add('assistant.suggestionsByView must be an object of view → questions');
+  for (final MapEntry(key: view, :value) in (byView is Map ? byView : const {}).entries) {
+    if (!const ['admin', 'power', 'normie'].contains(view)) {
+      errors.add('assistant.suggestionsByView.$view is not a view (admin, power or normie)');
+    }
+    final lists = value is Map ? value.values : [value];
+    if (lists.isEmpty || !lists.every(questions)) {
+      errors.add('assistant.suggestionsByView.$view must be a list of questions, or an object of language code → list');
+    }
+  }
 
   // A first-run language the app doesn't ship would quietly fall back to English.
   final defaults = j['defaults'];

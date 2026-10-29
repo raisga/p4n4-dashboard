@@ -24,6 +24,10 @@ class ChatMessage {
   /// For replies: the tools the agent ran for it, while it's on screen (not saved).
   final List<ToolStep> steps = [];
 
+  /// For replies: the questions the agent suggests asking next (its last
+  /// chunk's `suggestions`), while it's on screen (not saved).
+  final List<String> suggestions = [];
+
   Map<String, String> toJson() => {'role': role, 'content': content};
 }
 
@@ -151,6 +155,10 @@ class AgentApi {
   /// same [ToolStep]) when it's done. Only p4n4's agent says; plain Ollama
   /// and Letta never call it.
   ///
+  /// [onSuggestions] gets the questions p4n4's agent suggests asking next,
+  /// when its answer is done (a chunk's `suggestions`); other backends never
+  /// call it.
+  ///
   /// [system], instructions on how to answer, goes to Ollama ahead of the
   /// conversation; a Letta agent keeps its own persona and doesn't get it.
   Stream<String> send(
@@ -158,9 +166,10 @@ class AgentApi {
     String id,
     List<ChatMessage> history, {
     void Function(ToolStep step)? onStep,
+    void Function(List<String> questions)? onSuggestions,
     String? system,
   }) => switch (backend) {
-    AgentBackend.ollama => _ollama(id, history, onStep, system),
+    AgentBackend.ollama => _ollama(id, history, onStep, onSuggestions, system),
     AgentBackend.letta => _letta(id, history),
   };
 
@@ -168,6 +177,7 @@ class AgentApi {
     String model,
     List<ChatMessage> history,
     void Function(ToolStep step)? onStep,
+    void Function(List<String> questions)? onSuggestions,
     String? system,
   ) async* {
     final client = http.Client();
@@ -211,6 +221,13 @@ class AgentApi {
               ..ok = step['ok'] != false;
             onStep?.call(s);
           }
+        }
+        if (chunk['suggestions'] case final List questions) {
+          final asked = [
+            for (final q in questions)
+              if (q is String && q.trim().isNotEmpty) q.trim(),
+          ];
+          if (asked.isNotEmpty) onSuggestions?.call(asked);
         }
         final text = (chunk['message'] as Map?)?['content'] as String?;
         if (text != null && text.isNotEmpty) yield text;

@@ -764,6 +764,8 @@ void main() {
 
       final chat = seen.singleWhere((r) => r.url.path == '/api/v1/agents/chat');
       expect((jsonDecode(chat.body) as Map)['messages'], [
+        // Which view asks, so an agent can answer a viewer and an operator differently
+        {'role': 'system', 'content': "The person asking uses the dashboard's viewer view."},
         {'role': 'user', 'content': 'Is any unit on warning?'},
       ]);
     });

@@ -96,6 +96,37 @@ void main() {
       expect(Brand.fromJson(base()).suggestionsFor('en'), isNull);
     });
 
+    test('a view can have its own suggestions, else every view\'s', () {
+      final brand = Brand.fromJson(
+        base()
+          ..['assistant'] = {
+            'suggestions': ['Status?'],
+            'suggestionsByView': {
+              'normie': ['How are we doing?'],
+              'power': {
+                'es': ['¿Qué falta revisar?'],
+              },
+              'nobody': ['Ignored?'],
+            },
+          },
+      );
+      expect(brand.suggestionsFor('en', view: Role.normie), ['How are we doing?']);
+      expect(brand.suggestionsFor('es', view: Role.power), ['¿Qué falta revisar?']);
+      // No list for this language or view: every view's
+      expect(brand.suggestionsFor('en', view: Role.power), ['Status?']);
+      expect(brand.suggestionsFor('en', view: Role.admin), ['Status?']);
+      expect(brand.suggestionsFor('en'), ['Status?']);
+      expect(
+        () => Brand.fromJson(
+          base()
+            ..['assistant'] = {
+              'suggestionsByView': {'normie': <String>[]},
+            },
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('empty or malformed suggestions are refused', () {
       for (final bad in [
         <String>[],
