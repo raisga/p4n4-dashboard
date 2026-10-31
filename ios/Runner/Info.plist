@@ -12,7 +12,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Shows this device's cameras in the Video tab, when a camera is set to one.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Connects to the club's match analysis server and cameras on the local network.</string>
+	<string>Connects to p4n4 services (Grafana, Ollama, cameras) on your local network.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -31,7 +31,7 @@
 		<string>zh</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Pasiero Futbol</string>
+	<string>p4n4 dashboard</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

@@ -255,7 +255,7 @@ void main() {
     test('the assistant gives the recorded answer, or says what it was asked', () {
       final agent = DemoAgent(recordedAt(DateTime(2026, 12, 1, 12)));
       expect(agent.answer('how are we DOING').text, 'Ahead **2-1**.');
-      expect(agent.answer('¿Cómo vamos, Pasiero?').steps.single.$1, 'get_match');
+      expect(agent.answer('¿Cómo vamos, equipo?').steps.single.$1, 'get_match');
       final other = agent.answer('Who won the league in 1998?');
       expect(other.steps, isEmpty);
       expect(other.text, contains('- How are we doing?'));

@@ -49,6 +49,11 @@ LABEL org.opencontainers.image.title="p4n4-dashboard" \
       org.opencontainers.image.source="https://github.com/raisga/p4n4-dashboard" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="$VERSION"
+# Alpine's fixes ahead of the pinned base (brotli-libs 1.2.1-r0 for CVE-2026-111497);
+# drop once a rebuilt base carries them. The base runs as nginx (101).
+USER root
+RUN apk upgrade --no-cache brotli-libs
+USER 101
 # Defaults for the nginx template (the image's entrypoint runs envsubst over
 # /etc/nginx/templates/*.template, replacing only variables that are set).
 ENV P4N4_API_UPSTREAM=http://host.docker.internal:8000 \

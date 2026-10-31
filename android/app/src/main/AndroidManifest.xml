@@ -12,7 +12,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false" tools:replace="android:required"/>
     <application
-        android:label="Pasiero Futbol"
+        android:label="p4n4 dashboard"
         android:usesCleartextTraffic="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
