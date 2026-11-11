@@ -1,6 +1,6 @@
 # TODO
 
-_Last updated: 2026-10-18 (v1.5.0; 1.4.0 and 1.5.0 not yet released)_
+_Last updated: 2026-11-10 (Drive, unreleased; v1.5.0 published)_
 
 ## Original scope
 
@@ -27,6 +27,8 @@ _Last updated: 2026-10-18 (v1.5.0; 1.4.0 and 1.5.0 not yet released)_
 | Video | ✅ Working | MJPEG streams, JPEG snapshots, video files (MP4, WebM, HLS; Linux/Windows open them in the browser) and the device's own cameras. Several named cameras per deployment, grid by default; dropped streams reconnect (2 s → 30 s). Light grid for slow links (Settings → Appearance): a frame every 2 s per MJPEG or snapshot camera (on web, snapshots only). Demo cameras for admins, or a brand's own (`video.demoCameras`, served from `DASHBOARD_DEMO_DIR`). |
 | Vision overlay | ✅ Working (widget tests) | `dashboard.vision` in `.p4n4.json` (`GET /api/v1/project/vision`): boxes, behaviours and zones from a recording or a live WebSocket; alerts pulse on their camera and pop up as toasts on every tab, risks with a chime. Not checked against a live detector. |
 | Feed | ✅ Working | Opt-in tab relaying the project's feed through `GET /api/v1/feed`; operators and admins act on alerts. New pending alerts toast on every tab (checked every 5 s). |
+| Map | 🧪 Built (unit and widget tests; run on the Android emulator) | Opt-in tab, Android and iOS (MapLibre Native): the deployment's offline tiles (`http://<host>:8088/style.json`), else an online style (OpenFreeMap), following the phone with its heading, speed and the way driven. Web and desktop say it's in the phone apps. |
+| Drive | 🧪 Built (unit and widget tests; run on the Android emulator) | Settings → Drive (`lib/drive/`): GPS → MQTT (`sensors/<device>/gps`), the OBD-II relay (a paired Bluetooth or a Wi-Fi adapter, to the stack's obd2 service on port 35100, for the phone and its containers only) and the dashcam (Android: back camera in a loop, size cap, **Save clip**, saved on a jolt, GPX beside each clip; clips page). For the `mqtt-influx-grafana-obd2` template. |
 | Views | ✅ Working | Admins set each view's tabs and order (`/api/v1/dashboard/views`) and its start tab, Home cards, Grafana page, cameras, overlay and alerts (`/api/v1/dashboard/view-settings`); devices pick changes up within a minute. Admins can preview the power and normie views. |
 | Admin tools | ✅ Working | Settings → Users (create, role, reset or require a password, sign out everywhere, remove, last sign-in), Devices (list with last seen; admins register with the key shown once, disable, rotate keys, remove; power users read), Banner, Audit log (paged), Chats (link/unlink a project bot's chats, `dashboard.chats`) and Diagnostics. |
 | Kiosk mode | ✅ Working (widget tests) | Settings → This device: locked viewer sign-in, idle start-over, idle sign-out for admins and power users. Not yet tried on a wall tablet. |
@@ -43,18 +45,21 @@ _Last updated: 2026-10-18 (v1.5.0; 1.4.0 and 1.5.0 not yet released)_
 ## What was checked
 
 - **Tests:** `flutter test` passes 434 tests on Linux (2026-10-18): API clients (auth, users, banner, chats, feed, views, view settings, vision, project, devices, telemetry, inference, MQTT publish, stack logs and service restarts, request IDs, server-sent events), settings and preferences, kiosk, layouts per view at phone and desktop sizes, the tour, every language's messages and Spanish at phone size and the largest text, brands and their fonts, the status and metrics monitors (sharing, history, pruning), thresholds, outages, Home's status card in each state, the fleet grid, service details, the logs page, the sensors and command sections, the Devices screen, the Assistant's retry, copy and answer style, the service viewer's states (loading, down, slow/blocked, refused, mixed content, unsupported platform, normie wording, Spanish at phone size and the largest text), service URL resolution and where status probes go, Grafana's theme kept across its sign-in, and the web platform shims (`flutter test --platform chrome test/web`: the `<iframe>`'s load classification and address). `dart run tool/brand.dart check` passes for every installed brand and rejects a bad `locale`, `thresholds` and `support`.
+- **Drive (2026-11-10, on Windows):** `flutter test` passes 459 tests, adding the GPS payload, track and GPX, the MQTT publisher (rate, topic, errors), the OBD relay (both directions, the allow-list, a new reader taking over, adapter errors), the dashcam's clip pruning, names and jolt detection, the map style's offline-or-online choice, and Settings → Drive (switches, choices, hidden for other brands, Spanish, French and German at phone size). `flutter analyze` and `dart format` are clean, and the web release build passes; the web shims' tests (`--platform chrome`) weren't rerun, as the test browser hangs on that machine.
+- **Drive on the Android emulator** (2026-11-10, API 37, `p4n4-drive` brand): against the `mqtt-influx-grafana-obd2` template in Docker Desktop, through `adb reverse` (MQTT, Grafana, the tiles on 8088), with a recorded drive replayed as the emulator's GPS. The Map tab showed the offline extract and followed the phone; the fixes reached `sensors/car/gps`; the relay carried obd2's traffic (through `adb forward`) to a Wi-Fi adapter, the template's obd2-sim, and Grafana's Drive dashboard showed the readings, the trip, the route and a stored code. The dashcam recorded 3-minute clips with their GPX, **Save clip** locked one, stop finished one, and the clips page played, unlocked and deleted them; the Cameras tab paused it for the front camera and resumed. This found and fixed three bugs: the map stopped following after its first zoom, the dashcam's buttons sat under the camera grid's caption bar, and a Wi-Fi adapter showed a Bluetooth icon.
 - **Run by hand on Linux** (earlier releases): every tab in both themes, against a real p4n4-api (sign-in, wrong password, admin/operator, restart, sign-out revocation), a real Ollama, MJPEG and snapshot cameras, and the `mqtt-influx-grafana` template with the `verdant` brand.
 - **Web:** Chromium against the `mqtt-influx-grafana` template, through the container's proxy; the image built and served healthy. 2026-10-18: the web build behind the new nginx config, every tab with no CSP violations, and the viewer showing n8n through `/svc/n8n/` (push WebSocket included), InfluxDB directly, Swagger UI and Grafana.
 - **Builds:** all five platforms built in CI (first green run 2026-09-30, iOS unsigned); Android also locally.
 
 **Not checked:**
 
-- Running the app on Android, iOS, macOS or Windows, so also the embedded web view (Grafana and the service viewer) and white-label launcher icons there.
+- Running the app on a real Android device (only the emulator, see Drive above), iOS, macOS or Windows, so also the embedded web view (Grafana and the service viewer) and white-label launcher icons there.
 - Web in Safari, and served from a Raspberry Pi to a phone on the LAN. (The service viewer was checked in Chromium and Firefox, over HTTP and behind `make up-tls`: see SERVICE_INTEGRATION.md.)
 - Letta chat against a real Letta server.
 - Kiosk mode on a wall tablet; the vision overlay against a live detector.
 - The image on arm64 hardware.
 - 1.4.0's features against a live p4n4-api: stack logs, service restarts, devices, telemetry (stream and history), inference and MQTT publish were checked only with mocked responses and the demo build's answers, which follow p4n4-api 0.3.0's code and tests.
+- Drive on a phone in a car: a real camera, jolts, a Bluetooth ELM327 adapter (the emulator has no Bluetooth), the stack in Termux, the GPS while driving, and the map on iOS.
 
 ## Known limitations
 
@@ -69,7 +74,8 @@ _Last updated: 2026-10-18 (v1.5.0; 1.4.0 and 1.5.0 not yet released)_
 - **Light grid on web** slows snapshot cameras only: a browser `<img>` can't take one frame of an MJPEG stream and stop.
 - **Answer style** goes to Ollama only; a Letta agent keeps its own persona. Custom instructions are per device, not per deployment.
 - **Live sensors** come from MQTT `sensors/+/+` only (p4n4-api's stream); inference results and `sandbox/` topics aren't in it.
-- **White-label gaps:** the Linux window icon isn't set; the binary name (`p4n4_dashboard`) and the Android Kotlin package don't change per brand; the service catalog (names, ports, which services exist) is shared by all brands.
+- **White-label gaps:** the Linux window icon isn't set; the binary name (`p4n4_dashboard`) and the Android Kotlin package don't change per brand; the service catalog (names, ports, which services exist) is shared by all brands. Without p4n4-api, Home probes the whole catalog, so a stack without some of it (the obd2 template has no Node-RED, Ollama or n8n) always "needs attention"; p4n4-api leaves services it doesn't run out.
+- **Drive runs in the foreground only.** The dashcam, the GPS and the relay stop while the app is in the background (no foreground service yet), and the phone opens one camera at a time, so watching the front camera pauses recording. Clips are back to back with a short gap between them, live in the app's folder (uninstalling deletes them) and have no sound; the clip being recorded when the app is killed can't be played, as Android writes an MP4's index when recording stops. Speeds are in km/h. Bluetooth tries the serial profile, then RFCOMM channel 1 through a hidden API (some ELM327 clones only answer there), which some Android versions may refuse.
 
 ## Future work
 
@@ -127,3 +133,11 @@ _Last updated: 2026-10-18 (v1.5.0; 1.4.0 and 1.5.0 not yet released)_
 - [ ] Per-brand service catalog (rename/hide services, custom ports) in `brand.json`
 - [ ] Linux window icon, plus optional per-brand binary name
 - [ ] Per-brand Android signing and iOS team/provisioning configuration
+
+### Drive
+
+- [ ] Run it in a car: the Redmi 7 class of phone (memory, heat) with the stack in Termux, a Bluetooth ELM327, the dashcam for a whole trip
+- [ ] Record and publish in the background (an Android foreground service), and both cameras at once where the phone allows it
+- [ ] Keep a clip playable when the app is killed mid-recording (fragmented MP4, or repair it at the next start)
+- [ ] Miles per hour, following the temperature unit's region
+- [ ] Share or upload saved clips (e.g. to the stack, with their GPX), and show past trips from InfluxDB on the map

@@ -2116,4 +2116,278 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get clearList => '消去';
+
+  @override
+  String get navMap => '地図';
+
+  @override
+  String get sectionDrive => 'ドライブ';
+
+  @override
+  String get mapUnavailable => 'ここでは地図を表示できません';
+
+  @override
+  String get mapUnavailableMsg => '地図は Android と iOS のアプリで使えます。';
+
+  @override
+  String get mapOffline => 'オフライン地図';
+
+  @override
+  String get mapOnline => 'オンライン地図';
+
+  @override
+  String get mapRecheck => 'オフライン地図をもう一度探す';
+
+  @override
+  String get mapFollow => '現在地を追従';
+
+  @override
+  String get mapLocating => '現在地を取得中…';
+
+  @override
+  String get mapLocationDenied => '位置情報が許可されていません';
+
+  @override
+  String get mapLocationOff => '位置情報がオフです';
+
+  @override
+  String get mapLocationUnsupported => 'このデバイスでは位置情報を使えません';
+
+  @override
+  String get mapKmh => 'km/h';
+
+  @override
+  String get mapStyleField => 'オフライン地図スタイルの URL';
+
+  @override
+  String get mapFallbackField => 'オンライン地図スタイルの URL';
+
+  @override
+  String get driveGps => 'GPS';
+
+  @override
+  String get gpsPublishSwitch => 'このデバイスの位置情報をスタックに送信';
+
+  @override
+  String get driveStatus => '状態';
+
+  @override
+  String get driveOff => 'オフ';
+
+  @override
+  String get driveConnecting => '接続中…';
+
+  @override
+  String driveError(String error) {
+    return 'エラー: $error';
+  }
+
+  @override
+  String get driveUnsupported => 'このデバイスでは使えません';
+
+  @override
+  String gpsPublishSending(int count, String topic) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$topic に $count 件の位置を送信しました');
+    return '$_temp0';
+  }
+
+  @override
+  String get driveDeviceField => 'スタックでのデバイス名';
+
+  @override
+  String get mqttPortField => 'MQTT ポート';
+
+  @override
+  String get mqttUserField => 'MQTT ユーザー';
+
+  @override
+  String get mqttPasswordField => 'MQTT パスワード';
+
+  @override
+  String get driveObd => 'OBD-II';
+
+  @override
+  String get obdRelaySwitch => '車の OBD-II アダプターをスタックに中継';
+
+  @override
+  String get obdAdapterField => 'OBD-II アダプター';
+
+  @override
+  String get obdAdapterNone => '未選択';
+
+  @override
+  String get obdPick => '選択';
+
+  @override
+  String get obdPickTitle => 'アダプターを選択';
+
+  @override
+  String get obdNonePaired =>
+      'ペアリング済みのデバイスがありません。先に Android の Bluetooth 設定でアダプターをペアリングしてください。PIN は 1234 か 0000 のことがよくあります。';
+
+  @override
+  String get obdNoBluetooth => 'このデバイスには Bluetooth がありません';
+
+  @override
+  String get obdBluetoothDenied => 'アダプターを選ぶには「付近のデバイス」を許可してください';
+
+  @override
+  String get obdBluetoothOff => '先に Bluetooth をオンにしてください';
+
+  @override
+  String get obdAdapterAddressField => 'アダプターのアドレス（Bluetooth または host:port）';
+
+  @override
+  String get obdRelayPortField => '中継ポート';
+
+  @override
+  String get obdRelayUnset => '先にアダプターを選択してください';
+
+  @override
+  String obdRelayConnecting(String adapter) {
+    return '$adapter に接続中…';
+  }
+
+  @override
+  String obdRelayWaiting(String adapter, String port) {
+    return '$adapter に接続しました。ポート $port でスタックを待っています';
+  }
+
+  @override
+  String obdRelayRelaying(String adapter, String reader) {
+    return '$adapter を $reader に中継中';
+  }
+
+  @override
+  String obdRelayBytes(int up, int down) {
+    final intl.NumberFormat upNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String upString = upNumberFormat.format(up);
+    final intl.NumberFormat downNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String downString = downNumberFormat.format(down);
+
+    return 'アダプターへ $upString バイト、アダプターから $downString バイト';
+  }
+
+  @override
+  String obdRelayTurnedAway(String address) {
+    return '$address を拒否しました: 接続できるのはこのデバイスとそのコンテナーだけです';
+  }
+
+  @override
+  String get dashcam => 'ドライブレコーダー';
+
+  @override
+  String get dashcamAutoStart => 'アプリを開いたら録画を開始';
+
+  @override
+  String get dashcamSegmentField => 'クリップの長さ';
+
+  @override
+  String dashcamMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分');
+    return '$_temp0';
+  }
+
+  @override
+  String get dashcamStorageField => '最近のクリップ用の容量';
+
+  @override
+  String get dashcamStorageHelp => 'これを超えると、最近のクリップの古いものから削除されます。保存したクリップは残ります。';
+
+  @override
+  String get dashcamLockField => '衝撃でクリップを保存';
+
+  @override
+  String get dashcamLockHelp => 'この強さの急ブレーキや衝撃で、録画中のクリップを保存します';
+
+  @override
+  String get dashcamLockNever => 'しない';
+
+  @override
+  String get dashcamClips => 'ドライブレコーダーのクリップ';
+
+  @override
+  String get dashcamHasCamera => 'ドライブレコーダーが録画中です。このデバイスは一度に 1 台のカメラしか開けません。';
+
+  @override
+  String get dashcamPause => 'ドライブレコーダーを一時停止';
+
+  @override
+  String get dashcamPausedForCabin => '車内カメラの表示中はドライブレコーダーを一時停止しています';
+
+  @override
+  String get dashcamPaused => 'ドライブレコーダー一時停止中';
+
+  @override
+  String get dashcamResume => '録画を再開';
+
+  @override
+  String get dashcamRecord => 'ドライブレコーダーを開始';
+
+  @override
+  String get dashcamStop => 'ドライブレコーダーを停止';
+
+  @override
+  String get dashcamSave => 'クリップを保存';
+
+  @override
+  String get dashcamSaved => 'クリップを保存しました';
+
+  @override
+  String get dashcamSavedImpact => '衝撃を検知: クリップを保存しました';
+
+  @override
+  String get dashcamStarting => 'ドライブレコーダーを起動中…';
+
+  @override
+  String get dashcamNoCamera => 'このデバイスにはドライブレコーダー用の背面カメラがありません';
+
+  @override
+  String get dashcamPermission => 'ドライブレコーダーにはカメラの使用許可が必要です';
+
+  @override
+  String get dashcamNoStorage => 'ドライブレコーダーのクリップを保存する場所がありません';
+
+  @override
+  String get dashcamStorageFull => '録画に必要な空き容量が足りません';
+
+  @override
+  String get dashcamClipsEmpty => 'クリップはまだありません';
+
+  @override
+  String get dashcamClipsWhere => 'クリップはこのデバイスのアプリのフォルダーに保存されます。アプリをアンインストールすると削除されます。';
+
+  @override
+  String get dashcamClipsSaved => '保存済み';
+
+  @override
+  String get dashcamClipsRecent => '最近';
+
+  @override
+  String dashcamClipsStorage(String recent, String cap, String saved) {
+    return '最近のクリップ: $recent / $cap。保存済み: $saved。';
+  }
+
+  @override
+  String dashcamClipsFree(String free) {
+    return 'このデバイスの空き容量: $free';
+  }
+
+  @override
+  String get dashcamClipTrack => 'GPS トラック';
+
+  @override
+  String get dashcamClipRecording => '録画中';
+
+  @override
+  String get dashcamClipKeep => 'このクリップを保存';
+
+  @override
+  String get dashcamClipUnkeep => '最近に戻す';
+
+  @override
+  String get dashcamClipDeleteTitle => 'このクリップを削除しますか？';
+
+  @override
+  String get dashcamClipDeleteBody => '動画と GPS トラックがこのデバイスから削除されます。';
 }

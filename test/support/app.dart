@@ -38,7 +38,11 @@ Future<AppSettings> pumpApp(
     ...prefs,
   });
   final brand = loadBrand('p4n4', extra: brandExtra);
-  final settings = await AppSettings.load(defaults: brand.defaults, secrets: MemorySecretStore());
+  final settings = await AppSettings.load(
+    defaults: brand.defaults,
+    secrets: MemorySecretStore(),
+    brandTabs: brand.tabs,
+  );
   final session = await Session.load(settings, probe: (_) async => AuthMode.off);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;

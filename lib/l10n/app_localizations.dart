@@ -3788,6 +3788,498 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear'**
   String get clearList;
+
+  /// Navigation destination: a map of where this device is, for the phone in the car
+  ///
+  /// In en, this message translates to:
+  /// **'Map'**
+  String get navMap;
+
+  /// Settings category for the phone in the car: its map, GPS, OBD-II adapter and dashcam
+  ///
+  /// In en, this message translates to:
+  /// **'Drive'**
+  String get sectionDrive;
+
+  /// No description provided for @mapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No map here'**
+  String get mapUnavailable;
+
+  /// No description provided for @mapUnavailableMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'The map is in the Android and iOS apps.'**
+  String get mapUnavailableMsg;
+
+  /// Map source label: the stack's own map, which works without internet
+  ///
+  /// In en, this message translates to:
+  /// **'Offline map'**
+  String get mapOffline;
+
+  /// Map source label: online tiles, while the stack's own map can't be reached
+  ///
+  /// In en, this message translates to:
+  /// **'Online map'**
+  String get mapOnline;
+
+  /// No description provided for @mapRecheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for the offline map again'**
+  String get mapRecheck;
+
+  /// No description provided for @mapFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow my position'**
+  String get mapFollow;
+
+  /// No description provided for @mapLocating.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding your position…'**
+  String get mapLocating;
+
+  /// No description provided for @mapLocationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location not allowed'**
+  String get mapLocationDenied;
+
+  /// No description provided for @mapLocationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off'**
+  String get mapLocationOff;
+
+  /// No description provided for @mapLocationUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'No location on this device'**
+  String get mapLocationUnsupported;
+
+  /// Unit under the speed shown on the map
+  ///
+  /// In en, this message translates to:
+  /// **'km/h'**
+  String get mapKmh;
+
+  /// No description provided for @mapStyleField.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline map style URL'**
+  String get mapStyleField;
+
+  /// No description provided for @mapFallbackField.
+  ///
+  /// In en, this message translates to:
+  /// **'Online map style URL'**
+  String get mapFallbackField;
+
+  /// No description provided for @driveGps.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS'**
+  String get driveGps;
+
+  /// No description provided for @gpsPublishSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this device\'s location to the stack'**
+  String get gpsPublishSwitch;
+
+  /// No description provided for @driveStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get driveStatus;
+
+  /// No description provided for @driveOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get driveOff;
+
+  /// No description provided for @driveConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get driveConnecting;
+
+  /// No description provided for @driveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String driveError(String error);
+
+  /// No description provided for @driveUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this device'**
+  String get driveUnsupported;
+
+  /// GPS status; topic is the MQTT topic, e.g. sensors/car/gps
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 position sent to {topic}} other{{count} positions sent to {topic}}}'**
+  String gpsPublishSending(int count, String topic);
+
+  /// The name the stack files this car's readings under (its GPS topic and OBD-II readings)
+  ///
+  /// In en, this message translates to:
+  /// **'Device name in the stack'**
+  String get driveDeviceField;
+
+  /// No description provided for @mqttPortField.
+  ///
+  /// In en, this message translates to:
+  /// **'MQTT port'**
+  String get mqttPortField;
+
+  /// No description provided for @mqttUserField.
+  ///
+  /// In en, this message translates to:
+  /// **'MQTT user'**
+  String get mqttUserField;
+
+  /// No description provided for @mqttPasswordField.
+  ///
+  /// In en, this message translates to:
+  /// **'MQTT password'**
+  String get mqttPasswordField;
+
+  /// No description provided for @driveObd.
+  ///
+  /// In en, this message translates to:
+  /// **'OBD-II'**
+  String get driveObd;
+
+  /// Pass the adapter's connection through this device to the stack, which reads the car with it
+  ///
+  /// In en, this message translates to:
+  /// **'Relay the car\'s OBD-II adapter to the stack'**
+  String get obdRelaySwitch;
+
+  /// No description provided for @obdAdapterField.
+  ///
+  /// In en, this message translates to:
+  /// **'OBD-II adapter'**
+  String get obdAdapterField;
+
+  /// No description provided for @obdAdapterNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None chosen'**
+  String get obdAdapterNone;
+
+  /// No description provided for @obdPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get obdPick;
+
+  /// No description provided for @obdPickTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the adapter'**
+  String get obdPickTitle;
+
+  /// No description provided for @obdNonePaired.
+  ///
+  /// In en, this message translates to:
+  /// **'No paired devices. Pair the adapter in Android\'s Bluetooth settings first; its PIN is often 1234 or 0000.'**
+  String get obdNonePaired;
+
+  /// No description provided for @obdNoBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no Bluetooth'**
+  String get obdNoBluetooth;
+
+  /// Nearby devices is Android's name for the Bluetooth permission
+  ///
+  /// In en, this message translates to:
+  /// **'Allow \"Nearby devices\" to choose the adapter'**
+  String get obdBluetoothDenied;
+
+  /// No description provided for @obdBluetoothOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Bluetooth first'**
+  String get obdBluetoothOff;
+
+  /// No description provided for @obdAdapterAddressField.
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter address (Bluetooth or host:port)'**
+  String get obdAdapterAddressField;
+
+  /// No description provided for @obdRelayPortField.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay port'**
+  String get obdRelayPortField;
+
+  /// No description provided for @obdRelayUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the adapter first'**
+  String get obdRelayUnset;
+
+  /// No description provided for @obdRelayConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {adapter}…'**
+  String obdRelayConnecting(String adapter);
+
+  /// No description provided for @obdRelayWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to {adapter}. Waiting for the stack on port {port}'**
+  String obdRelayWaiting(String adapter, String port);
+
+  /// adapter is the adapter's name or address; reader the address of who's reading it
+  ///
+  /// In en, this message translates to:
+  /// **'Relaying {adapter} to {reader}'**
+  String obdRelayRelaying(String adapter, String reader);
+
+  /// No description provided for @obdRelayBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{up} bytes to the adapter, {down} from it'**
+  String obdRelayBytes(int up, int down);
+
+  /// No description provided for @obdRelayTurnedAway.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned away {address}: only this device and its containers may connect'**
+  String obdRelayTurnedAway(String address);
+
+  /// A camera that films the road ahead in a loop
+  ///
+  /// In en, this message translates to:
+  /// **'Dashcam'**
+  String get dashcam;
+
+  /// No description provided for @dashcamAutoStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start recording when the app opens'**
+  String get dashcamAutoStart;
+
+  /// No description provided for @dashcamSegmentField.
+  ///
+  /// In en, this message translates to:
+  /// **'Clip length'**
+  String get dashcamSegmentField;
+
+  /// No description provided for @dashcamMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String dashcamMinutes(int count);
+
+  /// No description provided for @dashcamStorageField.
+  ///
+  /// In en, this message translates to:
+  /// **'Space for recent clips'**
+  String get dashcamStorageField;
+
+  /// No description provided for @dashcamStorageHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Past this, the oldest recent clips are deleted. Saved clips are kept.'**
+  String get dashcamStorageHelp;
+
+  /// A jolt: a crash, or braking hard
+  ///
+  /// In en, this message translates to:
+  /// **'Save the clip on a jolt'**
+  String get dashcamLockField;
+
+  /// No description provided for @dashcamLockHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'A hard brake or a bump this strong saves the clip being recorded'**
+  String get dashcamLockHelp;
+
+  /// Jolt option: never save clips by itself
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get dashcamLockNever;
+
+  /// No description provided for @dashcamClips.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashcam clips'**
+  String get dashcamClips;
+
+  /// No description provided for @dashcamHasCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'The dashcam is recording. This device opens one camera at a time.'**
+  String get dashcamHasCamera;
+
+  /// No description provided for @dashcamPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause the dashcam'**
+  String get dashcamPause;
+
+  /// The cabin camera is this device's front one; it can open one camera at a time
+  ///
+  /// In en, this message translates to:
+  /// **'The dashcam is paused while the cabin camera shows'**
+  String get dashcamPausedForCabin;
+
+  /// No description provided for @dashcamPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashcam paused'**
+  String get dashcamPaused;
+
+  /// No description provided for @dashcamResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume recording'**
+  String get dashcamResume;
+
+  /// No description provided for @dashcamRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Start dashcam'**
+  String get dashcamRecord;
+
+  /// No description provided for @dashcamStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop dashcam'**
+  String get dashcamStop;
+
+  /// Keeps the clip being recorded, so the loop doesn't delete it
+  ///
+  /// In en, this message translates to:
+  /// **'Save clip'**
+  String get dashcamSave;
+
+  /// No description provided for @dashcamSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Clip saved'**
+  String get dashcamSaved;
+
+  /// No description provided for @dashcamSavedImpact.
+  ///
+  /// In en, this message translates to:
+  /// **'Jolt detected: clip saved'**
+  String get dashcamSavedImpact;
+
+  /// No description provided for @dashcamStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting dashcam…'**
+  String get dashcamStarting;
+
+  /// No description provided for @dashcamNoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no back camera for the dashcam'**
+  String get dashcamNoCamera;
+
+  /// No description provided for @dashcamPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'The dashcam needs permission to use the camera'**
+  String get dashcamPermission;
+
+  /// No description provided for @dashcamNoStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'No storage for the dashcam\'s clips'**
+  String get dashcamNoStorage;
+
+  /// No description provided for @dashcamStorageFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space to record'**
+  String get dashcamStorageFull;
+
+  /// No description provided for @dashcamClipsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No clips yet'**
+  String get dashcamClipsEmpty;
+
+  /// No description provided for @dashcamClipsWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Clips stay on this device, in the app\'s folder. Uninstalling the app deletes them.'**
+  String get dashcamClipsWhere;
+
+  /// Clips kept until deleted by hand
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get dashcamClipsSaved;
+
+  /// Clips the loop deletes, oldest first, when it needs room
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get dashcamClipsRecent;
+
+  /// Sizes, e.g. 1.2 GB of 4 GB
+  ///
+  /// In en, this message translates to:
+  /// **'Recent clips: {recent} of {cap}. Saved: {saved}.'**
+  String dashcamClipsStorage(String recent, String cap, String saved);
+
+  /// No description provided for @dashcamClipsFree.
+  ///
+  /// In en, this message translates to:
+  /// **'{free} free on this device'**
+  String dashcamClipsFree(String free);
+
+  /// No description provided for @dashcamClipTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS track'**
+  String get dashcamClipTrack;
+
+  /// No description provided for @dashcamClipRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get dashcamClipRecording;
+
+  /// No description provided for @dashcamClipKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this clip'**
+  String get dashcamClipKeep;
+
+  /// No description provided for @dashcamClipUnkeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Move back to recent'**
+  String get dashcamClipUnkeep;
+
+  /// No description provided for @dashcamClipDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this clip?'**
+  String get dashcamClipDeleteTitle;
+
+  /// No description provided for @dashcamClipDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its video and GPS track are deleted from this device.'**
+  String get dashcamClipDeleteBody;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

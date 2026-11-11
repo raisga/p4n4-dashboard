@@ -26,7 +26,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-const _tabs = ['services', 'edge', 'agent', 'grafana', 'video', 'feed'];
+const _tabs = ['services', 'edge', 'agent', 'grafana', 'video', 'feed', 'map'];
+const _optInTabs = {'feed', 'map'};
 const _tourSteps = ['welcome', 'navigation', 'theme', 'settings', 'signOut'];
 const _tokens = [
   'bg', 'bg2', 'bg3', 'accent', 'accent2', 'onAccent', 'amber', 'blue', //
@@ -318,8 +319,8 @@ Map<String, dynamic> _validate(Directory dir) {
     }
   }
 
-  // Without a list a brand gets every tab but the opt-in feed (lib/core/brand.dart DashTab.defaults)
-  final tabs = (j['tabs'] as List?)?.cast<String>() ?? [..._tabs.where((t) => t != 'feed')];
+  // Without a list a brand gets every tab but the opt-in feed and map (lib/core/brand.dart DashTab.defaults)
+  final tabs = (j['tabs'] as List?)?.cast<String>() ?? [..._tabs.where((t) => !_optInTabs.contains(t))];
   for (final t in tabs) {
     if (!_tabs.contains(t)) errors.add('unknown tab "$t" (valid: ${_tabs.join(', ')})');
   }

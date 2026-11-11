@@ -1675,5 +1675,225 @@
       }
     }
   },
-  "clearList": "Clear"
+  "clearList": "Clear",
+  "navMap": "Map",
+  "@navMap": {
+    "description": "Navigation destination: a map of where this device is, for the phone in the car"
+  },
+  "sectionDrive": "Drive",
+  "@sectionDrive": {
+    "description": "Settings category for the phone in the car: its map, GPS, OBD-II adapter and dashcam"
+  },
+  "mapUnavailable": "No map here",
+  "mapUnavailableMsg": "The map is in the Android and iOS apps.",
+  "mapOffline": "Offline map",
+  "@mapOffline": {
+    "description": "Map source label: the stack's own map, which works without internet"
+  },
+  "mapOnline": "Online map",
+  "@mapOnline": {
+    "description": "Map source label: online tiles, while the stack's own map can't be reached"
+  },
+  "mapRecheck": "Look for the offline map again",
+  "mapFollow": "Follow my position",
+  "mapLocating": "Finding your position…",
+  "mapLocationDenied": "Location not allowed",
+  "mapLocationOff": "Location is off",
+  "mapLocationUnsupported": "No location on this device",
+  "mapKmh": "km/h",
+  "@mapKmh": {
+    "description": "Unit under the speed shown on the map"
+  },
+  "mapStyleField": "Offline map style URL",
+  "mapFallbackField": "Online map style URL",
+  "driveGps": "GPS",
+  "gpsPublishSwitch": "Send this device's location to the stack",
+  "driveStatus": "Status",
+  "driveOff": "Off",
+  "driveConnecting": "Connecting…",
+  "driveError": "Error: {error}",
+  "@driveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "driveUnsupported": "Not available on this device",
+  "gpsPublishSending": "{count, plural, =1{1 position sent to {topic}} other{{count} positions sent to {topic}}}",
+  "@gpsPublishSending": {
+    "description": "GPS status; topic is the MQTT topic, e.g. sensors/car/gps",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "driveDeviceField": "Device name in the stack",
+  "@driveDeviceField": {
+    "description": "The name the stack files this car's readings under (its GPS topic and OBD-II readings)"
+  },
+  "mqttPortField": "MQTT port",
+  "mqttUserField": "MQTT user",
+  "mqttPasswordField": "MQTT password",
+  "driveObd": "OBD-II",
+  "obdRelaySwitch": "Relay the car's OBD-II adapter to the stack",
+  "@obdRelaySwitch": {
+    "description": "Pass the adapter's connection through this device to the stack, which reads the car with it"
+  },
+  "obdAdapterField": "OBD-II adapter",
+  "obdAdapterNone": "None chosen",
+  "obdPick": "Choose",
+  "obdPickTitle": "Choose the adapter",
+  "obdNonePaired": "No paired devices. Pair the adapter in Android's Bluetooth settings first; its PIN is often 1234 or 0000.",
+  "obdNoBluetooth": "This device has no Bluetooth",
+  "obdBluetoothDenied": "Allow \"Nearby devices\" to choose the adapter",
+  "@obdBluetoothDenied": {
+    "description": "Nearby devices is Android's name for the Bluetooth permission"
+  },
+  "obdBluetoothOff": "Turn on Bluetooth first",
+  "obdAdapterAddressField": "Adapter address (Bluetooth or host:port)",
+  "obdRelayPortField": "Relay port",
+  "obdRelayUnset": "Choose the adapter first",
+  "obdRelayConnecting": "Connecting to {adapter}…",
+  "@obdRelayConnecting": {
+    "placeholders": {
+      "adapter": {
+        "type": "String"
+      }
+    }
+  },
+  "obdRelayWaiting": "Connected to {adapter}. Waiting for the stack on port {port}",
+  "@obdRelayWaiting": {
+    "placeholders": {
+      "adapter": {
+        "type": "String"
+      },
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "obdRelayRelaying": "Relaying {adapter} to {reader}",
+  "@obdRelayRelaying": {
+    "description": "adapter is the adapter's name or address; reader the address of who's reading it",
+    "placeholders": {
+      "adapter": {
+        "type": "String"
+      },
+      "reader": {
+        "type": "String"
+      }
+    }
+  },
+  "obdRelayBytes": "{up} bytes to the adapter, {down} from it",
+  "@obdRelayBytes": {
+    "placeholders": {
+      "up": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "down": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "obdRelayTurnedAway": "Turned away {address}: only this device and its containers may connect",
+  "@obdRelayTurnedAway": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "dashcam": "Dashcam",
+  "@dashcam": {
+    "description": "A camera that films the road ahead in a loop"
+  },
+  "dashcamAutoStart": "Start recording when the app opens",
+  "dashcamSegmentField": "Clip length",
+  "dashcamMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@dashcamMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashcamStorageField": "Space for recent clips",
+  "dashcamStorageHelp": "Past this, the oldest recent clips are deleted. Saved clips are kept.",
+  "dashcamLockField": "Save the clip on a jolt",
+  "@dashcamLockField": {
+    "description": "A jolt: a crash, or braking hard"
+  },
+  "dashcamLockHelp": "A hard brake or a bump this strong saves the clip being recorded",
+  "dashcamLockNever": "Never",
+  "@dashcamLockNever": {
+    "description": "Jolt option: never save clips by itself"
+  },
+  "dashcamClips": "Dashcam clips",
+  "dashcamHasCamera": "The dashcam is recording. This device opens one camera at a time.",
+  "dashcamPause": "Pause the dashcam",
+  "dashcamPausedForCabin": "The dashcam is paused while the cabin camera shows",
+  "@dashcamPausedForCabin": {
+    "description": "The cabin camera is this device's front one; it can open one camera at a time"
+  },
+  "dashcamPaused": "Dashcam paused",
+  "dashcamResume": "Resume recording",
+  "dashcamRecord": "Start dashcam",
+  "dashcamStop": "Stop dashcam",
+  "dashcamSave": "Save clip",
+  "@dashcamSave": {
+    "description": "Keeps the clip being recorded, so the loop doesn't delete it"
+  },
+  "dashcamSaved": "Clip saved",
+  "dashcamSavedImpact": "Jolt detected: clip saved",
+  "dashcamStarting": "Starting dashcam…",
+  "dashcamNoCamera": "This device has no back camera for the dashcam",
+  "dashcamPermission": "The dashcam needs permission to use the camera",
+  "dashcamNoStorage": "No storage for the dashcam's clips",
+  "dashcamStorageFull": "Not enough free space to record",
+  "dashcamClipsEmpty": "No clips yet",
+  "dashcamClipsWhere": "Clips stay on this device, in the app's folder. Uninstalling the app deletes them.",
+  "dashcamClipsSaved": "Saved",
+  "@dashcamClipsSaved": {
+    "description": "Clips kept until deleted by hand"
+  },
+  "dashcamClipsRecent": "Recent",
+  "@dashcamClipsRecent": {
+    "description": "Clips the loop deletes, oldest first, when it needs room"
+  },
+  "dashcamClipsStorage": "Recent clips: {recent} of {cap}. Saved: {saved}.",
+  "@dashcamClipsStorage": {
+    "description": "Sizes, e.g. 1.2 GB of 4 GB",
+    "placeholders": {
+      "recent": {
+        "type": "String"
+      },
+      "cap": {
+        "type": "String"
+      },
+      "saved": {
+        "type": "String"
+      }
+    }
+  },
+  "dashcamClipsFree": "{free} free on this device",
+  "@dashcamClipsFree": {
+    "placeholders": {
+      "free": {
+        "type": "String"
+      }
+    }
+  },
+  "dashcamClipTrack": "GPS track",
+  "dashcamClipRecording": "Recording",
+  "dashcamClipKeep": "Keep this clip",
+  "dashcamClipUnkeep": "Move back to recent",
+  "dashcamClipDeleteTitle": "Delete this clip?",
+  "dashcamClipDeleteBody": "Its video and GPS track are deleted from this device."
 }

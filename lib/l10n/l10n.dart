@@ -87,6 +87,7 @@ extension L10nLabels on AppLocalizations {
     DashTab.grafana => navGrafana,
     DashTab.video => navVideo,
     DashTab.feed => navFeed,
+    DashTab.map => navMap,
   };
 
   /// [level] in words: "High" for usage, "Warm" for a [temperature].

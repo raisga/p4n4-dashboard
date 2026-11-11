@@ -39,6 +39,9 @@ const profileKeys = {
   'myStartTab',
   'defaultCamera',
   'thresholds',
+  'mapStyleUrl',
+  'mqttPort',
+  'mqttUser',
 };
 
 /// Profile keys that say where the services are, cleared by
@@ -51,11 +54,13 @@ const connectionKeys = {
   'grafanaPath',
   'grafanaKiosk',
   'serviceUrls',
+  'mapStyleUrl',
+  'mqttPort',
 };
 
 /// Profile keys whose values are credentials: kept in the platform's secure
 /// storage ([SecretStore]) instead of shared_preferences.
-const secretKeys = {'apiRefreshToken'};
+const secretKeys = {'apiRefreshToken', 'mqttPassword'};
 
 /// Deployment settings from before the assistant went through p4n4-api:
 /// where Ollama and Letta were, the Letta password, and the model or agent
@@ -69,7 +74,7 @@ const retiredKeys = {'ollamaBase', 'lettaBase', 'lettaToken', 'agentBackend', 'o
 /// Keys in [profileKeys] are read from and written to the active
 /// [deployment]; the getters below always reflect whichever one is connected.
 class AppSettings extends ChangeNotifier {
-  AppSettings._(this._prefs, this._defaults, this._store, Map<String, String>? secrets)
+  AppSettings._(this._prefs, this._defaults, this._store, Map<String, String>? secrets, this._brandTabs)
     : _secrets = {...?secrets},
       _secretsOk = secrets != null {
     _loadDeployments();
@@ -90,10 +95,17 @@ class AppSettings extends ChangeNotifier {
   /// Brand-supplied defaults, used until the user changes a value.
   final Map<String, Object> _defaults;
 
+  /// The brand's tabs ([Brand.tabs]), for opt-in tabs it shows without a project.
+  final List<DashTab> _brandTabs;
+
   late List<Deployment> _deployments;
   late String _activeId;
 
-  static Future<AppSettings> load({Map<String, Object> defaults = const {}, SecretStore? secrets}) async {
+  static Future<AppSettings> load({
+    Map<String, Object> defaults = const {},
+    SecretStore? secrets,
+    List<DashTab> brandTabs = DashTab.defaults,
+  }) async {
     final store = secrets ?? PlatformSecretStore();
     Map<String, String>? saved;
     try {
@@ -101,7 +113,7 @@ class AppSettings extends ChangeNotifier {
     } catch (_) {
       // No secure storage; see [secureStorageAvailable].
     }
-    final settings = AppSettings._(await SharedPreferences.getInstance(), defaults, store, saved);
+    final settings = AppSettings._(await SharedPreferences.getInstance(), defaults, store, saved, brandTabs);
     await settings._moveSecretsToStore();
     await settings._dropRetired();
     return settings;
@@ -537,13 +549,25 @@ class AppSettings extends ChangeNotifier {
   /// stored (in versions before camera lists) appears as one camera named
   /// "Camera"; without one, the connected project's cameras
   /// (`dashboard.cameras` in its `.p4n4.json`, on this deployment's host)
-  /// apply, and without those a default `videoUrl` (the project's or the
-  /// brand's). A project's cameras never hide one the user set up: saving the
-  /// list would then drop it for good.
+  /// apply, and without those a default `cameras` list or `videoUrl` (the
+  /// project's or the brand's). A project's cameras never hide one the user
+  /// set up: saving the list would then drop it for good.
   List<Camera> get cameras => switch ((deployment.values['cameras'], _raw('videoUrl', null))) {
     (List list, _) => [for (final c in list) Camera.fromJson((c as Map).cast())],
     (_, String url) when url.isNotEmpty => [_singleCamera(url)],
     _ when _project?.cameras.isNotEmpty ?? false => [for (final c in _project!.cameras) c.on(host)],
+    _ => _defaultCameras(),
+  };
+
+  /// The default `cameras` ({id, name, url} each, skipping any without a
+  /// usable url), else the default `videoUrl` as one camera.
+  List<Camera> _defaultCameras() => switch (_default<List>('cameras')) {
+    final List list when list.isNotEmpty => [
+      for (final c in list.whereType<Map>())
+        if ((c['id'], c['name'], c['url']) case (final String id, final String name, final String url)
+            when Camera.isValid(url))
+          Camera(id: id, name: name, url: url.trim()),
+    ],
     _ => [if (_default<String>('videoUrl') case final url? when url.isNotEmpty) _singleCamera(url)],
   };
 
@@ -585,6 +609,84 @@ class AppSettings extends ChangeNotifier {
 
   /// A camera id not used by any of [cameras].
   String newCameraId() => _newId(cameras.map((c) => c.id));
+
+  // Drive: the phone in the car (lib/drive/)
+
+  /// The map the Map tab shows: a MapLibre style URL; empty for the
+  /// deployment's tiles service, `http://<host>:8088/style.json`.
+  String get mapStyleUrl => _str('mapStyleUrl', '');
+  set mapStyleUrl(String v) => _set('mapStyleUrl', v.trim());
+
+  Uri get mapStyleUri => mapStyleUrl.isEmpty ? url(8088, '/style.json') : pageUri(mapStyleUrl);
+
+  /// The style the Map tab shows while the deployment's can't be reached:
+  /// online tiles. Empty for [defaultMapFallback]. App-wide, like the theme.
+  String get mapFallbackUrl => _str('mapFallbackUrl', '');
+  set mapFallbackUrl(String v) => _set('mapFallbackUrl', v.trim());
+
+  Uri get mapFallbackUri => pageUri(mapFallbackUrl.isEmpty ? defaultMapFallback : mapFallbackUrl);
+
+  /// OpenFreeMap's OpenStreetMap style: free, no key.
+  static const defaultMapFallback = 'https://tiles.openfreemap.org/styles/liberty';
+
+  /// The connected deployment's MQTT broker port, on its host.
+  int get mqttPort => _int('mqttPort', 1883);
+  set mqttPort(int v) => _set('mqttPort', v);
+
+  /// The broker's login, when it asks for one (the stack's MQTT_USER).
+  String get mqttUser => _str('mqttUser', '');
+  set mqttUser(String v) => _set('mqttUser', v.trim());
+
+  /// Its password, in secure storage.
+  String get mqttPassword => _str('mqttPassword', '');
+  set mqttPassword(String v) => _set('mqttPassword', v);
+
+  /// Publish this phone's GPS fixes to the broker, on
+  /// `sensors/<driveDevice>/gps`, while the app is open.
+  bool get gpsPublish => _bool('gpsPublish', false);
+  set gpsPublish(bool v) => _set('gpsPublish', v);
+
+  /// The device the car's readings are filed under: the GPS topic's, and the
+  /// stack's OBD_DEVICE_ID. Letters, digits, `-` and `_` only.
+  String get driveDevice => switch (_str('driveDevice', 'car').replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '')) {
+    '' => 'car',
+    final v => v,
+  };
+  set driveDevice(String v) => _set('driveDevice', v.trim());
+
+  /// Relay an OBD-II adapter to the stack's obd2 service, which reads it at
+  /// `socket://host.docker.internal:<obdRelayPort>`.
+  bool get obdRelay => _bool('obdRelay', false);
+  set obdRelay(bool v) => _set('obdRelay', v);
+
+  /// The adapter: a paired Bluetooth adapter's address, or `host:port` for a
+  /// Wi-Fi one (or the ELM327 simulator).
+  String get obdAdapter => _str('obdAdapter', '');
+  set obdAdapter(String v) => _set('obdAdapter', v.trim());
+
+  /// The port the relay listens on.
+  int get obdRelayPort => _int('obdRelayPort', 35100);
+  set obdRelayPort(int v) => _set('obdRelayPort', v);
+
+  /// Start the dashcam when the app opens.
+  bool get dashcamAutoStart => _bool('dashcamAutoStart', false);
+  set dashcamAutoStart(bool v) => _set('dashcamAutoStart', v);
+
+  /// Minutes per dashcam clip.
+  int get dashcamSegmentMinutes => _int('dashcamSegmentMinutes', 3);
+  set dashcamSegmentMinutes(int v) => _set('dashcamSegmentMinutes', v);
+
+  /// The storage the dashcam's unsaved clips may take, in GB; the oldest go first.
+  int get dashcamStorageGb => _int('dashcamStorageGb', 4);
+  set dashcamStorageGb(int v) => _set('dashcamStorageGb', v);
+
+  /// The jolt, in g, that saves the clip being recorded (a crash or hard
+  /// braking); 0 never.
+  double get dashcamLockG => switch (_raw('dashcamLockG', null) ?? _default<Object>('dashcamLockG')) {
+    num v => v.toDouble(),
+    _ => 0.5,
+  };
+  set dashcamLockG(double v) => _set('dashcamLockG', v);
 
   // Sign-in (see Session)
 
@@ -735,11 +837,15 @@ class AppSettings extends ChangeNotifier {
       fromApi ?? _str(key, fallback).split(',');
 
   /// The tabs this deployment knows: [DashTab.defaults], plus the feed when the
-  /// connected project serves one. An opt-in tab stays out of views and saved
-  /// orders until then, so an API that predates it is never sent its name.
+  /// connected project serves one, and the map when it lists one (or, with no
+  /// project, when the brand does: a phone running its own stack). An opt-in
+  /// tab stays out of views and saved orders until then, so an API that
+  /// predates it is never sent its name.
   List<DashTab> get knownTabs => [
     ...DashTab.defaults,
     if (_project?.tabs?.contains(DashTab.feed) ?? false) DashTab.feed,
+    if (_project == null ? _brandTabs.contains(DashTab.map) : _project!.tabs?.contains(DashTab.map) ?? false)
+      DashTab.map,
   ];
 
   /// The order of the brand tabs, after Home, in every view. Set by an admin

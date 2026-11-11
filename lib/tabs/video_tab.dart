@@ -10,6 +10,7 @@ import '../core/feed_moments.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../drive/drive_scope.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import '../widgets/device_camera_view.dart';
@@ -363,6 +364,8 @@ class _VideoTabState extends State<VideoTab> {
         lens: lens,
         active: widget.active && !_paused && (liveDevice ?? c.id) == c.id,
         onShow: () => setState(() => _selectedId = c.id),
+        dashcam: DriveScope.maybeOf(context)?.dashcam,
+        bottomInset: inGrid ? 30 : 0,
       ),
       (_, final uri?) when c.isVideo => VideoView(
         key: _key(c),

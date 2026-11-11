@@ -2163,4 +2163,285 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get clearList => 'Effacer';
+
+  @override
+  String get navMap => 'Carte';
+
+  @override
+  String get sectionDrive => 'Conduite';
+
+  @override
+  String get mapUnavailable => 'Pas de carte ici';
+
+  @override
+  String get mapUnavailableMsg => 'La carte se trouve dans les apps Android et iOS.';
+
+  @override
+  String get mapOffline => 'Carte hors ligne';
+
+  @override
+  String get mapOnline => 'Carte en ligne';
+
+  @override
+  String get mapRecheck => 'Rechercher à nouveau la carte hors ligne';
+
+  @override
+  String get mapFollow => 'Suivre ma position';
+
+  @override
+  String get mapLocating => 'Recherche de votre position…';
+
+  @override
+  String get mapLocationDenied => 'Localisation non autorisée';
+
+  @override
+  String get mapLocationOff => 'La localisation est désactivée';
+
+  @override
+  String get mapLocationUnsupported => 'Pas de localisation sur cet appareil';
+
+  @override
+  String get mapKmh => 'km/h';
+
+  @override
+  String get mapStyleField => 'URL du style de carte hors ligne';
+
+  @override
+  String get mapFallbackField => 'URL du style de carte en ligne';
+
+  @override
+  String get driveGps => 'GPS';
+
+  @override
+  String get gpsPublishSwitch => 'Envoyer la position de cet appareil au stack';
+
+  @override
+  String get driveStatus => 'État';
+
+  @override
+  String get driveOff => 'Désactivé';
+
+  @override
+  String get driveConnecting => 'Connexion…';
+
+  @override
+  String driveError(String error) {
+    return 'Erreur : $error';
+  }
+
+  @override
+  String get driveUnsupported => 'Indisponible sur cet appareil';
+
+  @override
+  String gpsPublishSending(int count, String topic) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count positions envoyées à $topic',
+      one: '1 position envoyée à $topic',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get driveDeviceField => 'Nom de l\'appareil dans le stack';
+
+  @override
+  String get mqttPortField => 'Port MQTT';
+
+  @override
+  String get mqttUserField => 'Utilisateur MQTT';
+
+  @override
+  String get mqttPasswordField => 'Mot de passe MQTT';
+
+  @override
+  String get driveObd => 'OBD-II';
+
+  @override
+  String get obdRelaySwitch => 'Relayer l\'adaptateur OBD-II de la voiture vers le stack';
+
+  @override
+  String get obdAdapterField => 'Adaptateur OBD-II';
+
+  @override
+  String get obdAdapterNone => 'Aucun choisi';
+
+  @override
+  String get obdPick => 'Choisir';
+
+  @override
+  String get obdPickTitle => 'Choisissez l\'adaptateur';
+
+  @override
+  String get obdNonePaired =>
+      'Aucun appareil associé. Associez d\'abord l\'adaptateur dans les réglages Bluetooth d\'Android ; son code PIN est souvent 1234 ou 0000.';
+
+  @override
+  String get obdNoBluetooth => 'Cet appareil n\'a pas de Bluetooth';
+
+  @override
+  String get obdBluetoothDenied => 'Autorisez « Appareils à proximité » pour choisir l\'adaptateur';
+
+  @override
+  String get obdBluetoothOff => 'Activez d\'abord le Bluetooth';
+
+  @override
+  String get obdAdapterAddressField => 'Adresse de l\'adaptateur (Bluetooth ou hôte:port)';
+
+  @override
+  String get obdRelayPortField => 'Port du relais';
+
+  @override
+  String get obdRelayUnset => 'Choisissez d\'abord l\'adaptateur';
+
+  @override
+  String obdRelayConnecting(String adapter) {
+    return 'Connexion à $adapter…';
+  }
+
+  @override
+  String obdRelayWaiting(String adapter, String port) {
+    return 'Connecté à $adapter. En attente du stack sur le port $port';
+  }
+
+  @override
+  String obdRelayRelaying(String adapter, String reader) {
+    return 'Relais de $adapter vers $reader';
+  }
+
+  @override
+  String obdRelayBytes(int up, int down) {
+    final intl.NumberFormat upNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String upString = upNumberFormat.format(up);
+    final intl.NumberFormat downNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String downString = downNumberFormat.format(down);
+
+    return '$upString octets vers l\'adaptateur, $downString reçus';
+  }
+
+  @override
+  String obdRelayTurnedAway(String address) {
+    return '$address refusé : seuls cet appareil et ses conteneurs peuvent se connecter';
+  }
+
+  @override
+  String get dashcam => 'Dashcam';
+
+  @override
+  String get dashcamAutoStart => 'Lancer l\'enregistrement à l\'ouverture de l\'app';
+
+  @override
+  String get dashcamSegmentField => 'Durée des clips';
+
+  @override
+  String dashcamMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count minutes', one: '1 minute');
+    return '$_temp0';
+  }
+
+  @override
+  String get dashcamStorageField => 'Espace pour les clips récents';
+
+  @override
+  String get dashcamStorageHelp =>
+      'Au-delà, les clips récents les plus anciens sont supprimés. Les clips sauvegardés sont conservés.';
+
+  @override
+  String get dashcamLockField => 'Sauvegarder le clip en cas de choc';
+
+  @override
+  String get dashcamLockHelp => 'Un freinage brusque ou un choc de cette force sauvegarde le clip en cours';
+
+  @override
+  String get dashcamLockNever => 'Jamais';
+
+  @override
+  String get dashcamClips => 'Clips de la dashcam';
+
+  @override
+  String get dashcamHasCamera => 'La dashcam enregistre. Cet appareil ouvre une seule caméra à la fois.';
+
+  @override
+  String get dashcamPause => 'Mettre la dashcam en pause';
+
+  @override
+  String get dashcamPausedForCabin => 'La dashcam est en pause pendant l\'affichage de la caméra intérieure';
+
+  @override
+  String get dashcamPaused => 'Dashcam en pause';
+
+  @override
+  String get dashcamResume => 'Reprendre l\'enregistrement';
+
+  @override
+  String get dashcamRecord => 'Démarrer la dashcam';
+
+  @override
+  String get dashcamStop => 'Arrêter la dashcam';
+
+  @override
+  String get dashcamSave => 'Sauvegarder le clip';
+
+  @override
+  String get dashcamSaved => 'Clip sauvegardé';
+
+  @override
+  String get dashcamSavedImpact => 'Choc détecté : clip sauvegardé';
+
+  @override
+  String get dashcamStarting => 'Démarrage de la dashcam…';
+
+  @override
+  String get dashcamNoCamera => 'Cet appareil n\'a pas de caméra arrière pour la dashcam';
+
+  @override
+  String get dashcamPermission => 'La dashcam a besoin de l\'autorisation d\'utiliser la caméra';
+
+  @override
+  String get dashcamNoStorage => 'Pas de stockage pour les clips de la dashcam';
+
+  @override
+  String get dashcamStorageFull => 'Pas assez d\'espace libre pour enregistrer';
+
+  @override
+  String get dashcamClipsEmpty => 'Aucun clip pour l\'instant';
+
+  @override
+  String get dashcamClipsWhere =>
+      'Les clips restent sur cet appareil, dans le dossier de l\'app. Désinstaller l\'app les supprime.';
+
+  @override
+  String get dashcamClipsSaved => 'Sauvegardés';
+
+  @override
+  String get dashcamClipsRecent => 'Récents';
+
+  @override
+  String dashcamClipsStorage(String recent, String cap, String saved) {
+    return 'Clips récents : $recent sur $cap. Sauvegardés : $saved.';
+  }
+
+  @override
+  String dashcamClipsFree(String free) {
+    return '$free libres sur cet appareil';
+  }
+
+  @override
+  String get dashcamClipTrack => 'Trace GPS';
+
+  @override
+  String get dashcamClipRecording => 'Enregistrement';
+
+  @override
+  String get dashcamClipKeep => 'Conserver ce clip';
+
+  @override
+  String get dashcamClipUnkeep => 'Remettre dans les récents';
+
+  @override
+  String get dashcamClipDeleteTitle => 'Supprimer ce clip ?';
+
+  @override
+  String get dashcamClipDeleteBody => 'Sa vidéo et sa trace GPS sont supprimées de cet appareil.';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/camera.dart' show CameraLens;
 import '../api/services.dart' show ServiceDef, stacks;
 import '../api/view_settings.dart';
 import '../core/brand.dart';
@@ -10,10 +11,16 @@ import '../core/session.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../core/thresholds.dart';
+import '../drive/dashcam.dart';
+import '../drive/drive_channel.dart';
+import '../drive/drive_scope.dart';
+import '../drive/gps_publisher.dart';
+import '../drive/obd_relay.dart';
 import '../l10n/l10n.dart';
 import '../widgets/common.dart';
 import 'admin_sections.dart';
 import 'chats_section.dart';
+import 'dashcam_clips_page.dart';
 import 'devices_section.dart';
 import 'kiosk_dialogs.dart';
 import 'password_page.dart';
@@ -23,12 +30,14 @@ import 'password_page.dart';
 /// Everyone gets the personal ones (this device's preferences, nothing that
 /// changes the system) and About. Power users also get the connection and
 /// endpoint settings; admins also views, users, the banner, the project's
-/// chats (when it has any), the audit log and diagnostics.
+/// chats (when it has any), the audit log and diagnostics. Drive (the phone
+/// in the car) shows where the brand has the Map tab, or the phone a dashcam.
 enum SettingsCategory {
   account,
   appearance,
   accessibility,
   language,
+  drive,
   connection,
   endpoints,
   devices,
@@ -151,6 +160,26 @@ List<_Category> _categories(BuildContext context) {
       ],
       build: (_) => const _LanguagePage(),
     ),
+    if (_drives(s, brand))
+      _Category(
+        SettingsCategory.drive,
+        _Heading.personal,
+        Icons.directions_car_outlined,
+        l.sectionDrive,
+        summary: [
+          if (s.gpsPublish) l.driveGps,
+          if (s.obdRelay) l.driveObd,
+          if (s.dashcamAutoStart) l.dashcam,
+        ].join(' · '),
+        keywords: [
+          l.gpsPublishSwitch,
+          l.obdRelaySwitch,
+          l.obdAdapterField,
+          if (Dashcam.supported) ...[l.dashcam, l.dashcamAutoStart, l.dashcamClips],
+          if (session.isTechnical) ...[l.mapStyleField, l.mqttPortField, l.obdRelayPortField],
+        ],
+        build: (_) => const _DrivePage(),
+      ),
     if (session.isTechnical) ...[
       _Category(
         SettingsCategory.connection,
@@ -1521,6 +1550,239 @@ class _LanguageDialogState extends State<_LanguageDialog> {
   }
 }
 
+// Drive
+
+/// Whether Settings has a Drive page: the brand has the Map tab, this phone
+/// a dashcam (a back camera in the Cameras tab), or something's on.
+bool _drives(AppSettings s, Brand brand) =>
+    brand.tabs.contains(DashTab.map) ||
+    (Dashcam.supported && s.cameras.any((c) => c.device == CameraLens.back)) ||
+    s.gpsPublish ||
+    s.obdRelay;
+
+/// The phone in the car (lib/drive/): its map, its GPS sent to the stack, the
+/// car's OBD-II adapter relayed to it, the dashcam. Addresses, ports and the
+/// broker's login are for power users.
+class _DrivePage extends StatelessWidget {
+  const _DrivePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final p4 = context.p4;
+    final s = SettingsScope.of(context);
+    final brand = BrandScope.of(context);
+    final technical = SessionScope.of(context).isTechnical;
+    final drive = DriveScope.maybeOf(context);
+    Widget choice<T>(String key, T value, List<T> options, String Function(T) label, ValueChanged<T> onChanged) =>
+        DropdownButton<T>(
+          key: ValueKey(key),
+          value: options.contains(value) ? value : null,
+          isExpanded: true,
+          underline: const SizedBox.shrink(),
+          style: p4.display(size: 14, color: p4.text, weight: FontWeight.w500, spacing: 0),
+          dropdownColor: p4.bg2,
+          items: [
+            for (final o in options)
+              DropdownMenuItem(
+                value: o,
+                child: Text(label(o), overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (v) => v == null ? null : onChanged(v),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (technical && brand.tabs.contains(DashTab.map))
+          _Group(
+            title: l.navMap,
+            children: [
+              _Padded(
+                children: [
+                  _Field(
+                    l.mapStyleField,
+                    s.mapStyleUrl,
+                    (v) => s.mapStyleUrl = v,
+                    hint: s.url(8088, '/style.json').toString(),
+                  ),
+                  _Field(
+                    l.mapFallbackField,
+                    s.mapFallbackUrl,
+                    (v) => s.mapFallbackUrl = v,
+                    hint: AppSettings.defaultMapFallback,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        _Group(
+          title: l.driveGps,
+          children: [
+            _SwitchTile(
+              title: l.gpsPublishSwitch,
+              icon: Icons.share_location,
+              value: s.gpsPublish,
+              onChanged: (v) => s.gpsPublish = v,
+            ),
+            if (drive != null && s.gpsPublish)
+              ListenableBuilder(
+                listenable: drive.publisher,
+                builder: (context, _) => _Tile(title: l.driveStatus, subtitle: _publishStatus(l, drive.publisher)),
+              ),
+            if (technical)
+              _Padded(
+                children: [
+                  _Field(l.driveDeviceField, s.driveDevice, (v) => s.driveDevice = v, hint: 'car'),
+                  _Field(l.mqttPortField, '${s.mqttPort}', (v) => s.mqttPort = int.tryParse(v.trim()) ?? 1883),
+                  _Field(l.mqttUserField, s.mqttUser, (v) => s.mqttUser = v),
+                  _Field(l.mqttPasswordField, s.mqttPassword, (v) => s.mqttPassword = v, obscure: true),
+                ],
+              ),
+          ],
+        ),
+        _Group(
+          title: l.driveObd,
+          children: [
+            _SwitchTile(
+              title: l.obdRelaySwitch,
+              icon: Icons.settings_input_component_outlined,
+              value: s.obdRelay,
+              onChanged: (v) => s.obdRelay = v,
+            ),
+            _Tile(
+              icon: AdapterAddress.parse(s.obdAdapter) is TcpAdapter ? Icons.wifi : Icons.bluetooth,
+              title: l.obdAdapterField,
+              subtitle: s.obdAdapter.isEmpty ? l.obdAdapterNone : s.obdAdapter,
+              trailing: DriveChannel.supported
+                  ? TextButton(onPressed: () => _pickAdapter(context, s), child: Text(l.obdPick))
+                  : null,
+            ),
+            if (drive != null && s.obdRelay)
+              ListenableBuilder(
+                listenable: drive.relay,
+                builder: (context, _) => _Tile(title: l.driveStatus, subtitle: _relayStatus(l, drive.relay, s)),
+              ),
+            if (technical)
+              _Padded(
+                children: [
+                  _Field(l.obdAdapterAddressField, s.obdAdapter, (v) => s.obdAdapter = v, hint: '192.168.0.10:35000'),
+                  _Field(
+                    l.obdRelayPortField,
+                    '${s.obdRelayPort}',
+                    (v) => s.obdRelayPort = int.tryParse(v.trim()) ?? 35100,
+                  ),
+                ],
+              ),
+          ],
+        ),
+        if (Dashcam.supported)
+          _Group(
+            title: l.dashcam,
+            children: [
+              _SwitchTile(
+                title: l.dashcamAutoStart,
+                icon: Icons.videocam_outlined,
+                value: s.dashcamAutoStart,
+                onChanged: (v) => s.dashcamAutoStart = v,
+              ),
+              _Tile(
+                title: l.dashcamSegmentField,
+                below: choice('dashcamSegment', s.dashcamSegmentMinutes, const [1, 2, 3, 5, 10], l.dashcamMinutes, (m) {
+                  s.dashcamSegmentMinutes = m;
+                }),
+              ),
+              _Tile(
+                title: l.dashcamStorageField,
+                subtitle: l.dashcamStorageHelp,
+                below: choice('dashcamStorage', s.dashcamStorageGb, const [1, 2, 4, 8, 16, 32], (g) => '$g GB', (g) {
+                  s.dashcamStorageGb = g;
+                }),
+              ),
+              _Tile(
+                title: l.dashcamLockField,
+                subtitle: l.dashcamLockHelp,
+                below: choice(
+                  'dashcamLock',
+                  s.dashcamLockG,
+                  const [0.0, 0.4, 0.5, 0.7, 1.0, 1.5],
+                  (g) => g == 0 ? l.dashcamLockNever : '$g g',
+                  (g) => s.dashcamLockG = g,
+                ),
+              ),
+              if (drive != null)
+                _Tile(
+                  icon: Icons.video_library_outlined,
+                  title: l.dashcamClips,
+                  trailing: Icon(Icons.chevron_right, color: p4.muted),
+                  onTap: () => openDashcamClips(context, drive.dashcam),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+String _publishStatus(AppLocalizations l, GpsPublisher p) => switch (p.status) {
+  PublishStatus.off => l.driveOff,
+  PublishStatus.unsupported => l.driveUnsupported,
+  PublishStatus.connecting => l.driveConnecting,
+  PublishStatus.connected => l.gpsPublishSending(p.sent, p.topic),
+  PublishStatus.error => l.driveError(p.error ?? ''),
+};
+
+String _relayStatus(AppLocalizations l, ObdRelay r, AppSettings s) => [
+  switch (r.status) {
+    RelayStatus.off => l.driveOff,
+    RelayStatus.unsupported => l.driveUnsupported,
+    RelayStatus.unset => l.obdRelayUnset,
+    RelayStatus.connecting => l.obdRelayConnecting(s.obdAdapter),
+    RelayStatus.waiting => l.obdRelayWaiting(r.adapterName ?? s.obdAdapter, '${s.obdRelayPort}'),
+    RelayStatus.relaying => l.obdRelayRelaying(r.adapterName ?? s.obdAdapter, r.reader ?? ''),
+    RelayStatus.error => l.driveError(r.error ?? ''),
+  },
+  if (r.bytesUp + r.bytesDown > 0) l.obdRelayBytes(r.bytesUp, r.bytesDown),
+  if (r.turnedAway case final who?) l.obdRelayTurnedAway(who),
+].join('\n');
+
+/// Picks the adapter from the phone's paired Bluetooth devices, asking for
+/// the permission first (Android 12+'s Nearby devices).
+Future<void> _pickAdapter(BuildContext context, AppSettings s) async {
+  final l = context.l10n;
+  final messenger = ScaffoldMessenger.of(context);
+  void say(String text) => messenger.showSnackBar(SnackBar(content: Text(text)));
+  var state = await DriveChannel.serialState();
+  if (!state.available) return say(l.obdNoBluetooth);
+  if (!state.permitted) {
+    if (!await DriveChannel.requestPermission()) return say(l.obdBluetoothDenied);
+    state = await DriveChannel.serialState();
+  }
+  if (!state.enabled) return say(l.obdBluetoothOff);
+  final devices = await DriveChannel.bondedDevices();
+  if (!context.mounted) return;
+  final picked = await showDialog<BondedDevice>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(l.obdPickTitle),
+      children: [
+        if (devices.isEmpty) Padding(padding: const EdgeInsets.fromLTRB(24, 8, 24, 16), child: Text(l.obdNonePaired)),
+        for (final d in devices)
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, d),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(d.address == s.obdAdapter ? Icons.radio_button_checked : Icons.radio_button_off),
+              title: Text(d.name.isEmpty ? d.address : d.name),
+              subtitle: Text(d.address),
+            ),
+          ),
+      ],
+    ),
+  );
+  if (picked != null) s.obdAdapter = picked.address;
+}
+
 // Deployment
 
 class _ConnectionPage extends StatelessWidget {
@@ -1693,12 +1955,15 @@ class _CameraRow extends StatelessWidget {
 
 /// Text field that commits on submit or focus loss.
 class _Field extends StatefulWidget {
-  const _Field(this.label, this.value, this.onCommit, {this.hint});
+  const _Field(this.label, this.value, this.onCommit, {this.hint, this.obscure = false});
 
   final String label;
   final String value;
   final ValueChanged<String> onCommit;
   final String? hint;
+
+  /// A password: shown as dots.
+  final bool obscure;
 
   @override
   State<_Field> createState() => _FieldState();
@@ -1742,6 +2007,7 @@ class _FieldState extends State<_Field> {
     return TextField(
       controller: _ctrl,
       focusNode: _focus,
+      obscureText: widget.obscure,
       style: p4.mono(size: 13, color: p4.text, spacing: 0),
       onSubmitted: (_) => _commit(),
       decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),

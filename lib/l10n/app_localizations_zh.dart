@@ -2115,4 +2115,277 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get clearList => '清除';
+
+  @override
+  String get navMap => '地图';
+
+  @override
+  String get sectionDrive => '驾驶';
+
+  @override
+  String get mapUnavailable => '此处无法显示地图';
+
+  @override
+  String get mapUnavailableMsg => '地图在 Android 和 iOS 应用中提供。';
+
+  @override
+  String get mapOffline => '离线地图';
+
+  @override
+  String get mapOnline => '在线地图';
+
+  @override
+  String get mapRecheck => '重新查找离线地图';
+
+  @override
+  String get mapFollow => '跟随我的位置';
+
+  @override
+  String get mapLocating => '正在定位…';
+
+  @override
+  String get mapLocationDenied => '未获得位置权限';
+
+  @override
+  String get mapLocationOff => '位置信息已关闭';
+
+  @override
+  String get mapLocationUnsupported => '此设备无法定位';
+
+  @override
+  String get mapKmh => 'km/h';
+
+  @override
+  String get mapStyleField => '离线地图样式 URL';
+
+  @override
+  String get mapFallbackField => '在线地图样式 URL';
+
+  @override
+  String get driveGps => 'GPS';
+
+  @override
+  String get gpsPublishSwitch => '将此设备的位置发送到堆栈';
+
+  @override
+  String get driveStatus => '状态';
+
+  @override
+  String get driveOff => '关闭';
+
+  @override
+  String get driveConnecting => '正在连接…';
+
+  @override
+  String driveError(String error) {
+    return '错误：$error';
+  }
+
+  @override
+  String get driveUnsupported => '此设备不支持';
+
+  @override
+  String gpsPublishSending(int count, String topic) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '已向 $topic 发送 $count 个位置');
+    return '$_temp0';
+  }
+
+  @override
+  String get driveDeviceField => '堆栈中的设备名称';
+
+  @override
+  String get mqttPortField => 'MQTT 端口';
+
+  @override
+  String get mqttUserField => 'MQTT 用户';
+
+  @override
+  String get mqttPasswordField => 'MQTT 密码';
+
+  @override
+  String get driveObd => 'OBD-II';
+
+  @override
+  String get obdRelaySwitch => '将汽车的 OBD-II 适配器中继到堆栈';
+
+  @override
+  String get obdAdapterField => 'OBD-II 适配器';
+
+  @override
+  String get obdAdapterNone => '未选择';
+
+  @override
+  String get obdPick => '选择';
+
+  @override
+  String get obdPickTitle => '选择适配器';
+
+  @override
+  String get obdNonePaired => '没有已配对的设备。请先在 Android 的蓝牙设置中配对适配器；其 PIN 码通常为 1234 或 0000。';
+
+  @override
+  String get obdNoBluetooth => '此设备没有蓝牙';
+
+  @override
+  String get obdBluetoothDenied => '请允许“附近的设备”权限以选择适配器';
+
+  @override
+  String get obdBluetoothOff => '请先打开蓝牙';
+
+  @override
+  String get obdAdapterAddressField => '适配器地址（蓝牙或 host:port）';
+
+  @override
+  String get obdRelayPortField => '中继端口';
+
+  @override
+  String get obdRelayUnset => '请先选择适配器';
+
+  @override
+  String obdRelayConnecting(String adapter) {
+    return '正在连接 $adapter…';
+  }
+
+  @override
+  String obdRelayWaiting(String adapter, String port) {
+    return '已连接 $adapter。正在端口 $port 上等待堆栈';
+  }
+
+  @override
+  String obdRelayRelaying(String adapter, String reader) {
+    return '正在将 $adapter 中继到 $reader';
+  }
+
+  @override
+  String obdRelayBytes(int up, int down) {
+    final intl.NumberFormat upNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String upString = upNumberFormat.format(up);
+    final intl.NumberFormat downNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String downString = downNumberFormat.format(down);
+
+    return '发往适配器 $upString 字节，来自适配器 $downString 字节';
+  }
+
+  @override
+  String obdRelayTurnedAway(String address) {
+    return '已拒绝 $address：只有此设备及其容器可以连接';
+  }
+
+  @override
+  String get dashcam => '行车记录仪';
+
+  @override
+  String get dashcamAutoStart => '打开应用时开始录制';
+
+  @override
+  String get dashcamSegmentField => '片段时长';
+
+  @override
+  String dashcamMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count 分钟');
+    return '$_temp0';
+  }
+
+  @override
+  String get dashcamStorageField => '最近片段的空间';
+
+  @override
+  String get dashcamStorageHelp => '超过此值后，会删除最旧的最近片段。已保存的片段会保留。';
+
+  @override
+  String get dashcamLockField => '碰撞时保存片段';
+
+  @override
+  String get dashcamLockHelp => '达到此强度的急刹车或碰撞会保存正在录制的片段';
+
+  @override
+  String get dashcamLockNever => '从不';
+
+  @override
+  String get dashcamClips => '行车记录仪片段';
+
+  @override
+  String get dashcamHasCamera => '行车记录仪正在录制。此设备一次只能打开一个摄像头。';
+
+  @override
+  String get dashcamPause => '暂停行车记录仪';
+
+  @override
+  String get dashcamPausedForCabin => '显示车内摄像头时，行车记录仪会暂停';
+
+  @override
+  String get dashcamPaused => '行车记录仪已暂停';
+
+  @override
+  String get dashcamResume => '继续录制';
+
+  @override
+  String get dashcamRecord => '启动行车记录仪';
+
+  @override
+  String get dashcamStop => '停止行车记录仪';
+
+  @override
+  String get dashcamSave => '保存片段';
+
+  @override
+  String get dashcamSaved => '片段已保存';
+
+  @override
+  String get dashcamSavedImpact => '检测到碰撞：片段已保存';
+
+  @override
+  String get dashcamStarting => '正在启动行车记录仪…';
+
+  @override
+  String get dashcamNoCamera => '此设备没有可用于行车记录仪的后置摄像头';
+
+  @override
+  String get dashcamPermission => '行车记录仪需要使用摄像头的权限';
+
+  @override
+  String get dashcamNoStorage => '没有可存放行车记录仪片段的存储空间';
+
+  @override
+  String get dashcamStorageFull => '可用空间不足，无法录制';
+
+  @override
+  String get dashcamClipsEmpty => '还没有片段';
+
+  @override
+  String get dashcamClipsWhere => '片段保存在此设备的应用文件夹中。卸载应用会将其删除。';
+
+  @override
+  String get dashcamClipsSaved => '已保存';
+
+  @override
+  String get dashcamClipsRecent => '最近';
+
+  @override
+  String dashcamClipsStorage(String recent, String cap, String saved) {
+    return '最近片段：$recent / $cap。已保存：$saved。';
+  }
+
+  @override
+  String dashcamClipsFree(String free) {
+    return '此设备可用空间：$free';
+  }
+
+  @override
+  String get dashcamClipTrack => 'GPS 轨迹';
+
+  @override
+  String get dashcamClipRecording => '录制中';
+
+  @override
+  String get dashcamClipKeep => '保留此片段';
+
+  @override
+  String get dashcamClipUnkeep => '移回最近';
+
+  @override
+  String get dashcamClipDeleteTitle => '删除此片段？';
+
+  @override
+  String get dashcamClipDeleteBody => '其视频和 GPS 轨迹将从此设备中删除。';
 }

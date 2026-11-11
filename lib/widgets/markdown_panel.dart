@@ -37,6 +37,7 @@ class MarkdownPanel extends StatelessWidget {
     'video': Icons.videocam_outlined,
     'edge': Icons.memory_outlined,
     'services': Icons.apps_outlined,
+    'map': Icons.map_outlined,
   };
 
   /// [markdown] with `tab:` and `ask:` links that can't be followed reduced to their text.

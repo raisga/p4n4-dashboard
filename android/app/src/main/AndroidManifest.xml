@@ -11,6 +11,18 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false" tools:replace="android:required"/>
+    <!-- Drive (lib/drive/): the GPS, for the Map tab and the stack's MQTT, and
+         Bluetooth, for an OBD-II adapter the app relays to the stack. Each is
+         asked for on first use and none is required. Below Android 12 a paired
+         device takes BLUETOOTH, and BLUETOOTH_ADMIN to stop a discovery. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
     <application
         android:label="p4n4 dashboard"
         android:usesCleartextTraffic="true"

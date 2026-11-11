@@ -13,6 +13,8 @@
 	<string>Shows this device's cameras in the Video tab, when a camera is set to one.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connects to p4n4 services (Grafana, Ollama, cameras) on your local network.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Shows where you are on the Map tab and, when Settings → Drive says so, sends your position to your p4n4 stack.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

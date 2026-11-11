@@ -2145,4 +2145,284 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get clearList => 'Wissen';
+
+  @override
+  String get navMap => 'Kaart';
+
+  @override
+  String get sectionDrive => 'Rijden';
+
+  @override
+  String get mapUnavailable => 'Hier geen kaart';
+
+  @override
+  String get mapUnavailableMsg => 'De kaart zit in de apps voor Android en iOS.';
+
+  @override
+  String get mapOffline => 'Offline kaart';
+
+  @override
+  String get mapOnline => 'Online kaart';
+
+  @override
+  String get mapRecheck => 'Opnieuw zoeken naar de offline kaart';
+
+  @override
+  String get mapFollow => 'Mijn positie volgen';
+
+  @override
+  String get mapLocating => 'Je positie zoeken…';
+
+  @override
+  String get mapLocationDenied => 'Locatie niet toegestaan';
+
+  @override
+  String get mapLocationOff => 'Locatie staat uit';
+
+  @override
+  String get mapLocationUnsupported => 'Geen locatie op dit apparaat';
+
+  @override
+  String get mapKmh => 'km/u';
+
+  @override
+  String get mapStyleField => 'URL van de offline kaartstijl';
+
+  @override
+  String get mapFallbackField => 'URL van de online kaartstijl';
+
+  @override
+  String get driveGps => 'GPS';
+
+  @override
+  String get gpsPublishSwitch => 'De locatie van dit apparaat naar de stack sturen';
+
+  @override
+  String get driveStatus => 'Status';
+
+  @override
+  String get driveOff => 'Uit';
+
+  @override
+  String get driveConnecting => 'Verbinden…';
+
+  @override
+  String driveError(String error) {
+    return 'Fout: $error';
+  }
+
+  @override
+  String get driveUnsupported => 'Niet beschikbaar op dit apparaat';
+
+  @override
+  String gpsPublishSending(int count, String topic) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count posities naar $topic gestuurd',
+      one: '1 positie naar $topic gestuurd',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get driveDeviceField => 'Apparaatnaam in de stack';
+
+  @override
+  String get mqttPortField => 'MQTT-poort';
+
+  @override
+  String get mqttUserField => 'MQTT-gebruiker';
+
+  @override
+  String get mqttPasswordField => 'MQTT-wachtwoord';
+
+  @override
+  String get driveObd => 'OBD-II';
+
+  @override
+  String get obdRelaySwitch => 'De OBD-II-adapter van de auto doorsturen naar de stack';
+
+  @override
+  String get obdAdapterField => 'OBD-II-adapter';
+
+  @override
+  String get obdAdapterNone => 'Geen gekozen';
+
+  @override
+  String get obdPick => 'Kiezen';
+
+  @override
+  String get obdPickTitle => 'Kies de adapter';
+
+  @override
+  String get obdNonePaired =>
+      'Geen gekoppelde apparaten. Koppel de adapter eerst in de Bluetooth-instellingen van Android; de pincode is vaak 1234 of 0000.';
+
+  @override
+  String get obdNoBluetooth => 'Dit apparaat heeft geen Bluetooth';
+
+  @override
+  String get obdBluetoothDenied => 'Sta ‘Apparaten in de buurt’ toe om de adapter te kiezen';
+
+  @override
+  String get obdBluetoothOff => 'Zet eerst Bluetooth aan';
+
+  @override
+  String get obdAdapterAddressField => 'Adres van de adapter (Bluetooth of host:poort)';
+
+  @override
+  String get obdRelayPortField => 'Doorstuurpoort';
+
+  @override
+  String get obdRelayUnset => 'Kies eerst de adapter';
+
+  @override
+  String obdRelayConnecting(String adapter) {
+    return 'Verbinden met $adapter…';
+  }
+
+  @override
+  String obdRelayWaiting(String adapter, String port) {
+    return 'Verbonden met $adapter. Wachten op de stack op poort $port';
+  }
+
+  @override
+  String obdRelayRelaying(String adapter, String reader) {
+    return '$adapter wordt doorgestuurd naar $reader';
+  }
+
+  @override
+  String obdRelayBytes(int up, int down) {
+    final intl.NumberFormat upNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String upString = upNumberFormat.format(up);
+    final intl.NumberFormat downNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String downString = downNumberFormat.format(down);
+
+    return '$upString bytes naar de adapter, $downString ervan';
+  }
+
+  @override
+  String obdRelayTurnedAway(String address) {
+    return '$address geweigerd: alleen dit apparaat en zijn containers mogen verbinden';
+  }
+
+  @override
+  String get dashcam => 'Dashcam';
+
+  @override
+  String get dashcamAutoStart => 'Opnemen starten als de app opent';
+
+  @override
+  String get dashcamSegmentField => 'Cliplengte';
+
+  @override
+  String dashcamMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count minuten', one: '1 minuut');
+    return '$_temp0';
+  }
+
+  @override
+  String get dashcamStorageField => 'Ruimte voor recente clips';
+
+  @override
+  String get dashcamStorageHelp => 'Daarboven worden de oudste recente clips verwijderd. Bewaarde clips blijven.';
+
+  @override
+  String get dashcamLockField => 'Clip bewaren bij een schok';
+
+  @override
+  String get dashcamLockHelp => 'Een noodstop of een schok van deze sterkte bewaart de clip die wordt opgenomen';
+
+  @override
+  String get dashcamLockNever => 'Nooit';
+
+  @override
+  String get dashcamClips => 'Dashcamclips';
+
+  @override
+  String get dashcamHasCamera => 'De dashcam neemt op. Dit apparaat opent één camera tegelijk.';
+
+  @override
+  String get dashcamPause => 'Dashcam pauzeren';
+
+  @override
+  String get dashcamPausedForCabin => 'De dashcam is gepauzeerd zolang de interieurcamera te zien is';
+
+  @override
+  String get dashcamPaused => 'Dashcam gepauzeerd';
+
+  @override
+  String get dashcamResume => 'Opname hervatten';
+
+  @override
+  String get dashcamRecord => 'Dashcam starten';
+
+  @override
+  String get dashcamStop => 'Dashcam stoppen';
+
+  @override
+  String get dashcamSave => 'Clip bewaren';
+
+  @override
+  String get dashcamSaved => 'Clip bewaard';
+
+  @override
+  String get dashcamSavedImpact => 'Schok gedetecteerd: clip bewaard';
+
+  @override
+  String get dashcamStarting => 'Dashcam wordt gestart…';
+
+  @override
+  String get dashcamNoCamera => 'Dit apparaat heeft geen achtercamera voor de dashcam';
+
+  @override
+  String get dashcamPermission => 'De dashcam heeft toestemming nodig om de camera te gebruiken';
+
+  @override
+  String get dashcamNoStorage => 'Geen opslag voor de clips van de dashcam';
+
+  @override
+  String get dashcamStorageFull => 'Niet genoeg vrije ruimte om op te nemen';
+
+  @override
+  String get dashcamClipsEmpty => 'Nog geen clips';
+
+  @override
+  String get dashcamClipsWhere =>
+      'Clips blijven op dit apparaat, in de map van de app. Als je de app verwijdert, worden ze ook verwijderd.';
+
+  @override
+  String get dashcamClipsSaved => 'Bewaard';
+
+  @override
+  String get dashcamClipsRecent => 'Recent';
+
+  @override
+  String dashcamClipsStorage(String recent, String cap, String saved) {
+    return 'Recente clips: $recent van $cap. Bewaard: $saved.';
+  }
+
+  @override
+  String dashcamClipsFree(String free) {
+    return '$free vrij op dit apparaat';
+  }
+
+  @override
+  String get dashcamClipTrack => 'GPS-spoor';
+
+  @override
+  String get dashcamClipRecording => 'Wordt opgenomen';
+
+  @override
+  String get dashcamClipKeep => 'Deze clip bewaren';
+
+  @override
+  String get dashcamClipUnkeep => 'Terug naar recent';
+
+  @override
+  String get dashcamClipDeleteTitle => 'Deze clip verwijderen?';
+
+  @override
+  String get dashcamClipDeleteBody => 'De video en het GPS-spoor worden van dit apparaat verwijderd.';
 }

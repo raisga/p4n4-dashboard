@@ -2115,4 +2115,277 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get clearList => '지우기';
+
+  @override
+  String get navMap => '지도';
+
+  @override
+  String get sectionDrive => '주행';
+
+  @override
+  String get mapUnavailable => '여기서는 지도를 볼 수 없습니다';
+
+  @override
+  String get mapUnavailableMsg => '지도는 Android 및 iOS 앱에서 사용할 수 있습니다.';
+
+  @override
+  String get mapOffline => '오프라인 지도';
+
+  @override
+  String get mapOnline => '온라인 지도';
+
+  @override
+  String get mapRecheck => '오프라인 지도 다시 찾기';
+
+  @override
+  String get mapFollow => '내 위치 따라가기';
+
+  @override
+  String get mapLocating => '위치를 찾는 중…';
+
+  @override
+  String get mapLocationDenied => '위치 권한이 없습니다';
+
+  @override
+  String get mapLocationOff => '위치가 꺼져 있습니다';
+
+  @override
+  String get mapLocationUnsupported => '이 기기에서는 위치를 사용할 수 없습니다';
+
+  @override
+  String get mapKmh => 'km/h';
+
+  @override
+  String get mapStyleField => '오프라인 지도 스타일 URL';
+
+  @override
+  String get mapFallbackField => '온라인 지도 스타일 URL';
+
+  @override
+  String get driveGps => 'GPS';
+
+  @override
+  String get gpsPublishSwitch => '이 기기의 위치를 스택으로 보내기';
+
+  @override
+  String get driveStatus => '상태';
+
+  @override
+  String get driveOff => '꺼짐';
+
+  @override
+  String get driveConnecting => '연결 중…';
+
+  @override
+  String driveError(String error) {
+    return '오류: $error';
+  }
+
+  @override
+  String get driveUnsupported => '이 기기에서는 사용할 수 없습니다';
+
+  @override
+  String gpsPublishSending(int count, String topic) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$topic(으)로 위치 $count개를 보냈습니다');
+    return '$_temp0';
+  }
+
+  @override
+  String get driveDeviceField => '스택의 기기 이름';
+
+  @override
+  String get mqttPortField => 'MQTT 포트';
+
+  @override
+  String get mqttUserField => 'MQTT 사용자';
+
+  @override
+  String get mqttPasswordField => 'MQTT 비밀번호';
+
+  @override
+  String get driveObd => 'OBD-II';
+
+  @override
+  String get obdRelaySwitch => '차량의 OBD-II 어댑터를 스택으로 중계';
+
+  @override
+  String get obdAdapterField => 'OBD-II 어댑터';
+
+  @override
+  String get obdAdapterNone => '선택 안 됨';
+
+  @override
+  String get obdPick => '선택';
+
+  @override
+  String get obdPickTitle => '어댑터 선택';
+
+  @override
+  String get obdNonePaired => '페어링된 기기가 없습니다. 먼저 Android의 블루투스 설정에서 어댑터를 페어링하세요. PIN은 보통 1234 또는 0000입니다.';
+
+  @override
+  String get obdNoBluetooth => '이 기기에는 블루투스가 없습니다';
+
+  @override
+  String get obdBluetoothDenied => '어댑터를 선택하려면 ‘근처 기기’ 권한을 허용하세요';
+
+  @override
+  String get obdBluetoothOff => '먼저 블루투스를 켜세요';
+
+  @override
+  String get obdAdapterAddressField => '어댑터 주소(블루투스 또는 host:port)';
+
+  @override
+  String get obdRelayPortField => '중계 포트';
+
+  @override
+  String get obdRelayUnset => '먼저 어댑터를 선택하세요';
+
+  @override
+  String obdRelayConnecting(String adapter) {
+    return '$adapter에 연결 중…';
+  }
+
+  @override
+  String obdRelayWaiting(String adapter, String port) {
+    return '$adapter에 연결됨. 포트 $port에서 스택을 기다리는 중';
+  }
+
+  @override
+  String obdRelayRelaying(String adapter, String reader) {
+    return '$adapter을(를) $reader(으)로 중계 중';
+  }
+
+  @override
+  String obdRelayBytes(int up, int down) {
+    final intl.NumberFormat upNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String upString = upNumberFormat.format(up);
+    final intl.NumberFormat downNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final String downString = downNumberFormat.format(down);
+
+    return '어댑터로 $upString바이트, 어댑터에서 $downString바이트';
+  }
+
+  @override
+  String obdRelayTurnedAway(String address) {
+    return '$address 거부됨: 이 기기와 그 컨테이너만 연결할 수 있습니다';
+  }
+
+  @override
+  String get dashcam => '블랙박스';
+
+  @override
+  String get dashcamAutoStart => '앱을 열면 녹화 시작';
+
+  @override
+  String get dashcamSegmentField => '클립 길이';
+
+  @override
+  String dashcamMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count분');
+    return '$_temp0';
+  }
+
+  @override
+  String get dashcamStorageField => '최근 클립용 공간';
+
+  @override
+  String get dashcamStorageHelp => '이 크기를 넘으면 가장 오래된 최근 클립부터 삭제됩니다. 저장한 클립은 유지됩니다.';
+
+  @override
+  String get dashcamLockField => '충격 시 클립 저장';
+
+  @override
+  String get dashcamLockHelp => '이 정도 세기의 급제동이나 충격이 있으면 녹화 중인 클립을 저장합니다';
+
+  @override
+  String get dashcamLockNever => '안 함';
+
+  @override
+  String get dashcamClips => '블랙박스 클립';
+
+  @override
+  String get dashcamHasCamera => '블랙박스가 녹화 중입니다. 이 기기는 한 번에 카메라 하나만 열 수 있습니다.';
+
+  @override
+  String get dashcamPause => '블랙박스 일시중지';
+
+  @override
+  String get dashcamPausedForCabin => '실내 카메라를 보는 동안 블랙박스가 일시중지됩니다';
+
+  @override
+  String get dashcamPaused => '블랙박스 일시중지됨';
+
+  @override
+  String get dashcamResume => '녹화 재개';
+
+  @override
+  String get dashcamRecord => '블랙박스 시작';
+
+  @override
+  String get dashcamStop => '블랙박스 중지';
+
+  @override
+  String get dashcamSave => '클립 저장';
+
+  @override
+  String get dashcamSaved => '클립 저장됨';
+
+  @override
+  String get dashcamSavedImpact => '충격 감지: 클립 저장됨';
+
+  @override
+  String get dashcamStarting => '블랙박스 시작 중…';
+
+  @override
+  String get dashcamNoCamera => '이 기기에는 블랙박스용 후면 카메라가 없습니다';
+
+  @override
+  String get dashcamPermission => '블랙박스가 카메라를 사용하려면 권한이 필요합니다';
+
+  @override
+  String get dashcamNoStorage => '블랙박스 클립을 저장할 공간이 없습니다';
+
+  @override
+  String get dashcamStorageFull => '녹화할 여유 공간이 부족합니다';
+
+  @override
+  String get dashcamClipsEmpty => '아직 클립이 없습니다';
+
+  @override
+  String get dashcamClipsWhere => '클립은 이 기기의 앱 폴더에 보관됩니다. 앱을 삭제하면 함께 삭제됩니다.';
+
+  @override
+  String get dashcamClipsSaved => '저장됨';
+
+  @override
+  String get dashcamClipsRecent => '최근';
+
+  @override
+  String dashcamClipsStorage(String recent, String cap, String saved) {
+    return '최근 클립: $recent / $cap. 저장됨: $saved.';
+  }
+
+  @override
+  String dashcamClipsFree(String free) {
+    return '이 기기의 여유 공간: $free';
+  }
+
+  @override
+  String get dashcamClipTrack => 'GPS 경로';
+
+  @override
+  String get dashcamClipRecording => '녹화 중';
+
+  @override
+  String get dashcamClipKeep => '이 클립 보관';
+
+  @override
+  String get dashcamClipUnkeep => '최근으로 되돌리기';
+
+  @override
+  String get dashcamClipDeleteTitle => '이 클립을 삭제할까요?';
+
+  @override
+  String get dashcamClipDeleteBody => '동영상과 GPS 경로가 이 기기에서 삭제됩니다.';
 }

@@ -28,6 +28,7 @@ import 'core/settings.dart';
 import 'core/theme.dart';
 import 'demo/demo.dart';
 import 'demo/demo_client.dart';
+import 'drive/drive_scope.dart';
 import 'l10n/l10n.dart';
 import 'pages/kiosk_dialogs.dart';
 import 'pages/login_page.dart';
@@ -39,6 +40,7 @@ import 'tabs/clients_tab.dart';
 import 'tabs/edge_tab.dart';
 import 'tabs/feed_tab.dart';
 import 'tabs/grafana_tab.dart';
+import 'tabs/map_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/services_tab.dart';
 import 'tabs/video_tab.dart';
@@ -59,7 +61,7 @@ Future<void> main() async {
         ..registerFontLicenses();
       // Lowest priority first: brand < config.json (web) < what the user saved.
       final runtime = kIsWeb ? await loadRuntimeDefaults(Uri.base) : const <String, Object>{};
-      final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime});
+      final settings = await AppSettings.load(defaults: {...brand.defaults, ...runtime}, brandTabs: brand.tabs);
       final session = credentials.session = await Session.load(settings);
       // Both live as long as the app.
       ProjectWatcher(settings);
@@ -67,12 +69,16 @@ Future<void> main() async {
       ViewSettingsWatcher(settings);
       BannerWatcher(settings);
       VisionWatcher(settings);
+      final drive = DriveServices(settings);
       runApp(
         BrandScope(
           brand: brand,
           child: SettingsScope(
             settings: settings,
-            child: SessionScope(session: session, child: const DashboardApp()),
+            child: DriveScope(
+              services: drive,
+              child: SessionScope(session: session, child: const DashboardApp()),
+            ),
           ),
         ),
       );
@@ -264,7 +270,8 @@ enum Screen {
   agent,
   grafana,
   video,
-  feed;
+  feed,
+  map;
 
   static Screen of(DashTab t) => values.byName(t.name);
 
@@ -280,6 +287,7 @@ final _dests = {
   Screen.grafana: _Dest((l) => l.navGrafana, Icons.show_chart_outlined, Icons.show_chart),
   Screen.video: _Dest((l) => l.navVideo, Icons.videocam_outlined, Icons.videocam),
   Screen.feed: _Dest((l) => l.navFeed, Icons.dynamic_feed_outlined, Icons.dynamic_feed),
+  Screen.map: _Dest((l) => l.navMap, Icons.map_outlined, Icons.map),
 };
 
 /// Screens for [role]: Home, then the brand tabs in the admin's
@@ -534,6 +542,7 @@ class _HomeShellState extends State<HomeShell> {
     Screen.grafana => const GrafanaTab(),
     Screen.video => VideoTab(active: active, live: _live, recorded: _recorded, focus: _videoFocus),
     Screen.feed => FeedTab(active: active, moments: _moments),
+    Screen.map => MapTab(active: active),
   };
 
   @override

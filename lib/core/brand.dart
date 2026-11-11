@@ -19,7 +19,11 @@ enum DashTab {
 
   /// The project's live events and alerts (`.p4n4.json` `dashboard.feed`).
   /// Opt-in: a brand without a `tabs` list doesn't get it.
-  feed;
+  feed,
+
+  /// Where this device is, and the trip so far, on the project's offline map
+  /// or an online one (lib/tabs/map_tab.dart). Opt-in, like [feed].
+  map;
 
   /// The tabs a brand gets when its brand.json lists none.
   static const defaults = [agent, grafana, video, edge, services];
