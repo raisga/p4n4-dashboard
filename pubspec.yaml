@@ -34,7 +34,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  camera: ^0.12.1
+  camera: ^0.12.2
   # The dashcam records straight into its folder (CameraPlatform.startVideoCapturing).
   camera_platform_interface: ^2.14.0
   flutter_markdown_plus: ^1.0.12
